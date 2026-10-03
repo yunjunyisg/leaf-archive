@@ -1,4 +1,5 @@
 import html from '../public/index.html';
+import welcomePlantData from '../public/welcome-plant.png';
 import css from '../public/style.css';
 import js from '../public/app.js';
 import assets from '../public/assets.json';
@@ -24,6 +25,7 @@ function valid(p){
 }
 export default {async fetch(request,env){const u=new URL(request.url);try{
 if(u.pathname==='/')return new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
+if(u.pathname==='/welcome-plant.png')return new Response(Uint8Array.from(atob(welcomePlantData.split(',')[1]),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/png','Cache-Control':'public, max-age=86400'}});
 if(u.pathname==='/style.css')return new Response(css,{headers:{'Content-Type':'text/css'}});
 if(u.pathname==='/app.js')return new Response(js,{headers:{'Content-Type':'text/javascript'}});
 if(assets[u.pathname]){const a=assets[u.pathname];return new Response(Uint8Array.from(atob(a),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=86400'}})}

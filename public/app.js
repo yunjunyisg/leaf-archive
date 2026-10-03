@@ -1,3 +1,10 @@
+(()=>{
+ const splash=document.querySelector('#welcomeSplash');if(!splash?.showModal)return;
+ const button=document.querySelector('#enterGarden'),plant=document.querySelector('#welcomePlant');let closing=false,autoTimer,fallbackTimer;
+ function dismiss(){if(closing)return;closing=true;clearTimeout(autoTimer);clearTimeout(fallbackTimer);splash.classList.add('welcome-leaving');const finish=()=>{splash.close();document.querySelector('#search')?.focus({preventScroll:true})};if(matchMedia('(prefers-reduced-motion: reduce)').matches)finish();else setTimeout(finish,320)}
+ function schedule(){if(!autoTimer&&!closing)autoTimer=setTimeout(dismiss,1600)}
+ splash.showModal();button.onclick=dismiss;splash.addEventListener('cancel',event=>{event.preventDefault();dismiss()});plant.addEventListener('load',schedule,{once:true});plant.addEventListener('error',dismiss,{once:true});if(plant.complete){if(plant.naturalWidth)schedule();else dismiss()}fallbackTimer=setTimeout(dismiss,4500);
+})();
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today=()=>new Date().toLocaleDateString('en-CA');
