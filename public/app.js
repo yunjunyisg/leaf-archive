@@ -34,7 +34,12 @@
  {src:'/welcome/plant-32.webp',alt:'银白斑纹与红色叶缘的尖叶捕虫堇手绘图标'},
  {src:'/welcome/plant-33.webp',alt:'深酒红尖叶与直立卷叶的捕虫堇手绘图标'},
  {src:'/welcome/plant-34.webp',alt:'酒红圆叶与黄绿中纹的茅膏菜手绘图标'},
- {src:'/welcome/plant-35.webp',alt:'银绿红背细长叶柄与露珠捕虫叶的茅膏菜手绘图标'}
+ {src:'/welcome/plant-35.webp',alt:'银绿红背细长叶柄与露珠捕虫叶的茅膏菜手绘图标'},
+ {src:'/welcome/plant-36.webp',alt:'银绿绒毛宽叶与橙红捕虫叶的茅膏菜手绘图标'},
+ {src:'/welcome/plant-37.webp',alt:'银粉长叶与鲜红露珠捕虫叶的茅膏菜手绘图标'},
+ {src:'/welcome/plant-38.webp',alt:'黄绿绒毛长叶与橙红捕虫叶的茅膏菜手绘图标'},
+ {src:'/welcome/plant-39.webp',alt:'深酒红圆叶与粉红内叶的茅膏菜手绘图标'},
+ {src:'/welcome/plant-40.webp',alt:'鲜绿纤细放射叶柄与金黄捕虫叶的茅膏菜手绘图标'}
  ];
  const chosen=welcomePlants[Math.floor(Math.random()*welcomePlants.length)];plant.alt=chosen.alt;plant.src=chosen.src;
  function dismiss(){if(closing)return;closing=true;clearTimeout(autoTimer);clearTimeout(fallbackTimer);splash.classList.add('welcome-leaving');const finish=()=>{splash.close();document.querySelector('#search')?.focus({preventScroll:true})};if(matchMedia('(prefers-reduced-motion: reduce)').matches)finish();else setTimeout(finish,320)}
