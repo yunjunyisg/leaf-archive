@@ -5,7 +5,23 @@ import assets from '../public/assets.json';
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 function owner(request){return request.headers.get('oai-authenticated-user-id')||null}
 const db=env=>{if(!env.DB)throw new Error('档案存储暂时不可用');return env.DB};
-function valid(p){if(!p||typeof p!=='object')throw new Error('无效的档案');const out={};const fields=['name','latin','number','sourceNumber','source','family','genus','description','origin','individualInfo','price','date','location','status','light','water','substrate','notes','lastWater','nextWater'];for(const f of fields){out[f]=String(p[f]??'').trim();if(out[f].length>10000)throw new Error('内容过长')}if(!out.name||!out.number)throw new Error('请填写中文名和收藏编号');if(out.price!==''&&(!Number.isFinite(Number(out.price))||Number(out.price)<0))throw new Error('价格应为非负数字');out.photos=Array.isArray(p.photos)?p.photos.filter(x=>typeof x==='string'&&/^\/(images\/[a-f0-9-]+|assets\/[A-Za-z0-9_]+\.jpg)$/.test(x)).slice(0,12):[];out.logs=Array.isArray(p.logs)?p.logs.filter(x=>typeof x?.text==='string'&&typeof x?.date==='string').map(x=>({date:x.date.slice(0,10),type:String(x.type||'观察').slice(0,20),text:x.text.slice(0,3000)})).slice(0,300):[];return out}
+const photoPath=x=>typeof x==='string'&&/^\/(images\/[a-f0-9-]+|assets\/[A-Za-z0-9_]+\.jpg)$/.test(x);
+const validDate=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&!Number.isNaN(Date.parse(x))&&new Date(x).toISOString().slice(0,10)===x;
+function valid(p){
+ if(!p||typeof p!=='object')throw new Error('无效的档案');const out={};
+ const fields=['name','latin','number','sourceNumber','source','family','genus','description','origin','individualInfo','price','date','location','status','light','water','substrate','notes','lastWater','nextWater'];
+ for(const f of fields){out[f]=String(p[f]??'').trim();if(out[f].length>10000)throw new Error('内容过长')}
+ if(!out.name||!out.number)throw new Error('请填写中文名和收藏编号');
+ if(out.price!==''&&(!Number.isFinite(Number(out.price))||Number(out.price)<0))throw new Error('价格应为非负数字');
+ out.photos=Array.isArray(p.photos)?p.photos.filter(photoPath).slice(0,12):[];
+ out.photoDates={};for(const url of out.photos){const date=p.photoDates?.[url];if(date){if(!validDate(date))throw new Error('照片日期无效');out.photoDates[url]=date}}
+ const logs=Array.isArray(p.logs)?p.logs:[];if(logs.length>300)throw new Error('每株植物最多保存 300 条生长记录');
+ out.logs=logs.filter(x=>typeof x?.text==='string'&&typeof x?.date==='string').map(x=>{
+  if(x.date&&!validDate(x.date))throw new Error('生长记录日期无效');
+  const photos=Array.isArray(x.photos)?x.photos.filter(photoPath).slice(0,6):[];
+  return {id:typeof x.id==='string'?x.id.slice(0,80):crypto.randomUUID(),date:x.date,type:String(x.type||'观察').slice(0,20),text:x.text.slice(0,3000),photos};
+ });return out;
+}
 export default {async fetch(request,env){const u=new URL(request.url);try{
 if(u.pathname==='/')return new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
 if(u.pathname==='/style.css')return new Response(css,{headers:{'Content-Type':'text/css'}});
@@ -20,4 +36,4 @@ if(u.pathname.startsWith('/api/plants/')&&['PUT','DELETE'].includes(request.meth
 if(u.pathname==='/api/images'&&request.method==='POST'){const f=await request.formData();const file=f.get('file');if(!file||!['image/jpeg','image/png','image/webp'].includes(file.type))return json({error:'请选择 JPG、PNG 或 WebP 图片'},400);if(file.size>8*1024*1024)return json({error:'每张图片请小于 8 MB'},400);if(!env.BUCKET)throw new Error('图片存储暂时不可用');const bytes=await file.arrayBuffer();const b=new Uint8Array(bytes);const magic=(file.type==='image/jpeg'&&b[0]===255&&b[1]===216)||(file.type==='image/png'&&b[0]===137&&b[1]===80&&b[2]===78&&b[3]===71)||(file.type==='image/webp'&&new TextDecoder().decode(b.slice(0,4))==='RIFF'&&new TextDecoder().decode(b.slice(8,12))==='WEBP');if(!magic)return json({error:'图片格式不匹配'},400);const id=crypto.randomUUID();await env.BUCKET.put(who+'/'+id,bytes,{httpMetadata:{contentType:file.type}});await db(env).prepare('INSERT INTO images (id,owner,mime) VALUES (?,?,?)').bind(id,who,file.type).run();return json({url:'/images/'+id})}
 if(u.pathname.startsWith('/images/')&&request.method==='GET'){const id=u.pathname.split('/').pop();const row=await db(env).prepare('SELECT mime FROM images WHERE id = ? AND owner = ?').bind(id,who).first();if(!row)return new Response('Not found',{status:404});const object=await env.BUCKET.get(who+'/'+id);if(!object)return new Response('Not found',{status:404});return new Response(object.body,{headers:{'Content-Type':row.mime,'Cache-Control':'private, max-age=3600','X-Content-Type-Options':'nosniff'}})}
 return json({error:'未找到此操作'},404);
-}catch(e){console.error(e);const duplicate=String(e).includes('UNIQUE');return json({error:duplicate?'收藏编号已存在，请使用其他编号。':e.message==='档案存储暂时不可用'||e.message==='图片存储暂时不可用'?e.message:'操作未完成，请检查填写内容后重试。'},duplicate?409:500)}}};
+}catch(e){console.error(e);if(['照片日期无效','生长记录日期无效','每株植物最多保存 300 条生长记录'].includes(e.message))return json({error:e.message},400);const duplicate=String(e).includes('UNIQUE');return json({error:duplicate?'收藏编号已存在，请使用其他编号。':e.message==='档案存储暂时不可用'||e.message==='图片存储暂时不可用'?e.message:'操作未完成，请检查填写内容后重试。'},duplicate?409:500)}}};
