@@ -29,6 +29,7 @@ npm run dev
 
 ## 目录
 
+- [`plant-icons/`](./plant-icons/)：独立植物标识图库，含全部 16 张透明开场图及预览
 - `public/`：页面、样式、交互脚本、示例照片与来源信息
 - `worker/index.js`：页面及 API，访问 D1 和 R2
 - `db/schema.ts`、`drizzle/`：数据库定义与迁移
