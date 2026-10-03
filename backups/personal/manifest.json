@@ -1,0 +1,12 @@
+{
+  "records": 1,
+  "photos": [
+    {
+      "path": "photos/872432df-f0d3-4cfe-8426-e1fc4762db02.jpg",
+      "originalId": "872432df-f0d3-4cfe-8426-e1fc4762db02",
+      "contentType": "image/jpeg",
+      "bytes": 4877415,
+      "sha256": "933f01a37c871deac3278858f0a54e4df85e3ce5c04662dce8c3e1ecfdfe7359"
+    }
+  ]
+}

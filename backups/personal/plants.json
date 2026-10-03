@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "exportedAt": "2026-10-03T06:14:25.088Z",
+  "plants": [
+    {
+      "id": "66f4c630-5497-447a-afe7-4b8d457e4314",
+      "createdAt": "2026-10-03T05:25:24.627Z",
+      "name": "超级宽叶银匙茅膏菜",
+      "latin": "drosera aff. ordensis",
+      "number": "D-OR-VWL-A",
+      "sourceNumber": "",
+      "source": "",
+      "family": "",
+      "genus": "drosera",
+      "description": "",
+      "origin": "",
+      "individualInfo": "",
+      "price": "",
+      "date": "2026-10-03",
+      "location": "",
+      "status": "生长中",
+      "light": "",
+      "water": "",
+      "substrate": "",
+      "notes": "",
+      "lastWater": "",
+      "nextWater": "",
+      "photos": [
+        "photos/872432df-f0d3-4cfe-8426-e1fc4762db02.jpg"
+      ],
+      "logs": [],
+      "originalPhotos": [
+        "/images/872432df-f0d3-4cfe-8426-e1fc4762db02"
+      ]
+    }
+  ]
+}
