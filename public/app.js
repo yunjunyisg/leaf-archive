@@ -7,7 +7,12 @@
  {src:'/welcome/plant-2.webp',alt:'银白细叶与密集红色捕虫叶的卡通茅膏菜'},
  {src:'/welcome/plant-3.webp',alt:'绿色匙形叶与橙红捕虫叶的卡通茅膏菜'},
  {src:'/welcome/plant-4.webp',alt:'细长直立叶柄与浅绿捕虫叶的卡通茅膏菜'},
- {src:'/welcome/plant-5.webp',alt:'卷曲银白绒毛叶与粉红捕虫叶的卡通茅膏菜'}
+ {src:'/welcome/plant-5.webp',alt:'卷曲银白绒毛叶与粉红捕虫叶的卡通茅膏菜'},
+ {src:'/welcome/plant-6.webp',alt:'银白绒毛细叶与橙红捕虫叶的卡通茅膏菜'},
+ {src:'/welcome/plant-7.webp',alt:'红绿细长叶柄与黄绿捕虫叶的卡通茅膏菜'},
+ {src:'/welcome/plant-8.webp',alt:'深红叶柄与卷曲鲜红捕虫叶的卡通茅膏菜'},
+ {src:'/welcome/plant-9.webp',alt:'三株银绿细叶与粉红触毛的卡通茅膏菜'},
+ {src:'/welcome/plant-10.webp',alt:'稀疏绿色带状叶与粉红捕虫叶的卡通茅膏菜'}
  ];
  const chosen=welcomePlants[Math.floor(Math.random()*welcomePlants.length)];plant.alt=chosen.alt;plant.src=chosen.src;
  function dismiss(){if(closing)return;closing=true;clearTimeout(autoTimer);clearTimeout(fallbackTimer);splash.classList.add('welcome-leaving');const finish=()=>{splash.close();document.querySelector('#search')?.focus({preventScroll:true})};if(matchMedia('(prefers-reduced-motion: reduce)').matches)finish();else setTimeout(finish,320)}

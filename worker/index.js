@@ -5,10 +5,15 @@ import welcomePlant2 from '../public/welcome/plant-2.webp';
 import welcomePlant3 from '../public/welcome/plant-3.webp';
 import welcomePlant4 from '../public/welcome/plant-4.webp';
 import welcomePlant5 from '../public/welcome/plant-5.webp';
+import welcomePlant6 from '../public/welcome/plant-6.webp';
+import welcomePlant7 from '../public/welcome/plant-7.webp';
+import welcomePlant8 from '../public/welcome/plant-8.webp';
+import welcomePlant9 from '../public/welcome/plant-9.webp';
+import welcomePlant10 from '../public/welcome/plant-10.webp';
 import css from '../public/style.css';
 import js from '../public/app.js';
 import assets from '../public/assets.json';
-const welcomeIcons={'/welcome/plant-0.webp':welcomePlant0,'/welcome/plant-1.webp':welcomePlant1,'/welcome/plant-2.webp':welcomePlant2,'/welcome/plant-3.webp':welcomePlant3,'/welcome/plant-4.webp':welcomePlant4,'/welcome/plant-5.webp':welcomePlant5};
+const welcomeIcons={'/welcome/plant-0.webp':welcomePlant0,'/welcome/plant-1.webp':welcomePlant1,'/welcome/plant-2.webp':welcomePlant2,'/welcome/plant-3.webp':welcomePlant3,'/welcome/plant-4.webp':welcomePlant4,'/welcome/plant-5.webp':welcomePlant5,'/welcome/plant-6.webp':welcomePlant6,'/welcome/plant-7.webp':welcomePlant7,'/welcome/plant-8.webp':welcomePlant8,'/welcome/plant-9.webp':welcomePlant9,'/welcome/plant-10.webp':welcomePlant10};
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 function owner(request){return request.headers.get('oai-authenticated-user-id')||null}
 const db=env=>{if(!env.DB)throw new Error('档案存储暂时不可用');return env.DB};
