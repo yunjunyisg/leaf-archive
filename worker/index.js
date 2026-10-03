@@ -94,9 +94,25 @@ if(assets[u.pathname]){const a=assets[u.pathname];return new Response(Uint8Array
 if(!u.pathname.startsWith('/api/')&&!u.pathname.startsWith('/images/'))return new Response('Not found',{status:404});
 const who=owner(request);if(!who)return json({error:'请先登录，再访问你的植物档案。'},401);
 if(request.method!=='GET'){const origin=request.headers.get('Origin');if(origin&&origin!==u.origin)return json({error:'请求来源无效'},403)}
-if(u.pathname==='/api/plants'&&request.method==='GET'){const r=await db(env).prepare('SELECT id, data FROM plants WHERE owner = ? ORDER BY created DESC').bind(who).all();return json(r.results.map(x=>({id:x.id,...JSON.parse(x.data)})))}
-if(u.pathname==='/api/plants'&&request.method==='POST'){const p=valid(await request.json());const id=crypto.randomUUID();await db(env).prepare('INSERT INTO plants (id,owner,number,data,created) VALUES (?,?,?,?,?)').bind(id,who,p.number,JSON.stringify(p),new Date().toISOString()).run();return json({id,...p},201)}
-if(u.pathname.startsWith('/api/plants/')&&['PUT','DELETE'].includes(request.method)){const id=u.pathname.split('/').pop();const row=await db(env).prepare('SELECT id FROM plants WHERE id = ? AND owner = ?').bind(id,who).first();if(!row)return json({error:'档案不存在'},404);if(request.method==='DELETE'){await db(env).prepare('DELETE FROM plants WHERE id = ? AND owner = ?').bind(id,who).run();return json({ok:true})}const p=valid(await request.json());await db(env).prepare('UPDATE plants SET number = ?, data = ? WHERE id = ? AND owner = ?').bind(p.number,JSON.stringify(p),id,who).run();return json({id,...p})}
+if(u.pathname==='/api/plants'&&request.method==='GET'){const r=await db(env).prepare('SELECT id, data FROM plants WHERE owner = ? ORDER BY created DESC').bind(who).all();return json(r.results.map(x=>{const p=JSON.parse(x.data);return {id:x.id,...p,_revision:p._revision||'legacy'}}))}
+if(u.pathname==='/api/plants'&&request.method==='POST'){const p={...valid(await request.json()),_revision:crypto.randomUUID()};const id=crypto.randomUUID();await db(env).prepare('INSERT INTO plants (id,owner,number,data,created) VALUES (?,?,?,?,?)').bind(id,who,p.number,JSON.stringify(p),new Date().toISOString()).run();return json({id,...p},201)}
+if(u.pathname.startsWith('/api/plants/')&&['PUT','DELETE'].includes(request.method)){
+ const id=u.pathname.split('/').pop();const row=await db(env).prepare('SELECT id, data FROM plants WHERE id = ? AND owner = ?').bind(id,who).first();
+ if(!row)return json({error:'档案不存在，可能已在其他窗口删除。'},404);
+ const current=JSON.parse(row.data),revision=current._revision||'legacy';
+ const expected=request.headers.get('If-Match');
+ if(!expected)return json({error:'请刷新页面后重试，以读取最新的云端档案。'},428);
+ if(expected!=='"'+revision+'"')return json({error:'档案已在其他窗口或设备修改。当前输入已保留，请复制需要的内容，再关闭并重新打开档案。'},409);
+ if(request.method==='DELETE'){
+  const result=await db(env).prepare('DELETE FROM plants WHERE id = ? AND owner = ? AND data = ?').bind(id,who,row.data).run();
+  if(!result.meta?.changes)return json({error:'档案刚刚在其他窗口更新，请重新打开后再操作。'},409);
+  return json({ok:true});
+ }
+ const p={...valid(await request.json()),_revision:crypto.randomUUID()};
+ const result=await db(env).prepare('UPDATE plants SET number = ?, data = ? WHERE id = ? AND owner = ? AND data = ?').bind(p.number,JSON.stringify(p),id,who,row.data).run();
+ if(!result.meta?.changes)return json({error:'档案刚刚在其他窗口更新。当前输入已保留，请复制需要的内容，再重新打开档案。'},409);
+ return json({id,...p});
+}
 if(u.pathname==='/api/images'&&request.method==='POST'){const f=await request.formData();const file=f.get('file');if(!file||!['image/jpeg','image/png','image/webp'].includes(file.type))return json({error:'请选择 JPG、PNG 或 WebP 图片'},400);if(file.size>8*1024*1024)return json({error:'每张图片请小于 8 MB'},400);if(!env.BUCKET)throw new Error('图片存储暂时不可用');const bytes=await file.arrayBuffer();const b=new Uint8Array(bytes);const magic=(file.type==='image/jpeg'&&b[0]===255&&b[1]===216)||(file.type==='image/png'&&b[0]===137&&b[1]===80&&b[2]===78&&b[3]===71)||(file.type==='image/webp'&&new TextDecoder().decode(b.slice(0,4))==='RIFF'&&new TextDecoder().decode(b.slice(8,12))==='WEBP');if(!magic)return json({error:'图片格式不匹配'},400);const id=crypto.randomUUID();await env.BUCKET.put(who+'/'+id,bytes,{httpMetadata:{contentType:file.type}});await db(env).prepare('INSERT INTO images (id,owner,mime) VALUES (?,?,?)').bind(id,who,file.type).run();return json({url:'/images/'+id})}
 if(u.pathname.startsWith('/images/')&&request.method==='GET'){const id=u.pathname.split('/').pop();const row=await db(env).prepare('SELECT mime FROM images WHERE id = ? AND owner = ?').bind(id,who).first();if(!row)return new Response('Not found',{status:404});const object=await env.BUCKET.get(who+'/'+id);if(!object)return new Response('Not found',{status:404});return new Response(object.body,{headers:{'Content-Type':row.mime,'Cache-Control':'private, max-age=3600','X-Content-Type-Options':'nosniff'}})}
 return json({error:'未找到此操作'},404);
