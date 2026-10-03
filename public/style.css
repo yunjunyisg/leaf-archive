@@ -14,3 +14,5 @@
 @keyframes welcome-image-fade{from{opacity:0}to{opacity:1}}
 @keyframes welcome-text-rise{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.welcome-ready .welcome-content>img,.welcome-ready .welcome-wordmark,.welcome-ready .welcome-content button{animation:none;opacity:1;transform:none}}
+
+.install-app{margin:22px 9px 0;padding:12px 8px;border:1px solid #cad4bf;border-radius:8px;font-size:14px;text-align:left}.install-app:hover{background:#dfe7d4}.install-dialog{width:min(440px,calc(100% - 32px));padding:24px;border:0;border-radius:14px;color:var(--ink);background:var(--paper)}.install-dialog p{font-size:16px;line-height:1.65}.install-icon{display:block;width:112px;height:112px;margin:12px auto}.install-dialog .install-secondary{font-size:14px;color:#687560}.shortcut-download{display:inline-block;text-decoration:none}.install-app[hidden],#installNow[hidden]{display:none}

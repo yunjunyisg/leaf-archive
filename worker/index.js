@@ -51,6 +51,16 @@ import css from '../public/style.css';
 import js from '../public/app.js';
 import assets from '../public/assets.json';
 const welcomeIcons={'/welcome/plant-0.webp':welcomePlant0,'/welcome/plant-1.webp':welcomePlant1,'/welcome/plant-2.webp':welcomePlant2,'/welcome/plant-3.webp':welcomePlant3,'/welcome/plant-4.webp':welcomePlant4,'/welcome/plant-5.webp':welcomePlant5,'/welcome/plant-6.webp':welcomePlant6,'/welcome/plant-8.webp':welcomePlant8,'/welcome/plant-9.webp':welcomePlant9,'/welcome/plant-11.webp':welcomePlant11,'/welcome/plant-13.webp':welcomePlant13,'/welcome/plant-14.webp':welcomePlant14,'/welcome/plant-15.webp':welcomePlant15,'/welcome/plant-16.webp':welcomePlant16,'/welcome/plant-17.webp':welcomePlant17,'/welcome/plant-18.webp':welcomePlant18,'/welcome/plant-19.webp':welcomePlant19,'/welcome/plant-20.webp':welcomePlant20,'/welcome/plant-21.webp':welcomePlant21,'/welcome/plant-22.webp':welcomePlant22,'/welcome/plant-23.webp':welcomePlant23,'/welcome/plant-24.webp':welcomePlant24,'/welcome/plant-25.webp':welcomePlant25,'/welcome/plant-26.webp':welcomePlant26,'/welcome/plant-27.webp':welcomePlant27,'/welcome/plant-28.webp':welcomePlant28,'/welcome/plant-29.webp':welcomePlant29,'/welcome/plant-30.webp':welcomePlant30,'/welcome/plant-31.webp':welcomePlant31,'/welcome/plant-32.webp':welcomePlant32,'/welcome/plant-33.webp':welcomePlant33,'/welcome/plant-34.webp':welcomePlant34,'/welcome/plant-35.webp':welcomePlant35,'/welcome/plant-36.webp':welcomePlant36,'/welcome/plant-37.webp':welcomePlant37,'/welcome/plant-38.webp':welcomePlant38,'/welcome/plant-39.webp':welcomePlant39,'/welcome/plant-40.webp':welcomePlant40,'/welcome/plant-41.webp':welcomePlant41,'/welcome/plant-42.webp':welcomePlant42,'/welcome/plant-43.webp':welcomePlant43,'/welcome/plant-44.webp':welcomePlant44,'/welcome/plant-45.webp':welcomePlant45,'/welcome/plant-46.webp':welcomePlant46,'/welcome/plant-47.webp':welcomePlant47,'/welcome/plant-48.webp':welcomePlant48,'/welcome/plant-49.webp':welcomePlant49,'/welcome/plant-50.webp':welcomePlant50};
+import manifest from '../public/manifest.json';
+import serviceWorker from '../public/sw.js';
+import offline from '../public/offline.html';
+import appIcon192 from '../public/icons/icon-192.png';
+import appIcon512 from '../public/icons/icon-512.png';
+import appIconMaskable from '../public/icons/icon-maskable-512.png';
+import appIconApple from '../public/icons/apple-touch-icon.png';
+import appIconIco from '../public/icons/plant.ico';
+import shortcuts from '../public/downloads/leaf-archive-shortcuts.zip';
+const desktopAssets={'/icons/icon-192.png':[appIcon192,'image/png'],'/icons/icon-512.png':[appIcon512,'image/png'],'/icons/icon-maskable-512.png':[appIconMaskable,'image/png'],'/icons/apple-touch-icon.png':[appIconApple,'image/png'],'/icons/plant.ico':[appIconIco,'image/x-icon'],'/downloads/leaf-archive-shortcuts.zip':[shortcuts,'application/zip']};
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 function owner(request){return request.headers.get('oai-authenticated-user-id')||null}
 const db=env=>{if(!env.DB)throw new Error('档案存储暂时不可用');return env.DB};
@@ -72,6 +82,10 @@ function valid(p){
  });return out;
 }
 export default {async fetch(request,env){const u=new URL(request.url);try{
+if(u.pathname==='/manifest.webmanifest')return new Response(JSON.stringify(manifest),{headers:{'Content-Type':'application/manifest+json; charset=utf-8','Cache-Control':'no-cache'}});
+if(u.pathname==='/sw.js')return new Response(serviceWorker,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-cache','Service-Worker-Allowed':'/'}});
+if(u.pathname==='/offline.html')return new Response(offline,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'}});
+if(desktopAssets[u.pathname]){const [data,mime]=desktopAssets[u.pathname];const headers={'Content-Type':mime,'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'};if(mime==='application/zip')headers['Content-Disposition']='attachment; filename="leaf-archive-shortcuts.zip"';return new Response(Uint8Array.from(atob(data.split(',')[1]),c=>c.charCodeAt(0)),{headers})}
 if(u.pathname==='/')return new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
 if(welcomeIcons[u.pathname])return new Response(Uint8Array.from(atob(welcomeIcons[u.pathname].split(',')[1]),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/webp','Cache-Control':'public, max-age=86400'}});
 if(u.pathname==='/style.css')return new Response(css,{headers:{'Content-Type':'text/css'}});
