@@ -1,0 +1,9 @@
+node_modules/
+.wrangler/
+dist/
+.sites-runtime/
+*.tar.gz
+.env
+.env.*
+!.env.example
+*.zip
