@@ -1,9 +1,18 @@
 (()=>{
  const splash=document.querySelector('#welcomeSplash');if(!splash?.showModal)return;
  const button=document.querySelector('#enterGarden'),plant=document.querySelector('#welcomePlant');let closing=false,autoTimer,fallbackTimer;
+ const welcomePlants=[
+ {src:'/welcome/plant-0.webp',alt:'白色绒毛宽叶与鲜红捕虫叶的卡通茅膏菜'},
+ {src:'/welcome/plant-1.webp',alt:'浅绿绒毛叶与黄绿色捕虫叶的卡通茅膏菜'},
+ {src:'/welcome/plant-2.webp',alt:'银白细叶与密集红色捕虫叶的卡通茅膏菜'},
+ {src:'/welcome/plant-3.webp',alt:'绿色匙形叶与橙红捕虫叶的卡通茅膏菜'},
+ {src:'/welcome/plant-4.webp',alt:'细长直立叶柄与浅绿捕虫叶的卡通茅膏菜'},
+ {src:'/welcome/plant-5.webp',alt:'卷曲银白绒毛叶与粉红捕虫叶的卡通茅膏菜'}
+ ];
+ const chosen=welcomePlants[Math.floor(Math.random()*welcomePlants.length)];plant.alt=chosen.alt;plant.src=chosen.src;
  function dismiss(){if(closing)return;closing=true;clearTimeout(autoTimer);clearTimeout(fallbackTimer);splash.classList.add('welcome-leaving');const finish=()=>{splash.close();document.querySelector('#search')?.focus({preventScroll:true})};if(matchMedia('(prefers-reduced-motion: reduce)').matches)finish();else setTimeout(finish,320)}
  function schedule(){if(!autoTimer&&!closing)autoTimer=setTimeout(dismiss,1600)}
- splash.showModal();button.onclick=dismiss;splash.addEventListener('cancel',event=>{event.preventDefault();dismiss()});plant.addEventListener('load',schedule,{once:true});plant.addEventListener('error',dismiss,{once:true});if(plant.complete){if(plant.naturalWidth)schedule();else dismiss()}fallbackTimer=setTimeout(dismiss,4500);
+ splash.showModal();button.onclick=dismiss;splash.addEventListener('cancel',event=>{event.preventDefault();dismiss()});plant.addEventListener('load',schedule,{once:true});plant.addEventListener('error',()=>{if(plant.getAttribute('src')!=='/welcome/plant-0.webp'){plant.src='/welcome/plant-0.webp';plant.alt=welcomePlants[0].alt}else dismiss()},{once:false});if(plant.complete){if(plant.naturalWidth)schedule();else dismiss()}fallbackTimer=setTimeout(dismiss,4500);
 })();
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

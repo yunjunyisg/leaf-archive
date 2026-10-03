@@ -1,8 +1,14 @@
 import html from '../public/index.html';
-import welcomePlantData from '../public/welcome-plant.png';
+import welcomePlant0 from '../public/welcome/plant-0.webp';
+import welcomePlant1 from '../public/welcome/plant-1.webp';
+import welcomePlant2 from '../public/welcome/plant-2.webp';
+import welcomePlant3 from '../public/welcome/plant-3.webp';
+import welcomePlant4 from '../public/welcome/plant-4.webp';
+import welcomePlant5 from '../public/welcome/plant-5.webp';
 import css from '../public/style.css';
 import js from '../public/app.js';
 import assets from '../public/assets.json';
+const welcomeIcons={'/welcome/plant-0.webp':welcomePlant0,'/welcome/plant-1.webp':welcomePlant1,'/welcome/plant-2.webp':welcomePlant2,'/welcome/plant-3.webp':welcomePlant3,'/welcome/plant-4.webp':welcomePlant4,'/welcome/plant-5.webp':welcomePlant5};
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 function owner(request){return request.headers.get('oai-authenticated-user-id')||null}
 const db=env=>{if(!env.DB)throw new Error('档案存储暂时不可用');return env.DB};
@@ -25,7 +31,7 @@ function valid(p){
 }
 export default {async fetch(request,env){const u=new URL(request.url);try{
 if(u.pathname==='/')return new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
-if(u.pathname==='/welcome-plant.png')return new Response(Uint8Array.from(atob(welcomePlantData.split(',')[1]),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/png','Cache-Control':'public, max-age=86400'}});
+if(welcomeIcons[u.pathname])return new Response(Uint8Array.from(atob(welcomeIcons[u.pathname].split(',')[1]),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/webp','Cache-Control':'public, max-age=86400'}});
 if(u.pathname==='/style.css')return new Response(css,{headers:{'Content-Type':'text/css'}});
 if(u.pathname==='/app.js')return new Response(js,{headers:{'Content-Type':'text/javascript'}});
 if(assets[u.pathname]){const a=assets[u.pathname];return new Response(Uint8Array.from(atob(a),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=86400'}})}
