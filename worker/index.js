@@ -12,10 +12,15 @@ import welcomePlant11 from '../public/welcome/plant-11.webp';
 import welcomePlant13 from '../public/welcome/plant-13.webp';
 import welcomePlant14 from '../public/welcome/plant-14.webp';
 import welcomePlant15 from '../public/welcome/plant-15.webp';
+import welcomePlant16 from '../public/welcome/plant-16.webp';
+import welcomePlant17 from '../public/welcome/plant-17.webp';
+import welcomePlant18 from '../public/welcome/plant-18.webp';
+import welcomePlant19 from '../public/welcome/plant-19.webp';
+import welcomePlant20 from '../public/welcome/plant-20.webp';
 import css from '../public/style.css';
 import js from '../public/app.js';
 import assets from '../public/assets.json';
-const welcomeIcons={'/welcome/plant-0.webp':welcomePlant0,'/welcome/plant-1.webp':welcomePlant1,'/welcome/plant-2.webp':welcomePlant2,'/welcome/plant-3.webp':welcomePlant3,'/welcome/plant-4.webp':welcomePlant4,'/welcome/plant-5.webp':welcomePlant5,'/welcome/plant-6.webp':welcomePlant6,'/welcome/plant-8.webp':welcomePlant8,'/welcome/plant-9.webp':welcomePlant9,'/welcome/plant-11.webp':welcomePlant11,'/welcome/plant-13.webp':welcomePlant13,'/welcome/plant-14.webp':welcomePlant14,'/welcome/plant-15.webp':welcomePlant15};
+const welcomeIcons={'/welcome/plant-0.webp':welcomePlant0,'/welcome/plant-1.webp':welcomePlant1,'/welcome/plant-2.webp':welcomePlant2,'/welcome/plant-3.webp':welcomePlant3,'/welcome/plant-4.webp':welcomePlant4,'/welcome/plant-5.webp':welcomePlant5,'/welcome/plant-6.webp':welcomePlant6,'/welcome/plant-8.webp':welcomePlant8,'/welcome/plant-9.webp':welcomePlant9,'/welcome/plant-11.webp':welcomePlant11,'/welcome/plant-13.webp':welcomePlant13,'/welcome/plant-14.webp':welcomePlant14,'/welcome/plant-15.webp':welcomePlant15,'/welcome/plant-16.webp':welcomePlant16,'/welcome/plant-17.webp':welcomePlant17,'/welcome/plant-18.webp':welcomePlant18,'/welcome/plant-19.webp':welcomePlant19,'/welcome/plant-20.webp':welcomePlant20};
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 function owner(request){return request.headers.get('oai-authenticated-user-id')||null}
 const db=env=>{if(!env.DB)throw new Error('档案存储暂时不可用');return env.DB};
