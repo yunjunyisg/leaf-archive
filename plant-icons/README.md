@@ -1,6 +1,6 @@
 # 植物标识图库
 
-集中存放「植藏」的 **18 张透明背景植物标识图**，用于网站开场随机展示。图标参考植物照片，以柔和手绘插画风格绘制；文件为 WebP。
+集中存放「植藏」的 **23 张透明背景植物标识图**，用于网站开场随机展示。图标参考植物照片，以柔和手绘插画风格绘制；文件为 WebP。
 
 ## 预览与下载
 
@@ -12,10 +12,11 @@
 | <img src="./plant-4.webp" width="160" alt="细长直立叶柄与浅绿捕虫叶"><br>[plant-4.webp](./plant-4.webp)<br>细长直立叶柄与浅绿捕虫叶 | <img src="./plant-5.webp" width="160" alt="卷曲银白绒毛叶与粉红捕虫叶"><br>[plant-5.webp](./plant-5.webp)<br>卷曲银白绒毛叶与粉红捕虫叶 | <img src="./plant-6.webp" width="160" alt="银白绒毛细叶与橙红捕虫叶"><br>[plant-6.webp](./plant-6.webp)<br>银白绒毛细叶与橙红捕虫叶 | <img src="./plant-8.webp" width="160" alt="深红叶柄与卷曲鲜红捕虫叶"><br>[plant-8.webp](./plant-8.webp)<br>深红叶柄与卷曲鲜红捕虫叶 |
 | <img src="./plant-9.webp" width="160" alt="三株银绿细叶与粉红触毛"><br>[plant-9.webp](./plant-9.webp)<br>三株银绿细叶与粉红触毛 | <img src="./plant-11.webp" width="160" alt="宽叶银白绒毛株"><br>[plant-11.webp](./plant-11.webp)<br>宽叶银白绒毛株 | <img src="./plant-13.webp" width="160" alt="带卷曲花梗株"><br>[plant-13.webp](./plant-13.webp)<br>带卷曲花梗株 | <img src="./plant-14.webp" width="160" alt="酒红色放射株"><br>[plant-14.webp](./plant-14.webp)<br>酒红色放射株 |
 | <img src="./plant-15.webp" width="160" alt="三株银绿组合"><br>[plant-15.webp](./plant-15.webp)<br>三株银绿组合 | <img src="./plant-16.webp" width="160" alt="三株红绿细叶与浅绿圆形捕虫叶"><br>[plant-16.webp](./plant-16.webp)<br>三株红绿细叶与浅绿圆形捕虫叶 | <img src="./plant-17.webp" width="160" alt="高挑绿叶柄与红黄圆形捕虫叶"><br>[plant-17.webp](./plant-17.webp)<br>高挑绿叶柄与红黄圆形捕虫叶 | <img src="./plant-18.webp" width="160" alt="银白绒毛放射细叶与弯曲红色捕虫叶"><br>[plant-18.webp](./plant-18.webp)<br>银白绒毛放射细叶与弯曲红色捕虫叶 |
-| <img src="./plant-19.webp" width="160" alt="紧凑直立银白宽叶与橙红捕虫叶"><br>[plant-19.webp](./plant-19.webp)<br>紧凑直立银白宽叶与橙红捕虫叶 | <img src="./plant-20.webp" width="160" alt="银白下垂细叶与橙黄捕虫叶"><br>[plant-20.webp](./plant-20.webp)<br>银白下垂细叶与橙黄捕虫叶 |  |  |
+| <img src="./plant-19.webp" width="160" alt="紧凑直立银白宽叶与橙红捕虫叶"><br>[plant-19.webp](./plant-19.webp)<br>紧凑直立银白宽叶与橙红捕虫叶 | <img src="./plant-20.webp" width="160" alt="银白下垂细叶与橙黄捕虫叶"><br>[plant-20.webp](./plant-20.webp)<br>银白下垂细叶与橙黄捕虫叶 | <img src="./plant-21.webp" width="160" alt="紧凑绿叶与密集红色圆形捕虫叶"><br>[plant-21.webp](./plant-21.webp)<br>紧凑绿叶与密集红色圆形捕虫叶 | <img src="./plant-22.webp" width="160" alt="双株高挑分枝茎与小型圆形捕虫叶"><br>[plant-22.webp](./plant-22.webp)<br>双株高挑分枝茎与小型圆形捕虫叶 |
+| <img src="./plant-23.webp" width="160" alt="鲜绿匙形叶与浅粉捕虫叶"><br>[plant-23.webp](./plant-23.webp)<br>鲜绿匙形叶与浅粉捕虫叶 | <img src="./plant-24.webp" width="160" alt="银绿放射细叶与卷曲深红捕虫叶"><br>[plant-24.webp](./plant-24.webp)<br>银绿放射细叶与卷曲深红捕虫叶 | <img src="./plant-25.webp" width="160" alt="小型银白绒毛株与浅橙捕虫叶"><br>[plant-25.webp](./plant-25.webp)<br>小型银白绒毛株与浅橙捕虫叶 |  |
 
 ## 保存约定
 
-- 当前保存 18 张开场图标，沿用原文件编号，与网站使用的文件一致；删除后不重新编号。
+- 当前保存 23 张开场图标，沿用原文件编号，与网站使用的文件一致；删除后不重新编号。
 - 本目录用于集中收藏和下载；网站实际加载文件位于 [`public/welcome/`](../public/welcome/)。两处图片内容相同。
 - 后续新增或修改植物标识图时，同时更新本目录、网站使用文件及本页预览。
