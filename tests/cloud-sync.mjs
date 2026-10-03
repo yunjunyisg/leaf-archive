@@ -11,7 +11,7 @@ function database(){
 function call(DB,method,path,body,revision,user='same-account'){
  const headers={'oai-authenticated-user-id':user,'Origin':'https://example.test'};
  if(body)headers['Content-Type']='application/json';if(revision)headers['If-Match']='"'+revision+'"';
- return worker.fetch(new Request('https://example.test'+path,{method,headers,body:body?JSON.stringify(body):undefined}),{DB});
+ return worker.fetch(new Request('https://example.test'+path,{method,headers,body:body?JSON.stringify(body):undefined}),{DB,TRUST_SITES_IDENTITY:'true'});
 }
 test('devices share records for the same account; stale edits and deletes do not overwrite them',async()=>{
  const {DB,sql}=database();
@@ -41,7 +41,7 @@ test('conditional database update rejects a write that races after the initial r
 const refreshSource=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8').split('async function refreshCloud(){')[1].split('setInterval(refreshCloud,15000);')[0];
 function client(){
  const elements={'#error':{hidden:false},'#demo':{checked:false},'#detail':{open:false},'#editor':{open:false},'#confirm':{open:false},'#logText':{value:''},'#growthPhotoPreview':{children:[]}};
- const ctx={loading:false,syncRunning:false,syncWrites:0,syncEpoch:0,autoDemo:false,records:[],document:{hidden:false},navigator:{onLine:true},selected:null,growthBusy:false,$:id=>elements[id],render(){ctx.renders++},syncStatus(text){ctx.status=text},renders:0,async api(){return [{id:'new',name:'手机新记录'}]}};
+ const ctx={authState:{user:{id:'same-account'}},loading:false,syncRunning:false,syncWrites:0,syncEpoch:0,autoDemo:false,records:[],document:{hidden:false},navigator:{onLine:true},selected:null,growthBusy:false,$:id=>elements[id],render(){ctx.renders++},syncStatus(text){ctx.status=text},renders:0,async api(url){return url==='/api/auth'?{user:{id:'same-account'}}:[{id:'new',name:'手机新记录'}]}};
  vm.createContext(ctx);vm.runInContext('async function refreshCloud(){'+refreshSource,ctx);return {ctx,elements};
 }
 test('background refresh receives another device record while preserving open editor',async()=>{

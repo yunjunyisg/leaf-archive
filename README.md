@@ -2,7 +2,7 @@
 
 中文植物收藏记录网站，支持检索、科属分类树、照片导入、植物档案与养护日志。
 
-线上网站：https://leaf-archive-oct03.giving-rook-4847.chatgpt.site （需要以网站所有者身份登录）
+线上网站：https://leaf-archive-oct03.giving-rook-4847.chatgpt.site （所有用户可打开；个人档案需要登录）
 
 ## 功能
 
@@ -38,7 +38,7 @@ npm run dev
 
 ## 部署说明
 
-原网站继续由 Sites 托管。此仓库保存源码；后续标识修改同时同步到 GitHub 和原有 Sites 线上网站。GitHub 本身没有自动部署工作流，发布仍通过 Sites 完成。`.openai/hosting.json` 保留逻辑存储绑定，不包含原网站标识；`wrangler.jsonc` 中数据库标识用于本地预览，自行部署时需配置自己的 D1、R2 和认证层。
+网站继续由 Sites 托管。此仓库保存源码；后续标识修改同时同步到 GitHub 和原有 Sites 线上网站。GitHub 本身没有自动部署工作流，发布仍通过 Sites 完成。`.openai/hosting.json` 保留逻辑存储绑定，不包含原网站标识；`wrangler.jsonc` 中数据库标识用于本地预览，自行部署时需配置自己的 D1、R2 和认证层。
 
 个人植物记录与上传照片的本次备份位于 `backups/personal/`，仅应保存在私有仓库。仓库不包含运行凭据或本地测试数据。示例照片及其署名、来源和许可信息见 `public/credits.json`；请遵守各照片对应的许可。
 
@@ -83,3 +83,18 @@ Windows 可下载 `/downloads/leaf-archive-shortcuts.zip`，解压后运行“�
 编辑表单和未提交的生长记录不会被自动刷新清空。保存与删除校验当前档案版本，其他设备已更新时会提示重新打开，避免旧内容覆盖新记录。旧档案首次保存时自动补上版本，无需数据迁移。断网时不会伪装保存成功，恢复连接后自动重试读取。
 
 运行 `npm test` 验证跨入口读取、账号隔离、并发修改保护与自动刷新行为。
+
+## 微信登录与独立账号
+
+网站开放访问登录页，个人档案与照片仍由服务端按账号隔离。支持微信开放平台网站应用扫码登录（`snsapi_login`），以及微信内公众号网页授权（`snsapi_userinfo`）。新微信账号独立保存数据，收藏编号可与其他账号重复；同一微信账号在多个设备使用同一份档案。
+
+微信实际登录需要项目所有者开通对应权限，并在微信后台登记/校验回调域名。按 `.env.example` 的变量名，在托管平台服务端运行环境设置 AppID、AppSecret 和完整 HTTPS 回调地址。AppSecret 必须作为密钥存储，不放到网页、GitHub 或聊天中。尚未配置时，前端明确显示“微信登录暂未开放”，不会模拟登录。
+
+- `WECHAT_WEB_APP_ID` / `WECHAT_WEB_APP_SECRET`：开放平台网站应用。
+- `WECHAT_MP_APP_ID` / `WECHAT_MP_APP_SECRET`：公众号网页授权；用户须在微信中打开。
+- `WECHAT_REDIRECT_URI`：当前网站域名下的 `/auth/wechat/callback` 完整地址，与微信后台登记保持一致。
+- `TRUST_SITES_IDENTITY=true`：仅在原 Sites 托管中启用可信身份头，保留“原网站账号登录”及原拥有者数据。其他托管环境默认忽略此头，不能把客户端自报的用户 ID 当作身份。
+
+微信授权 state 与当前浏览器绑定，10 分钟有效且单次使用。会话使用 Secure/HttpOnly/SameSite=Lax Cookie，数据库仅保存令牌摘要，30 天过期，退出即撤销。两个微信应用同属开放平台且返回相同 UnionID 时可共用账号；没有 UnionID 时按各应用 OpenID 隔离，既有账号冲突不自动合并。原拥有者数据不会自动迁移给新微信账号。
+
+数据库新增身份、会话和授权状态表，由 Drizzle 迁移创建。`npm test` 使用模拟微信响应验证完整授权流程、会话撤销、跨账号读写与照片隔离；真实微信登录还需完成平台配置后联调。开放登录页不等于已解决中国大陆网络可达性，托管迁移仍需单独完成。
