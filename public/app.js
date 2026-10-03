@@ -29,7 +29,12 @@
  {src:'/welcome/plant-27.webp',alt:'小型鲜绿稀疏株与细小粉红捕虫叶的卡通茅膏菜'},
  {src:'/welcome/plant-28.webp',alt:'四株红绿细叶与红黄捕虫叶组合的卡通茅膏菜'},
  {src:'/welcome/plant-29.webp',alt:'超宽银白绒毛叶与红色圆形捕虫叶的卡通茅膏菜'},
- {src:'/welcome/plant-30.webp',alt:'深酒红密集放射株与露珠捕虫叶的卡通茅膏菜'}
+ {src:'/welcome/plant-30.webp',alt:'深酒红密集放射株与露珠捕虫叶的卡通茅膏菜'},
+ {src:'/welcome/plant-31.webp',alt:'带弯曲花梗的酒红尖叶捕虫堇手绘图标'},
+ {src:'/welcome/plant-32.webp',alt:'银白斑纹与红色叶缘的尖叶捕虫堇手绘图标'},
+ {src:'/welcome/plant-33.webp',alt:'深酒红尖叶与直立卷叶的捕虫堇手绘图标'},
+ {src:'/welcome/plant-34.webp',alt:'酒红圆叶与黄绿中纹的茅膏菜手绘图标'},
+ {src:'/welcome/plant-35.webp',alt:'银绿红背细长叶柄与露珠捕虫叶的茅膏菜手绘图标'}
  ];
  const chosen=welcomePlants[Math.floor(Math.random()*welcomePlants.length)];plant.alt=chosen.alt;plant.src=chosen.src;
  function dismiss(){if(closing)return;closing=true;clearTimeout(autoTimer);clearTimeout(fallbackTimer);splash.classList.add('welcome-leaving');const finish=()=>{splash.close();document.querySelector('#search')?.focus({preventScroll:true})};if(matchMedia('(prefers-reduced-motion: reduce)').matches)finish();else setTimeout(finish,320)}
