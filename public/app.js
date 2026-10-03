@@ -9,12 +9,9 @@
  {src:'/welcome/plant-4.webp',alt:'细长直立叶柄与浅绿捕虫叶的卡通茅膏菜'},
  {src:'/welcome/plant-5.webp',alt:'卷曲银白绒毛叶与粉红捕虫叶的卡通茅膏菜'},
  {src:'/welcome/plant-6.webp',alt:'银白绒毛细叶与橙红捕虫叶的卡通茅膏菜'},
- {src:'/welcome/plant-7.webp',alt:'红绿细长叶柄与黄绿捕虫叶的卡通茅膏菜'},
  {src:'/welcome/plant-8.webp',alt:'深红叶柄与卷曲鲜红捕虫叶的卡通茅膏菜'},
  {src:'/welcome/plant-9.webp',alt:'三株银绿细叶与粉红触毛的卡通茅膏菜'},
- {src:'/welcome/plant-10.webp',alt:'稀疏绿色带状叶与粉红捕虫叶的卡通茅膏菜'},
  {src:'/welcome/plant-11.webp',alt:'宽叶银白绒毛与鲜红捕虫叶的卡通茅膏菜'},
- {src:'/welcome/plant-12.webp',alt:'直立银白绒毛叶与弯曲红色捕虫叶的卡通茅膏菜'},
  {src:'/welcome/plant-13.webp',alt:'带卷曲花梗与红黄圆形捕虫叶的卡通茅膏菜'},
  {src:'/welcome/plant-14.webp',alt:'酒红放射叶柄与卷曲玫红捕虫叶的卡通茅膏菜'},
  {src:'/welcome/plant-15.webp',alt:'三株银绿色细叶与粉红触毛的卡通茅膏菜'}
