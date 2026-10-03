@@ -98,3 +98,5 @@ Windows 可下载 `/downloads/leaf-archive-shortcuts.zip`，解压后运行“�
 微信授权 state 与当前浏览器绑定，10 分钟有效且单次使用。会话使用 Secure/HttpOnly/SameSite=Lax Cookie，数据库仅保存令牌摘要，30 天过期，退出即撤销。两个微信应用同属开放平台且返回相同 UnionID 时可共用账号；没有 UnionID 时按各应用 OpenID 隔离，既有账号冲突不自动合并。原拥有者数据不会自动迁移给新微信账号。
 
 数据库新增身份、会话和授权状态表，由 Drizzle 迁移创建。`npm test` 使用模拟微信响应验证完整授权流程、会话撤销、跨账号读写与照片隔离；真实微信登录还需完成平台配置后联调。开放登录页不等于已解决中国大陆网络可达性，托管迁移仍需单独完成。
+
+发布包使用 `npm run package:site` 生成，包含 Worker 构建输出和根目录 `drizzle/` 迁移；修改数据库后不能只打包 `dist/`。
