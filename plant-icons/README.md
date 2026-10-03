@@ -1,6 +1,6 @@
 # 植物标识图库
 
-集中存放「植藏」的 **43 张透明背景植物标识图**，用于网站开场随机展示。图标参考植物照片，以柔和手绘插画风格绘制；文件为 WebP。
+集中存放「植藏」的 **48 张透明背景植物标识图**，用于网站开场随机展示。图标参考植物照片，以柔和手绘插画风格绘制；文件为 WebP。
 
 ## 预览与下载
 
@@ -18,10 +18,11 @@
 | <img src="./plant-31.webp" width="160" alt="带弯曲花梗的酒红尖叶捕虫堇"><br>[plant-31.webp](./plant-31.webp)<br>带弯曲花梗的酒红尖叶捕虫堇 | <img src="./plant-32.webp" width="160" alt="银白斑纹与红色叶缘的尖叶捕虫堇"><br>[plant-32.webp](./plant-32.webp)<br>银白斑纹与红色叶缘的尖叶捕虫堇 | <img src="./plant-33.webp" width="160" alt="深酒红尖叶与直立卷叶的捕虫堇"><br>[plant-33.webp](./plant-33.webp)<br>深酒红尖叶与直立卷叶的捕虫堇 | <img src="./plant-34.webp" width="160" alt="酒红圆叶与黄绿中纹的茅膏菜"><br>[plant-34.webp](./plant-34.webp)<br>酒红圆叶与黄绿中纹的茅膏菜 |
 | <img src="./plant-35.webp" width="160" alt="银绿红背细长叶柄与露珠捕虫叶的茅膏菜"><br>[plant-35.webp](./plant-35.webp)<br>银绿红背细长叶柄与露珠捕虫叶的茅膏菜 | <img src="./plant-36.webp" width="160" alt="银绿绒毛宽叶与橙红捕虫叶的茅膏菜"><br>[plant-36.webp](./plant-36.webp)<br>银绿绒毛宽叶与橙红捕虫叶的茅膏菜 | <img src="./plant-37.webp" width="160" alt="银粉长叶与鲜红露珠捕虫叶的茅膏菜"><br>[plant-37.webp](./plant-37.webp)<br>银粉长叶与鲜红露珠捕虫叶的茅膏菜 | <img src="./plant-38.webp" width="160" alt="黄绿绒毛长叶与橙红捕虫叶的茅膏菜"><br>[plant-38.webp](./plant-38.webp)<br>黄绿绒毛长叶与橙红捕虫叶的茅膏菜 |
 | <img src="./plant-39.webp" width="160" alt="深酒红圆叶与粉红内叶的茅膏菜"><br>[plant-39.webp](./plant-39.webp)<br>深酒红圆叶与粉红内叶的茅膏菜 | <img src="./plant-40.webp" width="160" alt="鲜绿纤细放射叶柄与金黄捕虫叶的茅膏菜"><br>[plant-40.webp](./plant-40.webp)<br>鲜绿纤细放射叶柄与金黄捕虫叶的茅膏菜 | <img src="./plant-41.webp" width="160" alt="银绿纤细放射叶柄与红金捕虫叶的茅膏菜"><br>[plant-41.webp](./plant-41.webp)<br>银绿纤细放射叶柄与红金捕虫叶的茅膏菜 | <img src="./plant-42.webp" width="160" alt="双株红色分枝茎与白色小花的直立茅膏菜"><br>[plant-42.webp](./plant-42.webp)<br>双株红色分枝茎与白色小花的直立茅膏菜 |
-| <img src="./plant-43.webp" width="160" alt="浅绿直立茎与粉红露珠捕虫叶的小型茅膏菜"><br>[plant-43.webp](./plant-43.webp)<br>浅绿直立茎与粉红露珠捕虫叶的小型茅膏菜 | <img src="./plant-44.webp" width="160" alt="银白绒毛宽叶与粉红叶背红色捕虫叶的茅膏菜"><br>[plant-44.webp](./plant-44.webp)<br>银白绒毛宽叶与粉红叶背红色捕虫叶的茅膏菜 | <img src="./plant-45.webp" width="160" alt="深酒红放射叶柄与圆形捕虫叶的茅膏菜"><br>[plant-45.webp](./plant-45.webp)<br>深酒红放射叶柄与圆形捕虫叶的茅膏菜 |  |
+| <img src="./plant-43.webp" width="160" alt="浅绿直立茎与粉红露珠捕虫叶的小型茅膏菜"><br>[plant-43.webp](./plant-43.webp)<br>浅绿直立茎与粉红露珠捕虫叶的小型茅膏菜 | <img src="./plant-44.webp" width="160" alt="银白绒毛宽叶与粉红叶背红色捕虫叶的茅膏菜"><br>[plant-44.webp](./plant-44.webp)<br>银白绒毛宽叶与粉红叶背红色捕虫叶的茅膏菜 | <img src="./plant-45.webp" width="160" alt="深酒红放射叶柄与圆形捕虫叶的茅膏菜"><br>[plant-45.webp](./plant-45.webp)<br>深酒红放射叶柄与圆形捕虫叶的茅膏菜 | <img src="./plant-46.webp" width="160" alt="红色绒毛叶冠与灰褐枯叶柱的茅膏菜"><br>[plant-46.webp](./plant-46.webp)<br>红色绒毛叶冠与灰褐枯叶柱的茅膏菜 |
+| <img src="./plant-47.webp" width="160" alt="深酒红宽圆捕虫叶与紫红尖叶的茅膏菜"><br>[plant-47.webp](./plant-47.webp)<br>深酒红宽圆捕虫叶与紫红尖叶的茅膏菜 | <img src="./plant-48.webp" width="160" alt="粉红尖叶与向上卷曲宽圆捕虫叶的茅膏菜"><br>[plant-48.webp](./plant-48.webp)<br>粉红尖叶与向上卷曲宽圆捕虫叶的茅膏菜 | <img src="./plant-49.webp" width="160" alt="双株鲜绿稀疏长叶与浅粉小捕虫叶的茅膏菜"><br>[plant-49.webp](./plant-49.webp)<br>双株鲜绿稀疏长叶与浅粉小捕虫叶的茅膏菜 | <img src="./plant-50.webp" width="160" alt="橙粉放射叶柄与橙心红缘椭圆捕虫叶的茅膏菜"><br>[plant-50.webp](./plant-50.webp)<br>橙粉放射叶柄与橙心红缘椭圆捕虫叶的茅膏菜 |
 
 ## 保存约定
 
-- 当前保存 43 张开场图标，沿用原文件编号，与网站使用的文件一致；删除后不重新编号。
+- 当前保存 48 张开场图标，沿用原文件编号，与网站使用的文件一致；删除后不重新编号。
 - 本目录用于集中收藏和下载；网站实际加载文件位于 [`public/welcome/`](../public/welcome/)。两处图片内容相同。
 - 后续新增或修改植物标识图时，同时更新本目录、网站使用文件及本页预览。
