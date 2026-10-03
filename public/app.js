@@ -11,8 +11,8 @@
  ];
  const chosen=welcomePlants[Math.floor(Math.random()*welcomePlants.length)];plant.alt=chosen.alt;plant.src=chosen.src;
  function dismiss(){if(closing)return;closing=true;clearTimeout(autoTimer);clearTimeout(fallbackTimer);splash.classList.add('welcome-leaving');const finish=()=>{splash.close();document.querySelector('#search')?.focus({preventScroll:true})};if(matchMedia('(prefers-reduced-motion: reduce)').matches)finish();else setTimeout(finish,320)}
- function schedule(){if(!autoTimer&&!closing)autoTimer=setTimeout(dismiss,1600)}
- splash.showModal();button.onclick=dismiss;splash.addEventListener('cancel',event=>{event.preventDefault();dismiss()});plant.addEventListener('load',schedule,{once:true});plant.addEventListener('error',()=>{if(plant.getAttribute('src')!=='/welcome/plant-0.webp'){plant.src='/welcome/plant-0.webp';plant.alt=welcomePlants[0].alt}else dismiss()},{once:false});if(plant.complete){if(plant.naturalWidth)schedule();else dismiss()}fallbackTimer=setTimeout(dismiss,4500);
+ function schedule(){if(autoTimer||closing)return;splash.classList.add('welcome-ready');clearTimeout(fallbackTimer);autoTimer=setTimeout(dismiss,matchMedia('(prefers-reduced-motion: reduce)').matches?1600:3200)}
+ splash.showModal();button.onclick=dismiss;splash.addEventListener('cancel',event=>{event.preventDefault();dismiss()});plant.addEventListener('load',schedule,{once:true});plant.addEventListener('error',()=>{if(plant.getAttribute('src')!=='/welcome/plant-0.webp'){plant.src='/welcome/plant-0.webp';plant.alt=welcomePlants[0].alt}else dismiss()},{once:false});fallbackTimer=setTimeout(dismiss,7000);if(plant.complete){if(plant.naturalWidth)schedule();else dismiss()}
 })();
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
