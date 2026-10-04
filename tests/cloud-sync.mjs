@@ -51,3 +51,35 @@ test('background refresh receives another device record while preserving open ed
 test('a response started before a local save cannot replace newer local state',async()=>{
  const {ctx}=client();let finish;ctx.api=()=>new Promise(resolve=>finish=resolve);const pending=ctx.refreshCloud();ctx.syncEpoch++;ctx.records=[{id:'local',name:'刚保存'}];finish([{id:'stale'}]);await pending;assert.equal(ctx.records[0].id,'local');assert.equal(ctx.renders,0);
 });
+
+test('status changes from the detail form and archive editor create durable timeline events',async()=>{
+ const {DB,sql}=database();
+ const plant=await (await call(DB,'POST','/api/plants',{name:'银叶茅膏菜',number:'STATUS-1',status:'生长中',logs:[{id:'observation',date:'2026-10-01',type:'观察',text:'新叶展开',photos:[]}]})).json();
+ assert.equal(plant.logs.length,1);
+ const changed=await call(DB,'PUT','/api/plants/'+plant.id,{...plant,status:'休眠中',statusChange:{date:'2026-10-02',note:'减少浇水'}},plant._revision);
+ assert.equal(changed.status,200);const dormant=await changed.json();
+ assert.equal(dormant.status,'休眠中');const event=dormant.logs.find(l=>l.type==='状态变更');
+ assert.equal(event.date,'2026-10-02');assert.equal(event.fromStatus,'生长中');assert.equal(event.toStatus,'休眠中');assert.equal(event.text,'生长中 → 休眠中\n减少浇水');
+ const editor=await call(DB,'PUT','/api/plants/'+plant.id,{...dormant,status:'需关注'},dormant._revision);
+ assert.equal(editor.status,200);const attention=await editor.json();
+ assert.equal(attention.logs.filter(l=>l.type==='状态变更').length,2);
+ assert.equal(attention.logs.at(-1).date,new Date().toISOString().slice(0,10));
+ assert.deepEqual(attention.logs.find(l=>l.id===event.id),event);
+ const unchanged=await call(DB,'PUT','/api/plants/'+plant.id,{...attention,notes:'普通编辑',logs:attention.logs.filter(l=>l.type!=='状态变更')},attention._revision);
+ assert.equal(unchanged.status,200);const latest=await unchanged.json();
+ assert.equal(latest.logs.filter(l=>l.type==='状态变更').length,2);
+ assert.equal(latest.logs.find(l=>l.id==='observation').text,'新叶展开');
+ const reloaded=(await (await call(DB,'GET','/api/plants')).json())[0];assert.equal(reloaded.status,'需关注');assert.deepEqual(reloaded.logs,latest.logs);
+ assert.equal((await call(DB,'PUT','/api/plants/'+plant.id,{...dormant,status:'已死亡'},dormant._revision)).status,409);
+ assert.equal((await call(DB,'PUT','/api/plants/'+plant.id,{...latest,status:'已死亡'},latest._revision,'other-account')).status,404);
+ assert.equal((await call(DB,'PUT','/api/plants/'+plant.id,{...latest,status:'已死亡',statusChange:{date:'2026-02-30'}},latest._revision)).status,400);
+ assert.equal((await call(DB,'PUT','/api/plants/'+plant.id,{...latest,status:'无效状态'},latest._revision)).status,400);
+ assert.equal((await (await call(DB,'GET','/api/plants')).json())[0].status,'需关注');sql.close();
+});
+test('automatic status history respects the record limit without partially updating the status',async()=>{
+ const {DB,sql}=database();
+ const logs=Array.from({length:300},(_,i)=>({id:'log-'+i,date:'2026-10-01',type:'观察',text:'观察',photos:[]}));
+ const plant=await (await call(DB,'POST','/api/plants',{name:'测试',number:'STATUS-2',status:'生长中',logs})).json();
+ assert.equal((await call(DB,'PUT','/api/plants/'+plant.id,{...plant,status:'休眠中'},plant._revision)).status,400);
+ const latest=(await (await call(DB,'GET','/api/plants')).json())[0];assert.equal(latest.status,'生长中');assert.equal(latest.logs.length,300);sql.close();
+});
