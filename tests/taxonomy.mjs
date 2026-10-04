@@ -1,0 +1,50 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import fs from 'node:fs';
+import {ranks,validPath,plantPath,buildTree,pathKey} from '../shared/taxonomy.js';
+import worker from '../dist/server/index.js';
+const path=[{rank:'genus',name:'茅膏菜属'},{rank:'species',name:'Drosera burmannii'}];
+test('all ranks, optional ranks, species peers and qualifiers preserve their hierarchy',()=>{
+ const full=ranks.filter(r=>r.key!=='unresolved'&&!['aff','cf'].includes(r.key)).map(r=>({rank:r.key,name:r.label}));
+ assert.deepEqual(validPath(full),full);
+ assert.deepEqual(validPath([...path,{rank:'aff',name:'D. aff. burmannii'}]).at(-1).rank,'aff');
+ assert.throws(()=>validPath([...path,{rank:'unresolved',name:'sp.'}]));
+ assert.throws(()=>validPath([{rank:'aff',name:'aff.'}]));
+ assert.throws(()=>validPath([{rank:'genus',name:'属'},{rank:'unresolved',name:'sp. 1'},{rank:'variety',name:'var.'}]));
+ const plants=[{id:'1',genus:'茅膏菜属',name:'个体一',species:'Drosera burmannii'},{id:'2',genus:'茅膏菜属',name:'个体二',species:'Drosera burmannii'},{id:'3',genus:'茅膏菜属',name:'未鉴定',species:'Drosera sp. 1',identification:'unresolved'},{id:'4',genus:'茅膏菜属',name:'近缘',species:'Drosera burmannii',identification:'aff'}];
+ const tree=buildTree(plants,[{id:'taxon',path,references:['/assets/example.jpg']}]);
+ assert.equal(tree.nodes.get(pathKey(path)).plants.length,2);
+ assert.equal(tree.roots[0].children.find(n=>n.rank==='unresolved').name,'Drosera sp. 1');
+ assert.equal(tree.nodes.get(pathKey(path)).children[0].rank,'aff');
+ assert.equal(tree.nodes.get(pathKey(path)).references.length,1);
+ assert.equal(plantPath({name:'旧档案',family:'科',genus:'属'}).at(-1).name,'旧档案');
+});
+function setup(){
+ const sql=new DatabaseSync(':memory:');for(const file of fs.readdirSync('drizzle').filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync('drizzle/'+file,'utf8'));
+ const DB={prepare(query){return {bind(...args){return {async all(){return {results:sql.prepare(query).all(...args)}},async first(){return sql.prepare(query).get(...args)||null},async run(){return {meta:{changes:Number(sql.prepare(query).run(...args).changes)}}}}}}}};
+ async function call(method,url,body,revision,user='owner'){
+  const headers={'Origin':'https://example.test','oai-authenticated-user-id':user};if(body)headers['Content-Type']='application/json';if(revision)headers['If-Match']='"'+revision+'"';
+  return worker.fetch(new Request('https://example.test'+url,{method,headers,body:body?JSON.stringify(body):undefined}),{DB,TRUST_SITES_IDENTITY:'true'});
+ }return {sql,call};
+}
+test('classification reference images persist independently, isolate accounts and reject stale edits',async()=>{
+ const {sql,call}=setup();
+ const photo='/images/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';sql.prepare('INSERT INTO images VALUES (?,?,?)').run(photo.split('/').pop(),'owner','image/png');
+ const created=await call('POST','/api/taxa',{path,references:[photo]});assert.equal(created.status,201);const t=await created.json();
+ assert.equal((await (await call('GET','/api/taxa')).json())[0].references[0],photo);
+ assert.deepEqual(await (await call('GET','/api/taxa',null,null,'other')).json(),[]);
+ assert.equal((await call('PUT','/api/taxa/'+t.id,t,t._revision,'other')).status,400);
+ assert.equal((await call('POST','/api/taxa',{path,references:[photo]},null,'other')).status,400);
+ const updated=await call('PUT','/api/taxa/'+t.id,{path,references:[]},t._revision);assert.equal(updated.status,200);
+ assert.equal((await call('PUT','/api/taxa/'+t.id,t,t._revision)).status,409);
+ assert.equal((await call('PUT','/api/taxa/'+t.id,t)).status,428);
+ assert.equal((await call('POST','/api/taxa',{path,references:[]})).status,409);
+ assert.equal((await call('POST','/api/taxa',{path:[{rank:'genus',name:'属'}],references:[photo]})).status,400);
+ assert.equal((await call('POST','/api/taxa',{path:[{rank:'aff',name:'错误根节点'}],references:[]})).status,400);
+ const p=await call('POST','/api/plants',{name:'测试',number:'TEST',kingdom:'植物界',genus:'茅膏菜属',species:'D. burmannii',identification:'cf',infraspecific:'D. cf. burmannii'});
+ assert.equal(p.status,201);assert.equal((await p.json()).identification,'cf');
+ assert.equal((await call('POST','/api/plants',{name:'缺少基础种名',number:'BAD-AFF',identification:'aff'})).status,400);
+ assert.equal((await call('POST','/api/plants',{name:'错误',number:'BAD',identification:'unresolved',variety:'变种'})).status,400);
+ sql.close();
+});

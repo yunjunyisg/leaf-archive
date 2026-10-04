@@ -1,3 +1,5 @@
+import {validPath,referenceRank,pathKey,plantPath} from '../shared/taxonomy.js';
+import taxonomyJs from '../shared/taxonomy.js?raw';
 import {authRoutes, identity} from './auth.js';
 import html from '../public/index.html';
 import classificationHtml from '../public/classification.html';
@@ -69,10 +71,15 @@ const photoPath=x=>typeof x==='string'&&/^\/(images\/[a-f0-9-]+|assets\/[A-Za-z0
 const validDate=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&!Number.isNaN(Date.parse(x))&&new Date(x).toISOString().slice(0,10)===x;
 function valid(p){
  if(!p||typeof p!=='object')throw new Error('无效的档案');const out={};
- const fields=['name','latin','number','sourceNumber','source','family','genus','description','origin','individualInfo','price','date','location','status','light','water','substrate','notes','lastWater','nextWater'];
+ const fields=['name','latin','number','sourceNumber','source','family','genus','kingdom','division','className','order','tribe','section','series','species','identification','variety','form','infraspecific','description','origin','individualInfo','price','date','location','status','light','water','substrate','notes','lastWater','nextWater'];
  for(const f of fields){out[f]=String(p[f]??'').trim();if(out[f].length>10000)throw new Error('内容过长')}
  if(!out.name||!out.number)throw new Error('请填写中文名和收藏编号');
  if(out.price!==''&&(!Number.isFinite(Number(out.price))||Number(out.price)<0))throw new Error('价格应为非负数字');
+ if(!['','species','unresolved','aff','cf'].includes(out.identification))throw new Error('鉴定类别无效');
+ if(out.identification==='unresolved'&&(out.variety||out.form||out.infraspecific))throw new Error('未定种不能添加种下分类');
+ if(['aff','cf'].includes(out.identification)&&(out.variety||out.form))throw new Error('aff. 和 cf. 不能同时填写变种或变型');
+ if(['aff','cf'].includes(out.identification)&&!out.species)throw new Error('aff. 和 cf. 请填写基础种名');
+ if(plantPath(out).some(p=>p.name.length>200))throw new Error('分类名称最多 200 字');
  out.photos=Array.isArray(p.photos)?p.photos.filter(photoPath).slice(0,12):[];
  out.photoDates={};for(const url of out.photos){const date=p.photoDates?.[url];if(date){if(!validDate(date))throw new Error('照片日期无效');out.photoDates[url]=date}}
  const logs=Array.isArray(p.logs)?p.logs:[];if(logs.length>300)throw new Error('每株植物最多保存 300 条生长记录');
@@ -92,11 +99,36 @@ if(u.pathname==='/classification'||u.pathname==='/classification/')return new Re
 if(u.pathname==='/')return new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
 if(welcomeIcons[u.pathname])return new Response(Uint8Array.from(atob(welcomeIcons[u.pathname].split(',')[1]),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/webp','Cache-Control':'public, max-age=86400'}});
 if(u.pathname==='/style.css')return new Response(css,{headers:{'Content-Type':'text/css'}});
+if(u.pathname==='/taxonomy.js')return new Response(taxonomyJs,{headers:{'Content-Type':'text/javascript','Cache-Control':'no-cache'}});
 if(u.pathname==='/app.js')return new Response(js,{headers:{'Content-Type':'text/javascript'}});
 if(assets[u.pathname]){const a=assets[u.pathname];return new Response(Uint8Array.from(atob(a),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=86400'}})}
 if(!u.pathname.startsWith('/api/')&&!u.pathname.startsWith('/images/'))return new Response('Not found',{status:404});
 const who=(await identity(request,env))?.owner;if(!who)return json({error:'请先登录，再访问你的植物档案。'},401);
 if(request.method!=='GET'){const origin=request.headers.get('Origin');if(origin&&origin!==u.origin)return json({error:'请求来源无效'},403)}
+if(u.pathname==='/api/taxa'&&request.method==='GET'){
+ const r=await db(env).prepare('SELECT id, data FROM taxa WHERE owner = ? ORDER BY created').bind(who).all();return json(r.results.map(x=>({id:x.id,...JSON.parse(x.data)})));
+}
+if((u.pathname==='/api/taxa'&&request.method==='POST')||(u.pathname.startsWith('/api/taxa/')&&request.method==='PUT')){
+ const input=await request.json();const path=validPath(input.path);
+ if(!Array.isArray(input.references)||input.references.length>12||!input.references.every(photoPath))return json({error:'参考图无效或超过 12 张'},400);
+ if(input.references.length&&!referenceRank(path.at(-1).rank))return json({error:'仅种级及以下分类可导入参考图'},400);
+ for(const url of input.references.filter(x=>x.startsWith('/images/'))){
+  if(!await db(env).prepare('SELECT id FROM images WHERE id = ? AND owner = ?').bind(url.split('/').pop(),who).first())return json({error:'参考图不存在或不属于当前账号'},400);
+ }
+ const p={path,references:[...new Set(input.references)],_revision:crypto.randomUUID()};
+ if(request.method==='POST'){
+  const id=crypto.randomUUID();await db(env).prepare('INSERT INTO taxa (id,owner,path_key,data,created) VALUES (?,?,?,?,?)').bind(id,who,pathKey(path),JSON.stringify(p),new Date().toISOString()).run();return json({id,...p},201);
+ }
+ const id=u.pathname.split('/').pop();const row=await db(env).prepare('SELECT id, data FROM taxa WHERE id = ? AND owner = ?').bind(id,who).first();
+ if(!row)return json({error:'分类不存在'},404);
+ const current=JSON.parse(row.data);
+ if(!request.headers.get('If-Match'))return json({error:'请重新打开分类后保存'},428);
+ if(request.headers.get('If-Match')!=='"'+current._revision+'"')return json({error:'分类已在其他设备修改，请关闭后重新打开'},409);
+ if(pathKey(current.path)!==pathKey(path))return json({error:'参考图管理不能修改分类路径'},400);
+ const r=await db(env).prepare('UPDATE taxa SET data = ? WHERE id = ? AND owner = ? AND data = ?').bind(JSON.stringify(p),id,who,row.data).run();
+ if(!r.meta?.changes)return json({error:'分类刚刚在其他设备更新，请重新打开'},409);
+ return json({id,...p});
+}
 if(u.pathname==='/api/plants'&&request.method==='GET'){const r=await db(env).prepare('SELECT id, data FROM plants WHERE owner = ? ORDER BY created DESC').bind(who).all();return json(r.results.map(x=>{const p=JSON.parse(x.data);return {id:x.id,...p,_revision:p._revision||'legacy'}}))}
 if(u.pathname==='/api/plants'&&request.method==='POST'){const p={...valid(await request.json()),_revision:crypto.randomUUID()};const id=crypto.randomUUID();await db(env).prepare('INSERT INTO plants (id,owner,number,data,created) VALUES (?,?,?,?,?)').bind(id,who,p.number,JSON.stringify(p),new Date().toISOString()).run();return json({id,...p},201)}
 if(u.pathname.startsWith('/api/plants/')&&['PUT','DELETE'].includes(request.method)){
@@ -119,4 +151,4 @@ if(u.pathname.startsWith('/api/plants/')&&['PUT','DELETE'].includes(request.meth
 if(u.pathname==='/api/images'&&request.method==='POST'){const f=await request.formData();const file=f.get('file');if(!file||!['image/jpeg','image/png','image/webp'].includes(file.type))return json({error:'请选择 JPG、PNG 或 WebP 图片'},400);if(file.size>8*1024*1024)return json({error:'每张图片请小于 8 MB'},400);if(!env.BUCKET)throw new Error('图片存储暂时不可用');const bytes=await file.arrayBuffer();const b=new Uint8Array(bytes);const magic=(file.type==='image/jpeg'&&b[0]===255&&b[1]===216)||(file.type==='image/png'&&b[0]===137&&b[1]===80&&b[2]===78&&b[3]===71)||(file.type==='image/webp'&&new TextDecoder().decode(b.slice(0,4))==='RIFF'&&new TextDecoder().decode(b.slice(8,12))==='WEBP');if(!magic)return json({error:'图片格式不匹配'},400);const id=crypto.randomUUID();await env.BUCKET.put(who+'/'+id,bytes,{httpMetadata:{contentType:file.type}});await db(env).prepare('INSERT INTO images (id,owner,mime) VALUES (?,?,?)').bind(id,who,file.type).run();return json({url:'/images/'+id})}
 if(u.pathname.startsWith('/images/')&&request.method==='GET'){const id=u.pathname.split('/').pop();const row=await db(env).prepare('SELECT mime FROM images WHERE id = ? AND owner = ?').bind(id,who).first();if(!row)return new Response('Not found',{status:404});const object=await env.BUCKET.get(who+'/'+id);if(!object)return new Response('Not found',{status:404});return new Response(object.body,{headers:{'Content-Type':row.mime,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}})}
 return json({error:'未找到此操作'},404);
-}catch(e){console.error(e);if(['照片日期无效','生长记录日期无效','每株植物最多保存 300 条生长记录'].includes(e.message))return json({error:e.message},400);const duplicate=String(e).includes('UNIQUE');return json({error:duplicate?'收藏编号已存在，请使用其他编号。':e.message==='档案存储暂时不可用'||e.message==='图片存储暂时不可用'?e.message:'操作未完成，请检查填写内容后重试。'},duplicate?409:500)}}};
+}catch(e){console.error(e);if(['aff. 和 cf. 请填写基础种名','分类路径无效','分类层级或名称无效','鉴定类别无效','未定种不能添加种下分类','aff. 和 cf. 不能同时填写变种或变型','分类名称最多 200 字','照片日期无效','生长记录日期无效','每株植物最多保存 300 条生长记录'].includes(e.message))return json({error:e.message},400);const duplicate=String(e).includes('UNIQUE');return json({error:duplicate?(u.pathname.startsWith('/api/taxa')?'该分类已存在，请在分类树中管理参考图。':'收藏编号已存在，请使用其他编号。'):e.message==='档案存储暂时不可用'||e.message==='图片存储暂时不可用'?e.message:'操作未完成，请检查填写内容后重试。'},duplicate?409:500)}}};

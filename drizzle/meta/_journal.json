@@ -15,6 +15,13 @@
       "when": 1791031639752,
       "tag": "0001_polite_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791084572941,
+      "tag": "0002_taxonomy",
+      "breakpoints": true
     }
   ]
 }
