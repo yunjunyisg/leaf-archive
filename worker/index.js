@@ -110,7 +110,7 @@ if(u.pathname==='/api/taxa'&&request.method==='GET'){
 }
 if((u.pathname==='/api/taxa'&&request.method==='POST')||(u.pathname.startsWith('/api/taxa/')&&request.method==='PUT')){
  const input=await request.json();const path=validPath(input.path);
- if(!Array.isArray(input.references)||input.references.length>12||!input.references.every(photoPath))return json({error:'参考图无效或超过 12 张'},400);
+ if(!Array.isArray(input.references)||!input.references.every(photoPath))return json({error:'参考图无效'},400);
  if(input.references.length&&!referenceRank(path.at(-1).rank))return json({error:'仅种级及以下分类可导入参考图'},400);
  for(const url of input.references.filter(x=>x.startsWith('/images/'))){
   if(!await db(env).prepare('SELECT id FROM images WHERE id = ? AND owner = ?').bind(url.split('/').pop(),who).first())return json({error:'参考图不存在或不属于当前账号'},400);

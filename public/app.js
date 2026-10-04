@@ -289,7 +289,6 @@ if(classificationPage){
  const busy=value=>{taxonUploading=value;$('#saveTaxon').disabled=value;$('#referenceFiles').disabled=value;$('#taxonParent').disabled=value;$('#taxonRank').disabled=value;renderReferences()};
  $('#referenceFiles').onchange=async e=>{
   const files=[...e.target.files];e.target.value='';
-  if(taxonReferences.length+files.length>12){$('#referenceStatus').textContent='每个分类最多添加 12 张参考图。';return;}
   busy(true);
   try{for(const [i,file] of files.entries()){
    if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>8*1024*1024)throw new Error('请选择不超过 8 MB 的 JPG、PNG 或 WebP：'+file.name);

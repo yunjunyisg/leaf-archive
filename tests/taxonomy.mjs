@@ -48,3 +48,16 @@ test('classification reference images persist independently, isolate accounts an
  assert.equal((await call('POST','/api/plants',{name:'错误',number:'BAD',identification:'unresolved',variety:'变种'})).status,400);
  sql.close();
 });
+
+test('reference image counts above twelve survive creation, update and reload',async()=>{
+ const {sql,call}=setup();
+ const references=Array.from({length:25},()=>'/images/'+crypto.randomUUID());
+ for(const url of references)sql.prepare('INSERT INTO images VALUES (?,?,?)').run(url.split('/').pop(),'owner','image/png');
+ const created=await call('POST','/api/taxa',{path,references:references.slice(0,13)});
+ assert.equal(created.status,201);const taxon=await created.json();assert.equal(taxon.references.length,13);
+ const saved=await call('PUT','/api/taxa/'+taxon.id,{path,references},taxon._revision);
+ assert.equal(saved.status,200);assert.deepEqual((await saved.json()).references,references);
+ const reloaded=await (await call('GET','/api/taxa')).json();assert.deepEqual(reloaded[0].references,references);
+ assert.equal((await call('POST','/api/taxa',{path:[{rank:'species',name:'invalid'}],references:['https://example.test/image.png']})).status,400);
+ sql.close();
+});
