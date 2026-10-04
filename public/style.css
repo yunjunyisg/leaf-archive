@@ -20,3 +20,29 @@
 .cloud-sync{font-size:14px;color:#687560;margin-left:auto;margin-right:18px}@media(max-width:700px){.cloud-sync{font-size:12px;margin-right:0}.header-note{display:none}}
 
 .account-controls{display:flex;align-items:center;gap:10px;font-size:14px;margin-left:auto}.wechat-login{background:#177a45;color:white;padding:8px 12px;border-radius:7px}.account-controls button[hidden]{display:none}.account-controls button:disabled{cursor:not-allowed}.auth-notice{padding:14px 18px;border:1px solid #d5dfce;background:#eef3e7;border-radius:8px;margin-bottom:20px;font-size:14px;line-height:1.7}.auth-notice a{font-weight:600}.cloud-sync{margin-left:14px}@media(max-width:900px){header{flex-wrap:wrap;height:auto;min-height:78px;gap:8px;padding-top:12px;padding-bottom:12px}.account-controls{margin-left:0}.header-note{display:none}}@media(max-width:540px){#accountName{max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cloud-sync{margin-left:0;width:100%;font-size:13px}}
+
+/* Classification has its own page; the collection sidebar only links to it. */
+a.nav{text-decoration:none}
+[data-page="classification"] .toolbar>select,[data-page="classification"] .view-switch,[data-page="classification"] .export{display:none}
+[data-page="classification"] .collection-line{justify-content:flex-end;padding-bottom:14px}
+.classification-panel{background:white;border:1px solid var(--line);border-radius:10px;padding:24px}
+.classification-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}
+.classification-heading h2{font-size:18px;font-weight:500;margin:0}
+.classification-heading>div{display:flex;gap:8px;flex-wrap:wrap}
+.classification-heading button{font-size:14px;padding:8px 12px;border:1px solid var(--line);border-radius:6px}
+.taxonomy-family{border:1px solid var(--line);border-radius:8px;margin-bottom:14px;overflow:hidden}
+.taxonomy-family>summary{padding:16px;background:#eef3e8;font-size:17px;font-weight:500}
+.taxonomy-family summary span{overflow-wrap:anywhere;min-width:0}
+.taxonomy-family summary small{font-size:14px;white-space:nowrap;color:#6c7c5a}
+.taxonomy-branches{padding:8px 16px 12px 28px}
+.taxonomy-genus{border-left:1px solid #cbd7bd;margin:10px 0}
+.taxonomy-genus>summary{padding:10px 14px;font-size:16px}
+.taxonomy-plants{margin-left:28px;border-left:1px solid #dce3d3;padding:0 12px}
+.taxonomy-plant{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;width:100%;padding:14px 12px;border-radius:6px}
+.taxonomy-plant:hover{background:#f0f4e9}
+.taxonomy-plant span{min-width:0;overflow-wrap:anywhere}
+.taxonomy-plant strong{display:block;font-size:16px;font-weight:500}
+.taxonomy-plant i{display:block;font-size:14px;color:#7d8b6e;margin-top:4px}
+.taxonomy-plant small{font-size:14px;color:#7d8b6e;overflow-wrap:anywhere}
+.classification-empty{color:#7d8b6e;padding:24px 0;margin:0}
+@media(max-width:620px){.classification-panel{padding:14px}.classification-heading{align-items:flex-start;flex-direction:column}.taxonomy-family>summary{padding:14px 10px;font-size:16px;flex-wrap:wrap}.taxonomy-family summary small{font-size:14px}.taxonomy-branches{padding:4px 6px 8px 12px}.taxonomy-plants{margin-left:16px;padding:0 4px}.taxonomy-plant{padding:12px 6px;flex-wrap:wrap}.sidebar #tree{display:block;max-height:none}}

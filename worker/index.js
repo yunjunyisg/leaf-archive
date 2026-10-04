@@ -1,5 +1,6 @@
 import {authRoutes, identity} from './auth.js';
 import html from '../public/index.html';
+import classificationHtml from '../public/classification.html';
 import welcomePlant0 from '../public/welcome/plant-0.webp';
 import welcomePlant1 from '../public/welcome/plant-1.webp';
 import welcomePlant2 from '../public/welcome/plant-2.webp';
@@ -87,6 +88,7 @@ if(u.pathname==='/manifest.webmanifest')return new Response(JSON.stringify(manif
 if(u.pathname==='/sw.js')return new Response(serviceWorker,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-cache','Service-Worker-Allowed':'/'}});
 if(u.pathname==='/offline.html')return new Response(offline,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'}});
 if(desktopAssets[u.pathname]){const [data,mime]=desktopAssets[u.pathname];const headers={'Content-Type':mime,'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'};if(mime==='application/zip')headers['Content-Disposition']='attachment; filename="leaf-archive-shortcuts.zip"';return new Response(Uint8Array.from(atob(data.split(',')[1]),c=>c.charCodeAt(0)),{headers})}
+if(u.pathname==='/classification'||u.pathname==='/classification/')return new Response(classificationHtml,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
 if(u.pathname==='/')return new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
 if(welcomeIcons[u.pathname])return new Response(Uint8Array.from(atob(welcomeIcons[u.pathname].split(',')[1]),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/webp','Cache-Control':'public, max-age=86400'}});
 if(u.pathname==='/style.css')return new Response(css,{headers:{'Content-Type':'text/css'}});
