@@ -74,6 +74,7 @@ import {ranks,rankInfo,childRanks,referenceRank,plantPath,pathKey,buildTree} fro
  {src:'/welcome/plant-71.webp',alt:'黄绿直立筒状叶与深褐枯叶基部的食虫凤梨手绘图标'},
  {src:'/welcome/plant-72.webp',alt:'粉红圆囊与红黄条纹宽囊口的猪笼草手绘图标'},
  {src:'/welcome/plant-73.webp',alt:'橙红长囊与深红齿状囊口的猪笼草手绘图标'},
+ {src:'/welcome/plant-74.webp',alt:'黄绿纤细放射腺毛叶的食虫植物手绘图标'},
  {src:'/welcome/plant-75.webp',alt:'粉红长囊与红白条纹宽囊口的猪笼草手绘图标'}
  ];
  const chosen=welcomePlants[Math.floor(Math.random()*welcomePlants.length)];plant.alt=chosen.alt;plant.src=chosen.src;

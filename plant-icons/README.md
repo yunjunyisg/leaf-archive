@@ -1,6 +1,6 @@
 # 植物标识图库
 
-集中存放「植藏」的 **72 张透明背景植物标识图**，用于网站开场随机展示。图标参考植物照片，以柔和手绘插画风格绘制；文件为 WebP。
+集中存放「植藏」的 **73 张透明背景植物标识图**，用于网站开场随机展示。图标参考植物照片，以柔和手绘插画风格绘制；文件为 WebP。
 
 ## 预览与下载
 
@@ -26,12 +26,12 @@
 | <img src="./plant-59.webp" width="160" alt="金黄叶盘与铜橙果序的茅膏菜"><br>[plant-59.webp](./plant-59.webp)<br>金黄叶盘与铜橙果序的茅膏菜 | <img src="./plant-60.webp" width="160" alt="粉色长腺毛与晶莹露珠的茅膏菜"><br>[plant-60.webp](./plant-60.webp)<br>粉色长腺毛与晶莹露珠的茅膏菜 | <img src="./plant-61.webp" width="160" alt="黄绿圆叶与弯曲花梗淡粉花的茅膏菜"><br>[plant-61.webp](./plant-61.webp)<br>黄绿圆叶与弯曲花梗淡粉花的茅膏菜 | <img src="./plant-62.webp" width="160" alt="黄绿囊身与酒红斑纹的猪笼草"><br>[plant-62.webp](./plant-62.webp)<br>黄绿囊身与酒红斑纹的猪笼草 |
 | <img src="./plant-63.webp" width="160" alt="金黄直立茎与放射细长腺毛叶的食虫植物"><br>[plant-63.webp](./plant-63.webp)<br>金黄直立茎与放射细长腺毛叶的食虫植物 | <img src="./plant-64.webp" width="160" alt="珊瑚红宽圆叶盘与卷曲新叶的茅膏菜"><br>[plant-64.webp](./plant-64.webp)<br>珊瑚红宽圆叶盘与卷曲新叶的茅膏菜 | <img src="./plant-65.webp" width="160" alt="浅绿绒毛叶柄与粉红椭圆捕虫叶的茅膏菜"><br>[plant-65.webp](./plant-65.webp)<br>浅绿绒毛叶柄与粉红椭圆捕虫叶的茅膏菜 | <img src="./plant-66.webp" width="160" alt="黄绿绒毛叶柄与珊瑚粉露珠叶盘的茅膏菜"><br>[plant-66.webp](./plant-66.webp)<br>黄绿绒毛叶柄与珊瑚粉露珠叶盘的茅膏菜 |
 | <img src="./plant-67.webp" width="160" alt="红色细长叶柄与圆形露珠捕虫叶的茅膏菜"><br>[plant-67.webp](./plant-67.webp)<br>红色细长叶柄与圆形露珠捕虫叶的茅膏菜 | <img src="./plant-68.webp" width="160" alt="浅粉瓶身与黄绿斑纹的太阳瓶子草"><br>[plant-68.webp](./plant-68.webp)<br>浅粉瓶身与黄绿斑纹的太阳瓶子草 | <img src="./plant-69.webp?v=dry-1" width="160" alt="酒红网纹蛇首与分叉舌叶的眼镜蛇瓶子草"><br>[plant-69.webp](./plant-69.webp)<br>酒红网纹蛇首与分叉舌叶的眼镜蛇瓶子草 | <img src="./plant-70.webp" width="160" alt="粉色宽叶与三朵紫白花的捕虫堇"><br>[plant-70.webp](./plant-70.webp)<br>粉色宽叶与三朵紫白花的捕虫堇 |
-| <img src="./plant-71.webp" width="160" alt="黄绿直立筒状叶与深褐枯叶基部的食虫凤梨"><br>[plant-71.webp](./plant-71.webp)<br>黄绿直立筒状叶与深褐枯叶基部的食虫凤梨 | <img src="./plant-72.webp" width="160" alt="粉红圆囊与红黄条纹宽囊口的猪笼草"><br>[plant-72.webp](./plant-72.webp)<br>粉红圆囊与红黄条纹宽囊口的猪笼草 | <img src="./plant-73.webp" width="160" alt="橙红长囊与深红齿状囊口的猪笼草"><br>[plant-73.webp](./plant-73.webp)<br>橙红长囊与深红齿状囊口的猪笼草 |  |
+| <img src="./plant-71.webp" width="160" alt="黄绿直立筒状叶与深褐枯叶基部的食虫凤梨"><br>[plant-71.webp](./plant-71.webp)<br>黄绿直立筒状叶与深褐枯叶基部的食虫凤梨 | <img src="./plant-72.webp" width="160" alt="粉红圆囊与红黄条纹宽囊口的猪笼草"><br>[plant-72.webp](./plant-72.webp)<br>粉红圆囊与红黄条纹宽囊口的猪笼草 | <img src="./plant-73.webp" width="160" alt="橙红长囊与深红齿状囊口的猪笼草"><br>[plant-73.webp](./plant-73.webp)<br>橙红长囊与深红齿状囊口的猪笼草 | <img src="./plant-74.webp" width="160" alt="黄绿纤细放射腺毛叶的食虫植物"><br>[plant-74.webp](./plant-74.webp)<br>黄绿纤细放射腺毛叶的食虫植物 |
 | <img src="./plant-75.webp" width="160" alt="粉红长囊与红白条纹宽囊口的猪笼草"><br>[plant-75.webp](./plant-75.webp)<br>粉红长囊与红白条纹宽囊口的猪笼草 |  |  |  |
 
 ## 保存约定
 
-- 当前保存 72 张开场图标，沿用原文件编号，与网站使用的文件一致；删除后不重新编号。
+- 当前保存 73 张开场图标，沿用原文件编号，与网站使用的文件一致；删除后不重新编号。
 - 本目录用于集中收藏和下载；网站实际加载文件位于 [`public/welcome/`](../public/welcome/)。两处图片内容相同。
 - 后续新增或修改植物标识图时，同时更新本目录、网站使用文件及本页预览。
 
