@@ -80,7 +80,12 @@ import {ranks,rankInfo,childRanks,referenceRank,plantPath,pathKey,buildTree} fro
  {src:'/welcome/plant-77.webp',alt:'黄绿高筒捕虫叶与红粉垂花的瓶子草手绘图标'},
  {src:'/welcome/plant-78.webp',alt:'圆绿叶与成串白花黄喉的狸藻手绘图标'},
  {src:'/welcome/plant-79.webp',alt:'银白细毛与密集尖叶莲座的虎耳草手绘图标'},
- {src:'/welcome/plant-80.webp',alt:'两株鲜绿杯状圆叶莲座组合手绘图标'}
+ {src:'/welcome/plant-80.webp',alt:'两株鲜绿杯状圆叶莲座组合手绘图标'},
+ {src:'/welcome/plant-81.webp',alt:'红色枝茎与黄绿透明捕虫叶的水生食虫植物手绘图标'},
+ {src:'/welcome/plant-82.webp',alt:'黄绿细分枝与浅粉透明捕虫囊的水生狸藻手绘图标'},
+ {src:'/welcome/plant-83.webp',alt:'奶白卷边与粉红匙形叶莲座的捕虫堇手绘图标'},
+ {src:'/welcome/plant-84.webp',alt:'鲜绿波浪齿缘杯状捕虫夹的捕蝇草手绘图标'},
+ {src:'/welcome/plant-85.webp',alt:'鲜红夹面与黄绿长齿缘的捕蝇草手绘图标'}
  ];
  const chosen=welcomePlants[Math.floor(Math.random()*welcomePlants.length)];plant.alt=chosen.alt;plant.src=chosen.src;
  function dismiss(){if(closing)return;closing=true;clearTimeout(autoTimer);clearTimeout(fallbackTimer);splash.classList.add('welcome-leaving');const finish=()=>{splash.close();document.querySelector('#search')?.focus({preventScroll:true})};if(matchMedia('(prefers-reduced-motion: reduce)').matches)finish();else setTimeout(finish,320)}
