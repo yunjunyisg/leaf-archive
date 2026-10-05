@@ -50,7 +50,12 @@ import {ranks,rankInfo,childRanks,referenceRank,plantPath,pathKey,buildTree} fro
  {src:'/welcome/plant-47.webp',alt:'深酒红宽圆捕虫叶与紫红尖叶的茅膏菜手绘图标'},
  {src:'/welcome/plant-48.webp',alt:'粉红尖叶与向上卷曲宽圆捕虫叶的茅膏菜手绘图标'},
  {src:'/welcome/plant-49.webp',alt:'双株鲜绿稀疏长叶与浅粉小捕虫叶的茅膏菜手绘图标'},
- {src:'/welcome/plant-50.webp',alt:'橙粉放射叶柄与橙心红缘椭圆捕虫叶的茅膏菜手绘图标'}
+ {src:'/welcome/plant-50.webp',alt:'橙粉放射叶柄与橙心红缘椭圆捕虫叶的茅膏菜手绘图标'},
+ {src:'/welcome/plant-51.webp',alt:'银白绒毛密集圆盘与深红捕虫叶的茅膏菜手绘图标'},
+ {src:'/welcome/plant-52.webp',alt:'银白绒毛直立细叶与橙红捕虫叶的奥德茅膏菜手绘图标'},
+ {src:'/welcome/plant-53.webp',alt:'多株深红叶冠与灰褐枯叶柱的茅膏菜手绘图标'},
+ {src:'/welcome/plant-54.webp',alt:'铜红放射叶柄与弯曲花梗的茅膏菜手绘图标'},
+ {src:'/welcome/plant-55.webp',alt:'四株黄绿叶心与鲜红捕虫叶的茅膏菜手绘图标'}
  ];
  const chosen=welcomePlants[Math.floor(Math.random()*welcomePlants.length)];plant.alt=chosen.alt;plant.src=chosen.src;
  function dismiss(){if(closing)return;closing=true;clearTimeout(autoTimer);clearTimeout(fallbackTimer);splash.classList.add('welcome-leaving');const finish=()=>{splash.close();document.querySelector('#search')?.focus({preventScroll:true})};if(matchMedia('(prefers-reduced-motion: reduce)').matches)finish();else setTimeout(finish,320)}
