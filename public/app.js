@@ -75,7 +75,12 @@ import {ranks,rankInfo,childRanks,referenceRank,plantPath,pathKey,buildTree} fro
  {src:'/welcome/plant-72.webp',alt:'粉红圆囊与红黄条纹宽囊口的猪笼草手绘图标'},
  {src:'/welcome/plant-73.webp',alt:'橙红长囊与深红齿状囊口的猪笼草手绘图标'},
  {src:'/welcome/plant-74.webp',alt:'黄绿纤细放射腺毛叶的食虫植物手绘图标'},
- {src:'/welcome/plant-75.webp',alt:'粉红长囊与红白条纹宽囊口的猪笼草手绘图标'}
+ {src:'/welcome/plant-75.webp',alt:'粉红长囊与红白条纹宽囊口的猪笼草手绘图标'},
+ {src:'/welcome/plant-76.webp',alt:'细长分枝腺毛叶与淡紫粉花的食虫植物手绘图标'},
+ {src:'/welcome/plant-77.webp',alt:'黄绿高筒捕虫叶与红粉垂花的瓶子草手绘图标'},
+ {src:'/welcome/plant-78.webp',alt:'圆绿叶与成串白花黄喉的狸藻手绘图标'},
+ {src:'/welcome/plant-79.webp',alt:'银白细毛与密集尖叶莲座的虎耳草手绘图标'},
+ {src:'/welcome/plant-80.webp',alt:'两株鲜绿杯状圆叶莲座组合手绘图标'}
  ];
  const chosen=welcomePlants[Math.floor(Math.random()*welcomePlants.length)];plant.alt=chosen.alt;plant.src=chosen.src;
  function dismiss(){if(closing)return;closing=true;clearTimeout(autoTimer);clearTimeout(fallbackTimer);splash.classList.add('welcome-leaving');const finish=()=>{splash.close();document.querySelector('#search')?.focus({preventScroll:true})};if(matchMedia('(prefers-reduced-motion: reduce)').matches)finish();else setTimeout(finish,320)}

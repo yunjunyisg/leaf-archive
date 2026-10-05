@@ -1,6 +1,6 @@
 # 植物标识图库
 
-集中存放「植藏」的 **73 张透明背景植物标识图**，用于网站开场随机展示。图标参考植物照片，以柔和手绘插画风格绘制；文件为 WebP。
+集中存放「植藏」的 **78 张透明背景植物标识图**，用于网站开场随机展示。图标参考植物照片，以柔和手绘插画风格绘制；文件为 WebP。
 
 ## 预览与下载
 
@@ -28,10 +28,12 @@
 | <img src="./plant-67.webp" width="160" alt="红色细长叶柄与圆形露珠捕虫叶的茅膏菜"><br>[plant-67.webp](./plant-67.webp)<br>红色细长叶柄与圆形露珠捕虫叶的茅膏菜 | <img src="./plant-68.webp" width="160" alt="浅粉瓶身与黄绿斑纹的太阳瓶子草"><br>[plant-68.webp](./plant-68.webp)<br>浅粉瓶身与黄绿斑纹的太阳瓶子草 | <img src="./plant-69.webp?v=dry-1" width="160" alt="酒红网纹蛇首与分叉舌叶的眼镜蛇瓶子草"><br>[plant-69.webp](./plant-69.webp)<br>酒红网纹蛇首与分叉舌叶的眼镜蛇瓶子草 | <img src="./plant-70.webp" width="160" alt="粉色宽叶与三朵紫白花的捕虫堇"><br>[plant-70.webp](./plant-70.webp)<br>粉色宽叶与三朵紫白花的捕虫堇 |
 | <img src="./plant-71.webp" width="160" alt="黄绿直立筒状叶与深褐枯叶基部的食虫凤梨"><br>[plant-71.webp](./plant-71.webp)<br>黄绿直立筒状叶与深褐枯叶基部的食虫凤梨 | <img src="./plant-72.webp" width="160" alt="粉红圆囊与红黄条纹宽囊口的猪笼草"><br>[plant-72.webp](./plant-72.webp)<br>粉红圆囊与红黄条纹宽囊口的猪笼草 | <img src="./plant-73.webp" width="160" alt="橙红长囊与深红齿状囊口的猪笼草"><br>[plant-73.webp](./plant-73.webp)<br>橙红长囊与深红齿状囊口的猪笼草 | <img src="./plant-74.webp" width="160" alt="黄绿纤细放射腺毛叶的食虫植物"><br>[plant-74.webp](./plant-74.webp)<br>黄绿纤细放射腺毛叶的食虫植物 |
 | <img src="./plant-75.webp" width="160" alt="粉红长囊与红白条纹宽囊口的猪笼草"><br>[plant-75.webp](./plant-75.webp)<br>粉红长囊与红白条纹宽囊口的猪笼草 |  |  |  |
+| <img src="./plant-76.webp" width="160" alt="细长分枝腺毛叶与淡紫粉花的食虫植物"><br>[plant-76.webp](./plant-76.webp)<br>细长分枝腺毛叶与淡紫粉花的食虫植物 | <img src="./plant-77.webp" width="160" alt="黄绿高筒捕虫叶与红粉垂花的瓶子草"><br>[plant-77.webp](./plant-77.webp)<br>黄绿高筒捕虫叶与红粉垂花的瓶子草 | <img src="./plant-78.webp" width="160" alt="圆绿叶与成串白花黄喉的狸藻"><br>[plant-78.webp](./plant-78.webp)<br>圆绿叶与成串白花黄喉的狸藻 | <img src="./plant-79.webp" width="160" alt="银白细毛与密集尖叶莲座的虎耳草"><br>[plant-79.webp](./plant-79.webp)<br>银白细毛与密集尖叶莲座的虎耳草 |
+| <img src="./plant-80.webp" width="160" alt="两株鲜绿杯状圆叶莲座组合"><br>[plant-80.webp](./plant-80.webp)<br>两株鲜绿杯状圆叶莲座组合 |  |  |  |
 
 ## 保存约定
 
-- 当前保存 73 张开场图标，沿用原文件编号，与网站使用的文件一致；删除后不重新编号。
+- 当前保存 78 张开场图标，沿用原文件编号，与网站使用的文件一致；删除后不重新编号。
 - 本目录用于集中收藏和下载；网站实际加载文件位于 [`public/welcome/`](../public/welcome/)。两处图片内容相同。
 - 后续新增或修改植物标识图时，同时更新本目录、网站使用文件及本页预览。
 
