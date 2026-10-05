@@ -69,6 +69,7 @@ import welcomePlant65 from '../public/welcome/plant-65.webp';
 import welcomePlant66 from '../public/welcome/plant-66.webp';
 import welcomePlant67 from '../public/welcome/plant-67.webp';
 import welcomePlant68 from '../public/welcome/plant-68.webp';
+// plant-69: dry cobra lily surfaces; revised from reference 15089.
 import welcomePlant69 from '../public/welcome/plant-69.webp';
 import welcomePlant70 from '../public/welcome/plant-70.webp';
 import css from '../public/style.css';

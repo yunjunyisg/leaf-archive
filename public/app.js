@@ -69,7 +69,7 @@ import {ranks,rankInfo,childRanks,referenceRank,plantPath,pathKey,buildTree} fro
  {src:'/welcome/plant-66.webp',alt:'黄绿绒毛叶柄与珊瑚粉露珠叶盘的茅膏菜手绘图标'},
  {src:'/welcome/plant-67.webp',alt:'红色细长叶柄与圆形露珠捕虫叶的茅膏菜手绘图标'},
  {src:'/welcome/plant-68.webp',alt:'浅粉瓶身与黄绿斑纹的太阳瓶子草手绘图标'},
- {src:'/welcome/plant-69.webp',alt:'酒红网纹蛇首与分叉舌叶的眼镜蛇瓶子草手绘图标'},
+ {src:'/welcome/plant-69.webp?v=dry-1',alt:'酒红网纹蛇首与分叉舌叶的眼镜蛇瓶子草手绘图标'},
  {src:'/welcome/plant-70.webp',alt:'粉色宽叶与三朵紫白花的捕虫堇手绘图标'}
  ];
  const chosen=welcomePlants[Math.floor(Math.random()*welcomePlants.length)];plant.alt=chosen.alt;plant.src=chosen.src;
