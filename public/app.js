@@ -65,7 +65,12 @@ import {ranks,rankInfo,childRanks,referenceRank,plantPath,pathKey,buildTree} fro
  {src:'/welcome/plant-62.webp',alt:'黄绿囊身与酒红斑纹的猪笼草手绘图标'},
  {src:'/welcome/plant-63.webp',alt:'金黄直立茎与放射细长腺毛叶的食虫植物手绘图标'},
  {src:'/welcome/plant-64.webp',alt:'珊瑚红宽圆叶盘与卷曲新叶的茅膏菜手绘图标'},
- {src:'/welcome/plant-65.webp',alt:'浅绿绒毛叶柄与粉红椭圆捕虫叶的茅膏菜手绘图标'}
+ {src:'/welcome/plant-65.webp',alt:'浅绿绒毛叶柄与粉红椭圆捕虫叶的茅膏菜手绘图标'},
+ {src:'/welcome/plant-66.webp',alt:'黄绿绒毛叶柄与珊瑚粉露珠叶盘的茅膏菜手绘图标'},
+ {src:'/welcome/plant-67.webp',alt:'红色细长叶柄与圆形露珠捕虫叶的茅膏菜手绘图标'},
+ {src:'/welcome/plant-68.webp',alt:'浅粉瓶身与黄绿斑纹的太阳瓶子草手绘图标'},
+ {src:'/welcome/plant-69.webp',alt:'酒红网纹蛇首与分叉舌叶的眼镜蛇瓶子草手绘图标'},
+ {src:'/welcome/plant-70.webp',alt:'粉色宽叶与三朵紫白花的捕虫堇手绘图标'}
  ];
  const chosen=welcomePlants[Math.floor(Math.random()*welcomePlants.length)];plant.alt=chosen.alt;plant.src=chosen.src;
  function dismiss(){if(closing)return;closing=true;clearTimeout(autoTimer);clearTimeout(fallbackTimer);splash.classList.add('welcome-leaving');const finish=()=>{splash.close();document.querySelector('#search')?.focus({preventScroll:true})};if(matchMedia('(prefers-reduced-motion: reduce)').matches)finish();else setTimeout(finish,320)}
