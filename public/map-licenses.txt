@@ -85,3 +85,10 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+
+
+澳大利亚小地名快照：GeoNames，CC BY 4.0。
+https://download.geonames.org/export/dump/AU.zip
+https://download.geonames.org/export/dump/readme.txt
+https://creativecommons.org/licenses/by/4.0/
+包含 215,386 条记录；快照及处理说明见源码 data/gazetteers/。地名代表位置并非植物采集坐标，数据不保证完整性或测量精度。

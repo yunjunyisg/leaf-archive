@@ -39,6 +39,7 @@ test('geocoding requires authentication, caches identical requests and applies a
   assert.equal((await call('GET','/api/map/geocode?mode=reverse&lat=&lon=0')).status,400);
   const first=await call('GET','/api/map/geocode?q=Place');assert.equal(first.status,200);const body=await first.json();assert.equal(body.results[0].countryCode,'GH');assert.equal(body.results[0].precision,'county');
   assert.equal((await call('GET','/api/map/geocode?q=Place')).status,200);assert.equal(calls,1);
+  sql.prepare('UPDATE map_cache SET expires=? WHERE key=?').run(Date.now()+10000,'photon:gate');
   assert.equal((await call('GET','/api/map/geocode?q=Another')).status,429);assert.equal(calls,1);
   sql.prepare('UPDATE map_cache SET expires=0 WHERE key=?').run('photon:gate');globalThis.fetch=async()=>{throw Error('offline')};
   assert.equal((await call('GET','/api/map/geocode?q=Another')).status,503);
@@ -49,4 +50,33 @@ test('origin page and locally bundled map assets are available without exposing 
   for(const path of ['/origins','/origin-map.js','/origin-map.css','/leaflet.css','/geography.js'])assert.equal((await call('GET',path,null,null,null)).status,200);
   const html=await (await call('GET','/origins',null,null,null)).text();assert.ok(html.includes('id="originMapPanel"'));assert.ok(html.includes('id="originPicker"'));assert.ok(!html.includes('welcomeSplash'));
  }finally{sql.close()}
+});
+
+test('Kingston Rest resolves from the Australian snapshot and keeps locality, category and provenance',async()=>{
+ const {sql,call}=setup(),originalFetch=globalThis.fetch;globalThis.fetch=async()=>{throw Error('Online provider should not be needed for an Australian gazetteer match')};
+ try{
+  const response=await call('GET','/api/map/geocode?q=Kingston%20rest&country=AU');assert.equal(response.status,200);const body=await response.json();
+  const l=body.results.find(x=>x.sourceId==='8351675');assert.ok(l);assert.equal(l.locality,'Kingston Rest');assert.equal(l.precision,'locality');assert.equal(l.lat,-15.98111);assert.equal(l.lon,128.4178);assert.equal(l.county,'Wyndham-East Kimberley');assert.equal(l.source,'geonames');assert.equal(l.sourceUrl,'https://www.geonames.org/8351675/');assert.match(l.featureType,/Homestead/);
+  const created=await (await call('POST','/api/plants',{name:'小地名测试',number:'LOCALITY-1',origin:'Kingston Rest, Kimberley',originLocation:l})).json();assert.equal(created.originLocation.locality,'Kingston Rest');assert.equal(created.originLocation.sourceId,'8351675');assert.equal(created.originLocation.sourceUrl,l.sourceUrl);
+  assert.ok((await (await call('GET','/api/plants')).json())[0].originLocation.label.includes('Kingston Rest'));
+  assert.equal((await call('GET','/api/map/geocode?q=Kingston%20rest&country=AU')).status,200);
+ }finally{globalThis.fetch=originalFetch;sql.close()}
+});
+
+test('Australian small place search handles administrative context and falls back when online search is unavailable',async()=>{
+ const {sql,call}=setup(),originalFetch=globalThis.fetch;globalThis.fetch=async()=>{throw Error('offline')};
+ try{
+  const r=await call('GET','/api/map/geocode?q='+encodeURIComponent('Kingston Rest, Kimberley, Australia'));
+  assert.equal(r.status,200);const body=await r.json();assert.equal(body.results[0].locality,'Kingston Rest');assert.ok(body.warning);
+  sql.prepare('UPDATE map_cache SET expires=0 WHERE key=?').run('photon:gate');
+  assert.equal((await call('GET','/api/map/geocode?q=Kingston%20Rest&country=NZ')).status,503);
+ }finally{globalThis.fetch=originalFetch;sql.close()}
+});
+
+test('coordinate searches remain exact and provenance links reject executable URLs',async()=>{
+ const {sql,call}=setup(),originalFetch=globalThis.fetch;globalThis.fetch=async()=>{throw Error('Coordinates do not need an online lookup')};
+ try{
+  const response=await call('GET','/api/map/geocode?q='+encodeURIComponent('-15.98111, 128.4178'));assert.equal(response.status,200);const l=(await response.json()).results[0];assert.equal(l.lat,-15.98111);assert.equal(l.lon,128.4178);assert.equal(l.precision,'point');
+  assert.throws(()=>validOriginLocation({...location,locality:'Kingston Rest',sourceUrl:'javascript:alert(1)'}));
+ }finally{globalThis.fetch=originalFetch;sql.close()}
 });
