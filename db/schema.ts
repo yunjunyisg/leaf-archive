@@ -7,3 +7,5 @@ export const authSessions=sqliteTable('auth_sessions',{tokenHash:text('token_has
 export const oauthStates=sqliteTable('oauth_states',{stateHash:text('state_hash').primaryKey(),mode:text('mode').notNull(),appId:text('app_id').notNull(),expires:integer('expires').notNull()});
 
 export const taxa=sqliteTable('taxa',{id:text('id').primaryKey(),owner:text('owner').notNull(),pathKey:text('path_key').notNull(),data:text('data').notNull(),created:text('created').notNull()},t=>[uniqueIndex('taxa_owner_path').on(t.owner,t.pathKey)]);
+
+export const mapCache=sqliteTable('map_cache',{key:text('key').primaryKey(),value:text('value').notNull(),expires:integer('expires').notNull()});

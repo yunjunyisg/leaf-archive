@@ -1,0 +1,99 @@
+import L from 'leaflet';
+import {feature} from 'topojson-client';
+import atlas from 'world-atlas/countries-50m.json';
+import iso from 'i18n-iso-countries';
+import {locationLabel,locationPath,precisionLabels,groupByLocation,locatedPlants,filterByArea,distanceKm,validOriginLocation} from '../shared/geography.js';
+
+const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const displayNames=new Intl.DisplayNames(['zh-CN'],{type:'region'});
+const countryName=code=>{try{return displayNames.of(code)||code}catch{return code}};
+const countries=Object.keys(iso.getAlpha2Codes()).map(code=>({code,name:countryName(code)})).sort((a,b)=>a.name.localeCompare(b.name,'zh-CN'));
+const countryFeatures=feature(atlas,atlas.objects.countries);
+const codeFor=f=>iso.numericToAlpha2(String(f.id).padStart(3,'0'))||'';
+const pointLabel=l=>`${l.lat.toFixed(5)}, ${l.lon.toFixed(5)}`;
+const areaNames={countryCode:'国家 / 地区',state:'省 / 州',county:'区 / 县',city:'城市',district:'乡镇 / 街区'};
+const approximate=l=>l.precision==='point'?'手动标点 / 地点位置':precisionLabels[l.precision]+'代表位置';
+function styles(){for(const href of ['/leaflet.css','/origin-map.css'])if(!document.querySelector(`link[href="${href}"]`)){const link=document.createElement('link');link.rel='stylesheet';link.href=href;document.head.append(link)}}
+function baseMap(node,center=[20,12],zoom=2){
+ styles();const map=L.map(node,{center,zoom,minZoom:0,maxZoom:19,zoomSnap:.25,zoomDelta:.5,worldCopyJump:false,maxBounds:[[-85,-200],[85,200]],maxBoundsViscosity:.8});
+ let failed=0;const tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,noWrap:true,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(map);
+ const notice=L.control({position:'bottomleft'});notice.onAdd=()=>{const n=L.DomUtil.create('div','map-tile-notice');n.hidden=true;n.textContent='底图暂未加载，可继续使用标点和经纬度。';notice.node=n;return n};notice.addTo(map);
+ tiles.on('tileerror',()=>{if(++failed>=4)notice.node.hidden=false});tiles.on('tileload',()=>{failed=0;notice.node.hidden=true});
+ const resize=new ResizeObserver(()=>map.invalidateSize({pan:false}));resize.observe(node);
+ map.on('unload',()=>resize.disconnect());worldView(map);return map;
+}
+function countryAt(latlng){
+ const x=(latlng.lng+540)%360-180,y=latlng.lat;
+ const inRing=ring=>{let inside=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const a=ring[i],b=ring[j];if((a[1]>y)!==(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0])inside=!inside}return inside};
+ for(const f of countryFeatures.features){const polygons=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates;if(polygons.some(rings=>inRing(rings[0])&&!rings.slice(1).some(inRing)))return codeFor(f)}return '';
+}
+function worldView(map){map.fitBounds([[-60,-180],[83,180]],{padding:[8,8],maxZoom:2,animate:false})}
+function addCountries(map,onClick){
+ // Split outlines at the date line so Leaflet never draws a false line across the world.
+ const outlines={type:'FeatureCollection',features:countryFeatures.features.map(f=>{const polygons=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates,lines=[];for(const rings of polygons)for(const ring of rings){let line=[];for(const point of ring){if(line.length&&Math.abs(point[0]-line.at(-1)[0])>180){if(line.length>1)lines.push(line);line=[]}line.push(point)}if(line.length>1)lines.push(line)}return {...f,geometry:{type:'MultiLineString',coordinates:lines}}})};
+ return L.geoJSON(outlines,{style:{color:'#657d62',weight:.8,opacity:.65,fill:false},onEachFeature(f,layer){layer.options.bubblingMouseEvents=false;const code=codeFor(f);layer.bindTooltip(escape(code?countryName(code):f.properties.name),{sticky:true,direction:'top'});layer.on('click',e=>{L.DomEvent.stopPropagation(e.originalEvent);onClick(code,layer,e.latlng)})}}).addTo(map);
+}
+function fitCountry(map,code,overlay){let found=false;overlay.eachLayer(layer=>{if(codeFor(layer.feature)===code){const bounds=layer.getBounds();if(bounds.isValid()){map.fitBounds(bounds,{padding:[24,24],maxZoom:7,animate:false});found=true}}});return found;}
+function resultMarkup(results){return results.map((l,i)=>`<button type="button" class="place-result" data-result="${i}"><strong>${escape(l.label)}</strong><small>${escape(approximate(l))} · ${escape(pointLabel(l))}</small></button>`).join('')||'<p class="map-empty">没有找到地点。试试当地名称、英文名，或直接在地图上标点。</p>';}
+function boundsFor(l){return l.bounds&&l.bounds.length===4?[[l.bounds[3],l.bounds[0]],[l.bounds[1],l.bounds[2]]]:null;}
+function flyTo(map,l){const bounds=boundsFor(l);if(bounds&&bounds.flat().every(Number.isFinite))map.fitBounds(bounds,{padding:[24,24],maxZoom:13,animate:false});else map.setView([l.lat,l.lon],l.precision==='country'?4:l.precision==='region'?6:l.precision==='city'?10:12,{animate:false});}
+function pointLocation(latlng,countryCode=''){return {lat:Number(latlng.lat.toFixed(6)),lon:Number(((latlng.lng+540)%360-180).toFixed(6)),countryCode,country:countryCode?countryName(countryCode):'',state:'',county:'',city:'',district:'',label:'',source:'manual',precision:'point'};}
+async function lookup(api,point){const response=await api(`/api/map/geocode?mode=reverse&lat=${point.lat}&lon=${point.lon}`);const l=response.results?.[0];return l?{...l,lat:point.lat,lon:point.lon,precision:'point',source:'map',label:locationPath(l).join(' / ')}:point;}
+
+export function createOriginMap({root,getPlants,canEdit,openPlant,editPlant,api,isDemo}){
+ styles();root.innerHTML=`<section class="origin-summary" aria-label="产地概况"><div><span>已定位植物</span><strong id="mapLocated">0</strong></div><div><span>产地国家 / 地区</span><strong id="mapCountries">0</strong></div><div><span>待定位档案</span><strong id="mapUnlocated">0</strong></div></section><section class="origin-workspace"><div class="origin-map-column"><div class="map-toolbar"><label>国家 / 地区<select id="mapCountry"><option value="">世界全图</option>${countries.map(c=>`<option value="${c.code}">${escape(c.name)}</option>`).join('')}</select></label><button type="button" id="mapWorld">世界全图</button><button type="button" id="mapFit">查看全部标点</button></div><div id="worldMap" class="world-map" role="region" aria-label="可缩放的世界产地地图"></div><p class="map-caption">拖动和缩放地图查看国家、城市及区县。点击标点查看植物；点击地图可查询附近行政区。国界概览：Natural Earth。<a href="/map-licenses.txt" target="_blank" rel="noopener">数据来源</a></p><div class="map-saved-filters"><span>已标注产地筛选</span>${['state','county','city'].map(k=>`<label>${areaNames[k]}<select id="map-${k}"><option value="">全部</option></select></label>`).join('')}</div></div><aside class="origin-map-panel"><form id="placeSearch" class="place-search"><label for="placeQuery">查找国家、城市、区县或产地</label><div><input id="placeQuery" type="search" maxlength="160" placeholder="如：云南、Xishuangbanna、Cape Town"><button class="primary" type="submit">搜索</button></div><small>地点查询由 Photon / OpenStreetMap 提供；中文无结果时可试英文或当地名称。</small></form><p id="mapStatus" class="map-status" role="status"></p><div id="placeResults" class="place-results"></div><div id="areaTrail" class="area-trail"></div><div class="map-list-heading"><h2 id="mapListTitle">全部已定位植物</h2><button type="button" id="clearMapArea">清除筛选</button></div><div id="mapPlantList" class="map-plant-list"></div><details class="map-unlocated" open><summary id="unlocatedTitle">待定位档案</summary><p>已有产地文字会保留。逐株确认地图位置后，即可加入地图。</p><div id="mapUnlocatedList"></div></details></aside></section>`;
+ const $=s=>root.querySelector(s),map=baseMap($('#worldMap')),markers=L.layerGroup().addTo(map);let area={},focus=null,results=[],disposed=false,requestEpoch=0,pointMarker=null;
+ const overlay=addCountries(map,(code,layer,latlng)=>{if(map.getZoom()<4&&code){chooseCountry(code)}else selectPoint(latlng,code)});
+ function status(message){$('#mapStatus').textContent=message}
+ function chooseCountry(code){requestEpoch++;area=code?{countryCode:code}:{};focus=null;$('#mapCountry').value=code;if(code&&!fitCountry(map,code,overlay))status('该国家或地区面积较小，可搜索名称进一步定位。');render();}
+ function card(p,unlocated=false){return `<article class="map-plant"><button type="button" data-plant="${escape(p.id)}">${p.photos?.[0]?`<img src="${escape(p.photos[0])}" alt="" loading="lazy">`:'<span class="map-plant-placeholder">✳</span>'}<span><strong>${escape(p.name)}</strong><small>${escape(p.number)} · ${escape(p.origin||locationLabel(p.originLocation))}</small></span></button>${unlocated&&canEdit()&&!p.demo?`<button class="map-locate" type="button" data-locate="${escape(p.id)}">定位产地</button>`:''}</article>`;}
+ function relevant(plants){let filtered=filterByArea(plants,area);if(focus?.type==='group')filtered=filtered.filter(p=>focus.ids.includes(p.id));else if(focus?.type==='nearby')filtered=filtered.filter(p=>distanceKm(p.originLocation,focus.location)<=50);return filtered;}
+ function render(){
+  if(disposed)return;const all=getPlants(),located=locatedPlants(all),unlocated=all.filter(p=>!located.includes(p));
+  $('#mapLocated').textContent=located.length;$('#mapCountries').textContent=new Set(located.map(p=>p.originLocation.countryCode).filter(Boolean)).size;$('#mapUnlocated').textContent=unlocated.length;
+  $('#mapCountry').value=area.countryCode||'';
+  for(const k of ['state','county','city']){const select=$('#map-'+k),pool=filterByArea(located,area.countryCode?{countryCode:area.countryCode}:{}),values=[...new Set(pool.map(p=>p.originLocation[k]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh'));select.innerHTML='<option value="">全部</option>'+values.map(v=>`<option>${escape(v)}</option>`).join('');select.value=area[k]||'';}
+  markers.clearLayers();for(const group of groupByLocation(filterByArea(located,area))){const l=group.location;const marker=L.circleMarker([l.lat,l.lon],{radius:Math.min(18,7+Math.sqrt(group.plants.length)*2),color:'#fff',weight:2,fillColor:'#315e42',fillOpacity:.95});marker.bindTooltip(`${escape(locationLabel(l))}<br>${group.plants.length} 株 · ${escape(approximate(l))}`);marker.on('click',e=>{L.DomEvent.stopPropagation(e.originalEvent);focus={type:'group',ids:group.plants.map(p=>p.id),location:l};render()});marker.addTo(markers);}
+  const filtered=relevant(located);$('#mapListTitle').textContent=focus?.type==='nearby'?'标点附近 50 公里的植物':focus?.type==='group'?'此产地的植物':'已定位植物 · '+filtered.length;
+  const trail=Object.entries(area).filter(([,v])=>v).map(([k,v])=>`${areaNames[k]}：${k==='countryCode'?countryName(v):v}`);$('#areaTrail').textContent=trail.join(' / ')+(focus?' · '+locationLabel(focus.location):'');
+  $('#mapPlantList').innerHTML=filtered.map(p=>card(p)).join('')||'<p class="map-empty">'+(located.length?'当前地区还没有已标注的植物。':'还没有地图标点。在植物档案中点击“地图标注产地”，或浏览示例地图。')+'</p>';
+  $('#unlocatedTitle').textContent='待定位档案 · '+unlocated.length;$('#mapUnlocatedList').innerHTML=unlocated.map(p=>card(p,true)).join('')||'<p class="map-empty">所有档案均已标注。</p>';
+  root.querySelectorAll('[data-plant]').forEach(b=>b.onclick=()=>openPlant(b.dataset.plant));root.querySelectorAll('[data-locate]').forEach(b=>b.onclick=()=>editPlant(b.dataset.locate));
+  overlay.eachLayer(layer=>{const code=codeFor(layer.feature),count=located.filter(p=>p.originLocation.countryCode===code).length;layer.setStyle({fillOpacity:code&&code===area.countryCode ? .27 : count ? .14 : .05,fillColor:'#5c8154',weight:code===area.countryCode?1.7:.7});});
+ }
+ async function selectPoint(latlng,code=''){
+  const epoch=++requestEpoch,point=pointLocation(latlng,code);area={};focus={type:'nearby',location:point};if(pointMarker)pointMarker.remove();pointMarker=L.circleMarker([point.lat,point.lon],{radius:7,color:'#b55d32',fillColor:'#ebc598',fillOpacity:1,weight:3}).addTo(map);render();
+  if(!canEdit()){status('登录后可查询该地点的行政区。示例标点仅用于演示。');return;}
+  status('正在查询附近行政区…');try{const l=await lookup(api,point);if(disposed||epoch!==requestEpoch)return;focus={type:'nearby',location:l};status(locationPath(l).length?'附近行政区：'+locationPath(l).join(' / '):'未找到附近行政区，可在档案中手动标注。');render();}catch(error){if(epoch===requestEpoch)status(error.message)}
+ }
+ function applyResult(l){requestEpoch++;focus=null;area=l.countryCode?{countryCode:l.countryCode}:{};if(l.precision==='region'&&l.state)area.state=l.state;if(['county','city'].includes(l.precision)&&l.state)area.state=l.state;if(l.precision==='county'&&l.county)area.county=l.county;if(l.precision==='city'&&l.city){if(l.county)area.county=l.county;area.city=l.city;}if(['point','locality'].includes(l.precision))focus={type:'nearby',location:l};flyTo(map,l);status(locationPath(l).join(' / ')||locationLabel(l));render()}
+ map.on('click',e=>{const code=map.getZoom()<4?countryAt(e.latlng):'';if(code)chooseCountry(code);else selectPoint(e.latlng)});
+ $('#mapCountry').onchange=e=>{chooseCountry(e.target.value);if(!e.target.value)worldView(map)};$('#mapWorld').onclick=()=>{chooseCountry('');worldView(map);status('')};$('#clearMapArea').onclick=()=>{area={};focus=null;requestEpoch++;render();status('')};
+ $('#mapFit').onclick=()=>{const points=locatedPlants(getPlants()).map(p=>[p.originLocation.lat,p.originLocation.lon]);if(points.length)map.fitBounds(L.latLngBounds(points),{padding:[35,35],maxZoom:12,animate:false});else status('还没有已定位植物。')};
+ for(const k of ['state','county','city'])$('#map-'+k).onchange=e=>{focus=null;if(e.target.value)area[k]=e.target.value;else delete area[k];render();const points=relevant(locatedPlants(getPlants())).map(p=>[p.originLocation.lat,p.originLocation.lon]);if(points.length)map.fitBounds(L.latLngBounds(points),{padding:[30,30],maxZoom:12,animate:false})};
+ $('#placeSearch').onsubmit=async e=>{e.preventDefault();if(!canEdit()){status('请先登录，再搜索产地；也可浏览世界地图与示例标点。');return;}const q=$('#placeQuery').value.trim();if(q.length<2){status('请输入至少两个字的地名。');return;}const epoch=++requestEpoch;status('正在搜索地点…');const button=e.currentTarget.querySelector('button');button.disabled=true;try{const r=await api('/api/map/geocode?q='+encodeURIComponent(q)+(area.countryCode?'&country='+area.countryCode:''));if(disposed||epoch!==requestEpoch)return;results=r.results;$('#placeResults').innerHTML=resultMarkup(results);$('#placeResults').querySelectorAll('[data-result]').forEach(b=>b.onclick=()=>applyResult(results[Number(b.dataset.result)]));status('找到 '+results.length+' 个地点。请选择符合产地的结果。');}catch(error){if(epoch===requestEpoch)status(error.message)}finally{button.disabled=false}};
+ render();return {update:render,reset(){requestEpoch++;area={};focus=null;results=[];$('#placeQuery').value='';$('#placeResults').replaceChildren();status('');if(pointMarker){pointMarker.remove();pointMarker=null;}render()},focusPlant(p){if(!p?.originLocation)return;area={};focus={type:'group',ids:[p.id],location:p.originLocation};map.setView([p.originLocation.lat,p.originLocation.lon],10,{animate:false});render()},destroy(){disposed=true;requestEpoch++;map.remove();root.replaceChildren()}};
+}
+
+export function createOriginPicker({dialog,onConfirm,api,canEdit}){
+ styles();const $=s=>dialog.querySelector(s),map=baseMap($('#originPickerMap'));let draft=null,marker=null,epoch=0,results=[];
+ const overlay=addCountries(map,(code,layer,latlng)=>{if(map.getZoom()<4&&code){$('#pickerCountry').value=code;fitCountry(map,code,overlay);setDraft({...pointLocation(latlng,code),precision:'country',label:countryName(code)});}else selectPoint(latlng,code)});
+ $('#pickerCountry').innerHTML='<option value="">选择国家 / 地区</option>'+countries.map(c=>`<option value="${c.code}">${escape(c.name)}</option>`).join('');
+ function status(t){$('#pickerStatus').textContent=t}
+ function setDraft(l){draft=l;for(const key of ['lat','lon','country','state','county','city','district'])$('#picker-'+key).value=l?.[key]??'';$('#pickerCountry').value=l?.countryCode||'';$('#pickerPrecision').value=l?.precision||'point';if(marker)marker.remove();marker=l?L.circleMarker([l.lat,l.lon],{radius:8,color:'#fff',weight:3,fillColor:'#bb743f',fillOpacity:1}).addTo(map):null;}
+ async function selectPoint(latlng,code=''){
+  const attempt=++epoch,l=pointLocation(latlng,code);setDraft(l);status('已标点，可直接使用；正在查询附近行政区…');
+  try{const found=await lookup(api,l);if(attempt!==epoch||!dialog.open)return;setDraft(found);status(locationPath(found).length?'已查询附近行政区，请核对后使用。':'此处没有可用行政区信息，可手动填写。')}catch(error){if(attempt===epoch)status('已保留标点。'+error.message)}
+ }
+ map.on('click',e=>selectPoint(e.latlng));$('#pickerCountry').onchange=e=>{epoch++;const code=e.target.value;if(code)fitCountry(map,code,overlay);if(draft&&draft.countryCode!==code){setDraft(null);$('#pickerCountry').value=code;$('#picker-country').value=code?countryName(code):'';status('已切换国家或地区，请重新标点或填写经纬度。')}else if(!draft)$('#picker-country').value=code?countryName(code):'';};
+ $('#pickerSearchForm').onsubmit=async e=>{e.preventDefault();const q=$('#pickerQuery').value.trim();if(q.length<2){status('请输入至少两个字的地名。');return;}const attempt=++epoch,button=e.currentTarget.querySelector('button');button.disabled=true;status('正在搜索地点…');try{const r=await api('/api/map/geocode?q='+encodeURIComponent(q)+($('#pickerCountry').value?'&country='+$('#pickerCountry').value:''));if(attempt!==epoch||!dialog.open)return;results=r.results;$('#pickerResults').innerHTML=resultMarkup(results);$('#pickerResults').querySelectorAll('[data-result]').forEach(b=>b.onclick=()=>{epoch++;const l=results[Number(b.dataset.result)];setDraft(l);flyTo(map,l);status('已选择地点。行政区中心是代表位置，请按已知产地精度保存。')});status('请选择搜索结果，或直接在地图上标点。')}catch(error){if(attempt===epoch)status(error.message)}finally{button.disabled=false}};
+ $('#pickerUse').onclick=()=>{
+  epoch++;const latText=$('#picker-lat').value.trim(),lonText=$('#picker-lon').value.trim();if(!latText||!lonText){status('请先搜索地点、在地图上标点，或填写经纬度。');return;}
+  const l={lat:Number(latText),lon:Number(lonText),countryCode:$('#pickerCountry').value,country:$('#picker-country').value,state:$('#picker-state').value,county:$('#picker-county').value,city:$('#picker-city').value,district:$('#picker-district').value,precision:$('#pickerPrecision').value,source:draft?.source||'manual',label:''};l.label=locationPath(l).join(' / ');
+  try{onConfirm(validOriginLocation(l));dialog.close()}catch(error){status(error.message)}
+ };
+ $('#pickerClose').onclick=()=>dialog.close();$('#pickerCancel').onclick=()=>dialog.close();
+ for(const input of dialog.querySelectorAll('#pickerFields input,#pickerFields select'))input.addEventListener('input',()=>{epoch++;if(draft)draft.source='manual';if(['picker-lat','picker-lon'].includes(input.id))$('#pickerPrecision').value='point';});
+ dialog.addEventListener('close',()=>{epoch++});
+ return {open(location,text=''){if(!canEdit())return;epoch++;$('#pickerResults').replaceChildren();$('#pickerQuery').value=text;status('搜索地名后选择结果，或直接点击地图。位置只会在保存植物档案后同步。');setDraft(location);dialog.showModal();setTimeout(()=>{map.invalidateSize();if(location)map.setView([location.lat,location.lon],location.precision==='country'?4:10,{animate:false});else worldView(map)},0)}};
+}

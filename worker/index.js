@@ -1,3 +1,11 @@
+import mapLicenses from '../public/map-licenses.txt';
+import {validOriginLocation} from '../shared/geography.js';
+import geographyJs from '../shared/geography.js?raw';
+import {geocodingRoute} from './geocoding.js';
+import originMapHtml from '../public/origins.html';
+import originMapJs from '../public/origin-map.js';
+import originMapCss from '../public/origin-map.css';
+import leafletCss from '../node_modules/leaflet/dist/leaflet.css';
 import {validPath,referenceRank,pathKey,plantPath} from '../shared/taxonomy.js';
 import taxonomyJs from '../shared/taxonomy.js?raw';
 import {authRoutes, identity} from './auth.js';
@@ -110,6 +118,7 @@ function valid(p){
  if(!p||typeof p!=='object')throw new Error('无效的档案');const out={};
  const fields=['name','latin','number','sourceNumber','source','family','genus','kingdom','division','className','order','tribe','section','series','species','identification','variety','form','infraspecific','description','origin','individualInfo','price','date','location','status','light','water','substrate','notes','lastWater','nextWater'];
  for(const f of fields){out[f]=String(p[f]??'').trim();if(out[f].length>10000)throw new Error('内容过长')}
+ if(Object.hasOwn(p,'originLocation'))out.originLocation=validOriginLocation(p.originLocation);
  if(out.status&&!plantStatuses.includes(out.status))throw new Error('植物状态无效');
  if(!out.name||!out.number)throw new Error('请填写中文名和收藏编号');
  if(out.price!==''&&(!Number.isFinite(Number(out.price))||Number(out.price)<0))throw new Error('价格应为非负数字');
@@ -148,6 +157,12 @@ if(u.pathname==='/manifest.webmanifest')return new Response(JSON.stringify(manif
 if(u.pathname==='/sw.js')return new Response(serviceWorker,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-cache','Service-Worker-Allowed':'/'}});
 if(u.pathname==='/offline.html')return new Response(offline,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'}});
 if(desktopAssets[u.pathname]){const [data,mime]=desktopAssets[u.pathname];const headers={'Content-Type':mime,'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'};if(mime==='application/zip')headers['Content-Disposition']='attachment; filename="leaf-archive-shortcuts.zip"';return new Response(Uint8Array.from(atob(data.split(',')[1]),c=>c.charCodeAt(0)),{headers})}
+if(u.pathname==='/origins'||u.pathname==='/origins/')return new Response(originMapHtml,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
+if(u.pathname==='/origin-map.js')return new Response(originMapJs,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-cache'}});
+if(u.pathname==='/origin-map.css')return new Response(originMapCss,{headers:{'Content-Type':'text/css; charset=utf-8'}});
+if(u.pathname==='/map-licenses.txt')return new Response(mapLicenses,{headers:{'Content-Type':'text/plain; charset=utf-8'}});
+if(u.pathname==='/leaflet.css')return new Response(leafletCss,{headers:{'Content-Type':'text/css; charset=utf-8'}});
+if(u.pathname==='/geography.js')return new Response(geographyJs,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-cache'}});
 if(u.pathname==='/classification'||u.pathname==='/classification/')return new Response(classificationHtml,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
 if(u.pathname==='/')return new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
 if(welcomeIcons[u.pathname])return new Response(Uint8Array.from(atob(welcomeIcons[u.pathname].split(',')[1]),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/webp','Cache-Control':'public, max-age=86400'}});
@@ -158,6 +173,7 @@ if(assets[u.pathname]){const a=assets[u.pathname];return new Response(Uint8Array
 if(!u.pathname.startsWith('/api/')&&!u.pathname.startsWith('/images/'))return new Response('Not found',{status:404});
 const who=(await identity(request,env))?.owner;if(!who)return json({error:'请先登录，再访问你的植物档案。'},401);
 if(request.method!=='GET'){const origin=request.headers.get('Origin');if(origin&&origin!==u.origin)return json({error:'请求来源无效'},403)}
+if(u.pathname==='/api/map/geocode')return geocodingRoute(request,env);
 if(u.pathname==='/api/taxa'&&request.method==='GET'){
  const r=await db(env).prepare('SELECT id, data FROM taxa WHERE owner = ? ORDER BY created').bind(who).all();return json(r.results.map(x=>({id:x.id,...JSON.parse(x.data)})));
 }
@@ -197,6 +213,7 @@ if(u.pathname.startsWith('/api/plants/')&&['PUT','DELETE'].includes(request.meth
   return json({ok:true});
  }
  const input=await request.json();const p={...valid(input),_revision:crypto.randomUUID()};
+ if(!Object.hasOwn(input,'originLocation')&&current.originLocation)p.originLocation=current.originLocation;
  recordStatusChange(p,current,input.statusChange);
  const result=await db(env).prepare('UPDATE plants SET number = ?, data = ? WHERE id = ? AND owner = ? AND data = ?').bind(p.number,JSON.stringify(p),id,who,row.data).run();
  if(!result.meta?.changes)return json({error:'档案刚刚在其他窗口更新。当前输入已保留，请复制需要的内容，再重新打开档案。'},409);
@@ -205,4 +222,4 @@ if(u.pathname.startsWith('/api/plants/')&&['PUT','DELETE'].includes(request.meth
 if(u.pathname==='/api/images'&&request.method==='POST'){const f=await request.formData();const file=f.get('file');if(!file||!['image/jpeg','image/png','image/webp'].includes(file.type))return json({error:'请选择 JPG、PNG 或 WebP 图片'},400);if(file.size>8*1024*1024)return json({error:'每张图片请小于 8 MB'},400);if(!env.BUCKET)throw new Error('图片存储暂时不可用');const bytes=await file.arrayBuffer();const b=new Uint8Array(bytes);const magic=(file.type==='image/jpeg'&&b[0]===255&&b[1]===216)||(file.type==='image/png'&&b[0]===137&&b[1]===80&&b[2]===78&&b[3]===71)||(file.type==='image/webp'&&new TextDecoder().decode(b.slice(0,4))==='RIFF'&&new TextDecoder().decode(b.slice(8,12))==='WEBP');if(!magic)return json({error:'图片格式不匹配'},400);const id=crypto.randomUUID();await env.BUCKET.put(who+'/'+id,bytes,{httpMetadata:{contentType:file.type}});await db(env).prepare('INSERT INTO images (id,owner,mime) VALUES (?,?,?)').bind(id,who,file.type).run();return json({url:'/images/'+id})}
 if(u.pathname.startsWith('/images/')&&request.method==='GET'){const id=u.pathname.split('/').pop();const row=await db(env).prepare('SELECT mime FROM images WHERE id = ? AND owner = ?').bind(id,who).first();if(!row)return new Response('Not found',{status:404});const object=await env.BUCKET.get(who+'/'+id);if(!object)return new Response('Not found',{status:404});return new Response(object.body,{headers:{'Content-Type':row.mime,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}})}
 return json({error:'未找到此操作'},404);
-}catch(e){console.error(e);if(['植物状态无效','状态变更日期无效','状态变更备注最多 3000 字','aff. 和 cf. 请填写基础种名','分类路径无效','分类层级或名称无效','鉴定类别无效','未定种不能添加种下分类','aff. 和 cf. 不能同时填写变种或变型','分类名称最多 200 字','照片日期无效','生长记录日期无效','每株植物最多保存 300 条生长记录'].includes(e.message))return json({error:e.message},400);const duplicate=String(e).includes('UNIQUE');return json({error:duplicate?(u.pathname.startsWith('/api/taxa')?'该分类已存在，请在分类树中管理参考图。':'收藏编号已存在，请使用其他编号。'):e.message==='档案存储暂时不可用'||e.message==='图片存储暂时不可用'?e.message:'操作未完成，请检查填写内容后重试。'},duplicate?409:500)}}};
+}catch(e){console.error(e);if(['产地位置无效','产地经纬度无效','产地位置内容过长','产地国家代码无效','产地位置精度无效','植物状态无效','状态变更日期无效','状态变更备注最多 3000 字','aff. 和 cf. 请填写基础种名','分类路径无效','分类层级或名称无效','鉴定类别无效','未定种不能添加种下分类','aff. 和 cf. 不能同时填写变种或变型','分类名称最多 200 字','照片日期无效','生长记录日期无效','每株植物最多保存 300 条生长记录'].includes(e.message))return json({error:e.message},400);const duplicate=String(e).includes('UNIQUE');return json({error:duplicate?(u.pathname.startsWith('/api/taxa')?'该分类已存在，请在分类树中管理参考图。':'收藏编号已存在，请使用其他编号。'):e.message==='档案存储暂时不可用'||e.message==='图片存储暂时不可用'?e.message:'操作未完成，请检查填写内容后重试。'},duplicate?409:500)}}};
