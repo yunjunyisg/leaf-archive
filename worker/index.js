@@ -1,3 +1,6 @@
+import admin1Json from '../data/boundaries/admin1.json.gz';
+import usCountiesJson from '../data/boundaries/US-counties.json.gz';
+import auCountiesJson from '../data/boundaries/AU-admin2.json.gz';
 import mapLicenses from '../public/map-licenses.txt';
 import {validOriginLocation} from '../shared/geography.js';
 import geographyJs from '../shared/geography.js?raw';
@@ -158,6 +161,7 @@ if(u.pathname==='/sw.js')return new Response(serviceWorker,{headers:{'Content-Ty
 if(u.pathname==='/offline.html')return new Response(offline,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'}});
 if(desktopAssets[u.pathname]){const [data,mime]=desktopAssets[u.pathname];const headers={'Content-Type':mime,'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'};if(mime==='application/zip')headers['Content-Disposition']='attachment; filename="leaf-archive-shortcuts.zip"';return new Response(Uint8Array.from(atob(data.split(',')[1]),c=>c.charCodeAt(0)),{headers})}
 if(u.pathname==='/origins'||u.pathname==='/origins/')return new Response(originMapHtml,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
+if(u.pathname.startsWith('/map-boundaries/')){const data={'/map-boundaries/admin1.json':admin1Json,'/map-boundaries/US-counties.json':usCountiesJson,'/map-boundaries/AU-admin2.json':auCountiesJson}[u.pathname];if(data){const decoded=atob(data.slice(data.indexOf(',')+1)),bytes=new Uint8Array(decoded.length);for(let i=0;i<decoded.length;i++)bytes[i]=decoded.charCodeAt(i);return new Response(bytes,{headers:{'Content-Type':'application/json; charset=utf-8','Content-Encoding':'gzip','Cache-Control':'public, max-age=3600'}})};}
 if(u.pathname==='/origin-map.js')return new Response(originMapJs,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-cache'}});
 if(u.pathname==='/origin-map.css')return new Response(originMapCss,{headers:{'Content-Type':'text/css; charset=utf-8'}});
 if(u.pathname==='/map-licenses.txt')return new Response(mapLicenses,{headers:{'Content-Type':'text/plain; charset=utf-8'}});
