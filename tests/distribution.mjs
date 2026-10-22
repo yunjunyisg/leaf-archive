@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {feature} from 'topojson-client';
-import {taxonName,taxonColor,taxonGroups,regionIndex,regionFor,regionGroups} from '../shared/distribution.js';
+import {taxonName,taxonColor,taxonGroups,regionIndex,regionFor,regionGroups,automaticDistributionLevel} from '../shared/distribution.js';
 import worker from '../dist/server/index.js';
 const data=name=>JSON.parse(gunzipSync(fs.readFileSync('data/boundaries/'+name+'.json.gz')));
 const admin1=regionIndex(data('admin1').features),au=regionIndex(data('AU-admin2').features);
@@ -27,4 +27,13 @@ test('boundary routes serve only licensed public data as compressed lazy assets'
  for(const path of ['/map-boundaries/admin1.json','/map-boundaries/US-counties.json','/map-boundaries/AU-admin2.json']){
   const r=await worker.fetch(new Request('https://example.test'+path),{});assert.equal(r.status,200);assert.equal(r.headers.get('Content-Encoding'),'gzip');const d=JSON.parse(gunzipSync(new Uint8Array(await r.arrayBuffer())));assert.ok(d.type==='Topology'||d.type==='FeatureCollection');assert.ok(!JSON.stringify(d).includes('qa-owner'));
  }
+});
+
+test('zooming narrows the same Kingston Rest record from Australia to Western Australia to its LGA and back',()=>{
+ const p={id:'kingston',originLocation:{lat:-15.98111,lon:128.4178,countryCode:'AU',state:'Western Australia',county:'Wyndham-East Kimberley',precision:'locality'}};
+ const countries=regionIndex([{type:'Feature',id:'AU',properties:{code:'AU',name:'Australia'},geometry:{type:'Polygon',coordinates:[[[110,-45],[155,-45],[155,-10],[110,-10],[110,-45]]]}}]);
+ const layers={country:countries,state:admin1,county:au};
+ const trace=[2,3.75,4,6.75,7,12,6,3].map(zoom=>{const level=automaticDistributionLevel(zoom,'AU'),result=regionGroups([p],layers[level],level);assert.equal(result.groups.size,1);assert.equal(result.unmatched,0);return [...result.groups.values()][0].feature.properties.name});
+ assert.deepEqual(trace,['Australia','Australia','Western Australia','Western Australia','Wyndham-East Kimberley','Wyndham-East Kimberley','Western Australia','Australia']);
+ assert.equal(automaticDistributionLevel(12,'CN'),'state');assert.equal(automaticDistributionLevel(7,'US'),'county');assert.equal(automaticDistributionLevel(2,'US'),'country');
 });

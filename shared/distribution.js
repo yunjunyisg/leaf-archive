@@ -31,3 +31,9 @@ export function regionFor(location,index,level){
  return candidates.find(r=>{const [w,s,e,n]=r.bounds;return location.lon>=w&&location.lon<=e&&location.lat>=s&&location.lat<=n&&pointInFeature(location,r.feature)})?.feature||null;
 }
 export function regionGroups(plants,index,level){const groups=new Map();let unmatched=0;for(const p of plants){const f=regionFor(p.originLocation,index,level);if(!f){unmatched++;continue}const id=String(f.id);if(!groups.has(id))groups.set(id,{feature:f,plants:[]});groups.get(id).plants.push(p)}return {groups,unmatched}}
+// Leaflet zoom levels: continent/country overview, state overview, local detail.
+export function automaticDistributionLevel(zoom,countryCode=''){
+ if(zoom<4)return 'country';
+ if(zoom>=7&&['US','AU'].includes(countryCode))return 'county';
+ return 'state';
+}
