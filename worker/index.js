@@ -1,3 +1,5 @@
+import admin1Countries from 'leaf:admin1-countries';
+import {publicAsset} from './public-assets.js';
 import admin1Json from '../data/boundaries/admin1.json.gz';
 import usCountiesJson from '../data/boundaries/US-counties.json.gz';
 import auCountiesJson from '../data/boundaries/AU-admin2.json.gz';
@@ -161,19 +163,19 @@ if(u.pathname==='/sw.js')return new Response(serviceWorker,{headers:{'Content-Ty
 if(u.pathname==='/offline.html')return new Response(offline,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'}});
 if(desktopAssets[u.pathname]){const [data,mime]=desktopAssets[u.pathname];const headers={'Content-Type':mime,'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'};if(mime==='application/zip')headers['Content-Disposition']='attachment; filename="leaf-archive-shortcuts.zip"';return new Response(Uint8Array.from(atob(data.split(',')[1]),c=>c.charCodeAt(0)),{headers})}
 if(u.pathname==='/origins'||u.pathname==='/origins/')return new Response(originMapHtml,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
-if(u.pathname.startsWith('/map-boundaries/')){const data={'/map-boundaries/admin1.json':admin1Json,'/map-boundaries/US-counties.json':usCountiesJson,'/map-boundaries/AU-admin2.json':auCountiesJson}[u.pathname];if(data){const decoded=atob(data.slice(data.indexOf(',')+1)),bytes=new Uint8Array(decoded.length);for(let i=0;i<decoded.length;i++)bytes[i]=decoded.charCodeAt(i);return new Response(bytes,{encodeBody:'manual',headers:{'Content-Type':'application/json; charset=utf-8','Content-Encoding':'gzip','Cache-Control':'public, max-age=3600, no-transform'}})};}
-if(u.pathname==='/origin-map.js')return new Response(originMapJs,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-cache'}});
-if(u.pathname==='/origin-map.css')return new Response(originMapCss,{headers:{'Content-Type':'text/css; charset=utf-8'}});
+if(u.pathname.startsWith('/map-boundaries/')){const countryMatch=/^\/map-boundaries\/admin1\/([A-Z]{2})\.json$/.exec(u.pathname);const data=(countryMatch?admin1Countries[countryMatch[1]]:null)||{'/map-boundaries/admin1.json':admin1Json,'/map-boundaries/US-counties.json':usCountiesJson,'/map-boundaries/AU-admin2.json':auCountiesJson}[u.pathname];if(data){const decoded=atob(data.slice(data.indexOf(',')+1)),bytes=new Uint8Array(decoded.length);for(let i=0;i<decoded.length;i++)bytes[i]=decoded.charCodeAt(i);return new Response(bytes,{encodeBody:'manual',headers:{'Content-Type':'application/json; charset=utf-8','Content-Encoding':'gzip','Cache-Control':'public, max-age=3600, no-transform'}})};}
+if(u.pathname==='/origin-map.js')return publicAsset(request,originMapJs,'text/javascript; charset=utf-8');
+if(u.pathname==='/origin-map.css')return publicAsset(request,originMapCss,'text/css; charset=utf-8');
 if(u.pathname==='/map-licenses.txt')return new Response(mapLicenses,{headers:{'Content-Type':'text/plain; charset=utf-8'}});
-if(u.pathname==='/leaflet.css')return new Response(leafletCss,{headers:{'Content-Type':'text/css; charset=utf-8'}});
-if(u.pathname==='/geography.js')return new Response(geographyJs,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-cache'}});
+if(u.pathname==='/leaflet.css')return publicAsset(request,leafletCss,'text/css; charset=utf-8');
+if(u.pathname==='/geography.js')return publicAsset(request,geographyJs,'text/javascript; charset=utf-8');
 if(u.pathname==='/classification'||u.pathname==='/classification/')return new Response(classificationHtml,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
 if(u.pathname==='/')return new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
-if(welcomeIcons[u.pathname])return new Response(Uint8Array.from(atob(welcomeIcons[u.pathname].split(',')[1]),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/webp','Cache-Control':'public, max-age=86400'}});
-if(u.pathname==='/style.css')return new Response(css,{headers:{'Content-Type':'text/css'}});
-if(u.pathname==='/taxonomy.js')return new Response(taxonomyJs,{headers:{'Content-Type':'text/javascript','Cache-Control':'no-cache'}});
-if(u.pathname==='/app.js')return new Response(js,{headers:{'Content-Type':'text/javascript'}});
-if(assets[u.pathname]){const a=assets[u.pathname];return new Response(Uint8Array.from(atob(a),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=86400'}})}
+if(welcomeIcons[u.pathname])return publicAsset(request,welcomeIcons[u.pathname],'image/webp',true);
+if(u.pathname==='/style.css')return publicAsset(request,css,'text/css; charset=utf-8');
+if(u.pathname==='/taxonomy.js')return publicAsset(request,taxonomyJs,'text/javascript; charset=utf-8');
+if(u.pathname==='/app.js')return publicAsset(request,js,'text/javascript; charset=utf-8');
+if(assets[u.pathname])return publicAsset(request,assets[u.pathname],'image/jpeg',true);
 if(!u.pathname.startsWith('/api/')&&!u.pathname.startsWith('/images/'))return new Response('Not found',{status:404});
 const who=(await identity(request,env))?.owner;if(!who)return json({error:'请先登录，再访问你的植物档案。'},401);
 if(request.method!=='GET'){const origin=request.headers.get('Origin');if(origin&&origin!==u.origin)return json({error:'请求来源无效'},403)}
