@@ -1,0 +1,30 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'top.gloriouscarnivorousplants.leafarchive'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'top.gloriouscarnivorousplants.leafarchive'
+        minSdk 29
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+    signingConfigs {
+        release {
+            if (System.getenv('LEAF_ANDROID_KEYSTORE')) {
+                storeFile file(System.getenv('LEAF_ANDROID_KEYSTORE'))
+                storePassword System.getenv('LEAF_ANDROID_KEYSTORE_PASSWORD')
+                keyAlias 'leafarchive'
+                keyPassword System.getenv('LEAF_ANDROID_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (System.getenv('LEAF_ANDROID_KEYSTORE')) signingConfig signingConfigs.release
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+dependencies { implementation 'androidx.webkit:webkit:1.14.0' }
