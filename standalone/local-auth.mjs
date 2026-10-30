@@ -2,7 +2,7 @@ import {randomBytes,createHash,scrypt,timingSafeEqual} from 'node:crypto';
 import {promisify} from 'node:util';
 const derive=promisify(scrypt),SESSION='__Host-leaf-session';
 const hash=x=>createHash('sha256').update(x).digest('hex');
-const noStore={'Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'};
+const noStore={'Cache-Control':'no-store','Referrer-Policy':'same-origin','X-Content-Type-Options':'nosniff'};
 export async function passwordRecord(password,salt=randomBytes(32).toString('hex')){
  if(typeof password!=='string'||password.length<6||password.length>256)throw Error('密码应为 6 至 256 个字符');
  return {salt,password_hash:Buffer.from(await derive(password,salt,64)).toString('hex')};

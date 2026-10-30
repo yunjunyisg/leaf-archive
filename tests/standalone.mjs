@@ -48,6 +48,9 @@ test('standalone HTTP proxy preserves cookies, gzip boundaries and origin checks
  const base='http://127.0.0.1:'+server.address().port;
  try{
   await setAccount(app.database.sql,{username:'alice',password,owner:'alice'});
+  const form=await fetch(base+'/auth/local');assert.equal(form.status,200);assert.equal(form.headers.get('Referrer-Policy'),'same-origin');
+  for(const originValue of ['null','https://attacker.test']){const rejected=await fetch(base+'/auth/local',{method:'POST',headers:{Origin:originValue,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({username:'alice',password})});assert.equal(rejected.status,403)}
+  const noOrigin=await fetch(base+'/auth/local',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({username:'alice',password})});assert.equal(noOrigin.status,403);
   const login=await fetch(base+'/auth/local',{method:'POST',redirect:'manual',headers:{Origin:origin,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({username:'alice',password})});assert.equal(login.status,303);assert.equal(login.headers.getSetCookie().length,2);
   const cookie=login.headers.getSetCookie()[0].split(';')[0];assert.equal((await (await fetch(base+'/api/auth',{headers:{Cookie:cookie}})).json()).user.id,'alice');
   const country=await fetch(base+'/map-boundaries/admin1/AU.json');assert.equal((await country.json()).features.length,12);
