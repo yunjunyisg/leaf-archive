@@ -21,12 +21,18 @@ export function createApp({dataDirectory,origin,env={}}){
   request=new Request(request,{headers});
   if(url.pathname==='/healthz')return Response.json({status:'ok'},{headers:{'Cache-Control':'no-store'}});
   if(!['GET','HEAD','OPTIONS'].includes(request.method)&&request.headers.get('Origin')!==site.origin)return new Response('请求来源无效',{status:403});
+  const session=sessionAccount(database.sql,request);
+  if(request.method==='GET'&&session&&isAdmin(database.sql,session.owner)&&['/auth/local','/auth/register'].includes(url.pathname))return new Response(null,{status:303,headers:{Location:accountSecurity(database.sql,session.owner).must_change?'/auth/change-password':'/admin','Cache-Control':'private, no-store'}});
   const authenticated=await login(request,ip);if(authenticated)return withFilingFooter(authenticated);
-  const session=sessionAccount(database.sql,request);if(session)recordActivity(database.sql,session.owner);
+  if(session)recordActivity(database.sql,session.owner);
   if(session&&accountSecurity(database.sql,session.owner).must_change&&url.pathname!=='/api/auth/logout'){
    const headers={'Cache-Control':'private, no-store'};
    if(url.pathname.startsWith('/api/')||url.pathname.startsWith('/images/'))return Response.json({error:'请先修改密码',code:'PASSWORD_CHANGE_REQUIRED',redirect:'/auth/change-password'},{status:403,headers});
    return new Response(null,{status:303,headers:{...headers,Location:'/auth/change-password'}});
+  }
+  if(session&&isAdmin(database.sql,session.owner)){
+   if(['/', '/origins','/origins/','/classification','/classification/','/offline.html'].includes(url.pathname))return new Response(null,{status:303,headers:{Location:'/admin','Cache-Control':'private, no-store'}});
+   if(/^\/api\/(plants|taxa|images)(\/|$)/.test(url.pathname))return Response.json({error:'管理员账号仅提供数据、管理和用户总植物地图功能'},{status:403,headers:{'Cache-Control':'private, no-store'}});
   }
   const administrative=await adminRoutes(request,{sql:database.sql,bucket:BUCKET,dataDirectory,session});if(administrative)return withFilingFooter(administrative);
   const response=await worker.fetch(request,bindings);

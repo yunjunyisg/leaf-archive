@@ -48,7 +48,7 @@ export async function adminRoutes(request,{sql,bucket,dataDirectory,session}){
   return json({ok:true,message:reset?'密码已重置为 000000，用户登录后必须立即修改密码。':'账号已注销，现有登录已失效；植物档案和照片保留。'});
  }
  if(request.method!=='GET'&&request.method!=='HEAD')return json({error:'不支持此操作'},405);
- if(route==='/admin'||route==='/admin/')return new Response(request.method==='HEAD'?null:page,{headers:{...headers,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"}});
+ if(route==='/admin'||route==='/admin/')return new Response(request.method==='HEAD'?null:page,{headers:{...headers,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"}});
  if(route==='/admin/app.js')return new Response(request.method==='HEAD'?null:client,{headers:{...headers,'Content-Type':'text/javascript; charset=utf-8'}});
  if(route==='/api/admin/stats'){
   const now=Date.now(),today=dayInChina(now),sevenDays=dayInChina(now-6*86400000),days=[],startedAt=sql.prepare('SELECT value FROM activity_meta WHERE key=?').get('started_at').value,startedDay=dayInChina(startedAt);
@@ -62,6 +62,19 @@ export async function adminRoutes(request,{sql,bucket,dataDirectory,session}){
    (SELECT count(*) FROM plants p WHERE p.owner=a.owner) AS plantCount,(SELECT count(*) FROM images i WHERE i.owner=a.owner) AS imageCount,(SELECT count(*) FROM taxa x WHERE x.owner=a.owner) AS taxonCount
    FROM local_accounts a LEFT JOIN local_admins m ON m.owner=a.owner LEFT JOIN account_activity t ON t.owner=a.owner LEFT JOIN account_security s ON s.owner=a.owner WHERE ${condition} ORDER BY a.username COLLATE NOCASE LIMIT ? OFFSET ?`).all(q,q,pageSize,offset);
   return json({users,total:number(sql,'SELECT count(*) AS n FROM local_accounts a WHERE '+condition,q,q),page,pageSize});
+ }
+ if(route==='/api/admin/map-plants'){
+  const after=(url.searchParams.get('after')||'').slice(0,512),owner=(url.searchParams.get('owner')||'').slice(0,512),args=[after];
+  if(owner)args.push(owner);
+  const rows=sql.prepare("SELECT p.id,p.owner,p.number,p.data,a.username FROM plants p LEFT JOIN local_accounts a ON a.owner=p.owner WHERE p.id>?"+(owner?' AND p.owner=?':'')+' ORDER BY p.id LIMIT 501').all(...args),more=rows.length>500;
+  const plants=rows.slice(0,500).map(row=>{
+   const source=JSON.parse(row.data),plant={id:row.id,owner:row.owner,username:row.username||'历史归属',number:row.number,originLocation:source.originLocation||null};
+   for(const key of ['name','latin','family','genus','species','identification','infraspecific','origin'])plant[key]=source[key]||'';
+   const photo=(source.photos||[]).find(value=>/^\/images\/[a-f0-9-]{36}$/.test(value)||/^\/assets\/[A-Za-z0-9_]+\.jpg$/.test(value));
+   plant.photos=photo?[photo.startsWith('/images/')?'/api/admin'+photo:photo]:[];
+   return plant;
+  });
+  return json({plants,nextCursor:more?plants.at(-1).id:null});
  }
  if(route==='/api/admin/plants'){
   const {page,pageSize,offset}=pagination(url),owner=(url.searchParams.get('owner')||'').slice(0,512),where=owner?' WHERE p.owner=?':'',args=owner?[owner]:[];

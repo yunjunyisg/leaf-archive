@@ -1,4 +1,5 @@
 const $=id=>document.getElementById(id);
+let currentView='data',mapOwner='',mapOwnerName='',mapController=null,mapRecords=[],mapEpoch=0;
 let userPage=1,plantPage=1,owner='',ownerName='',epoch=0,usersEpoch=0,plantsEpoch=0,detailEpoch=0;
 const date=value=>value?new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',dateStyle:'short',timeStyle:'short'}).format(new Date(value)):'未记录';
 const bytes=value=>value<1024?value+' 字节':value<1024*1024?(value/1024).toFixed(1)+' 千字节':(value/1024/1024).toFixed(1)+' 兆字节';
@@ -20,7 +21,7 @@ async function stats(){
 }
 async function users(){
  const attempt=++usersEpoch,data=await api('/api/admin/users?page='+userPage+'&q='+encodeURIComponent($('userQuery').value.trim()));if(attempt!==usersEpoch)return;
- $('userCount').textContent='共 '+data.total+' 个账号';$('users').replaceChildren();for(const u of data.users){const tr=document.createElement('tr');cell(tr,u.username).append(Object.assign(document.createElement('small'),{textContent:u.nickname}));cell(tr,u.disabled?'已注销':u.mustChange?'待修改密码':u.role==='admin'?'管理员':'普通账号');cell(tr,u.plantCount+' / '+u.imageCount+' / '+u.taxonCount);cell(tr,date(u.registeredAt));cell(tr,date(u.lastLogin));cell(tr,date(u.lastSeen));button(cell(tr,''),'查看档案',()=>{owner=u.owner;ownerName=u.username;plantPage=1;plants().catch(showError);$('plantsTitle').scrollIntoView({behavior:'smooth',block:'start'})});if(u.role!=='admin'&&!u.disabled){button(tr.lastElementChild,'重置密码',()=>manageUser(u,'reset-password').catch(showError));button(tr.lastElementChild,'注销账号',()=>manageUser(u,'deactivate').catch(showError));}$('users').append(tr)}pager('users',data);
+ $('userCount').textContent='共 '+data.total+' 个账号';$('users').replaceChildren();for(const u of data.users){const tr=document.createElement('tr');cell(tr,u.username).append(Object.assign(document.createElement('small'),{textContent:u.nickname}));cell(tr,u.disabled?'已注销':u.mustChange?'待修改密码':u.role==='admin'?'管理员':'普通账号');cell(tr,u.plantCount+' / '+u.imageCount+' / '+u.taxonCount);cell(tr,date(u.registeredAt));cell(tr,date(u.lastLogin));cell(tr,date(u.lastSeen));button(cell(tr,''),'查看档案',()=>{owner=u.owner;ownerName=u.username;plantPage=1;setView('manage');plants().catch(showError);$('plantsTitle').scrollIntoView({behavior:'smooth',block:'start'})});button(tr.lastElementChild,'查看地图',()=>{mapOwner=u.owner;mapOwnerName=u.username;setView('map',true)});if(u.role!=='admin'&&!u.disabled){button(tr.lastElementChild,'重置密码',()=>manageUser(u,'reset-password').catch(showError));button(tr.lastElementChild,'注销账号',()=>manageUser(u,'deactivate').catch(showError));}$('users').append(tr)}pager('users',data);
 }
 let managing=false;
 async function manageUser(user,action){
@@ -42,7 +43,33 @@ async function detail(id){
  for(const url of photos){const personal=/^\/images\/[a-f0-9-]{36}$/.test(url),example=/^\/assets\/[A-Za-z0-9_]+\.jpg$/.test(url);if(!personal&&!example)continue;const image=document.createElement('img');image.src=personal?'/api/admin'+url:url;image.alt=p.name||'植物照片';image.loading='lazy';image.decoding='async';$('detailPhotos').append(image)}
  if(!$('detail').open)$('detail').showModal();
 }
-async function refresh(){const b=$('refresh');b.disabled=true;$('message').textContent='';try{await Promise.all([stats(),users(),plants()])}catch(e){showError(e)}finally{b.disabled=false}}
+function setView(view,reload=false){
+ currentView=view;for(const node of document.querySelectorAll('[data-view]'))node.hidden=node.dataset.view!==view;
+ for(const node of document.querySelectorAll('[data-nav]')){if(node.dataset.nav===view)node.setAttribute('aria-current','page');else node.removeAttribute('aria-current')}
+ if(view==='map'&&(!mapController||reload))loadMap().catch(showError);
+}
+async function loadMap(){
+ const attempt=++mapEpoch,selectedOwner=mapOwner;mapController?.destroy();mapController=null;mapRecords=[];$('adminMapRoot').replaceChildren();
+ $('adminMapTitle').textContent=selectedOwner?'用户 '+mapOwnerName+' 的植物产地地图':'全部用户植物产地地图';$('mapAllUsers').hidden=!selectedOwner;
+ $('adminMapStatus').textContent='正在加载用户植物产地…';
+ try{
+  const records=[];let after='';
+  do{
+   const data=await api('/api/admin/map-plants?after='+encodeURIComponent(after)+(selectedOwner?'&owner='+encodeURIComponent(selectedOwner):''));
+   if(attempt!==mapEpoch)return;
+   records.push(...data.plants);after=data.nextCursor||'';
+   $('adminMapStatus').textContent='已加载 '+records.length+' 份档案'+(after?'，继续读取…':'');
+  }while(after);
+  const module=await import('/origin-map.js');if(attempt!==mapEpoch)return;
+  mapRecords=records.map(p=>({...p,number:p.username+' · '+p.number}));
+  mapController=module.createOriginMap({root:$('adminMapRoot'),getPlants:()=>mapRecords,canEdit:()=>false,openPlant:id=>detail(id).catch(showError),editPlant:()=>{},api,isDemo:()=>false});
+  $('adminMapStatus').textContent='已加载 '+records.length+' 份档案，可缩放地图、筛选分类并点击标点查看用户档案。';
+ }catch(error){if(attempt===mapEpoch){$('adminMapStatus').textContent='地图加载失败：'+error.message+'。可点击重新加载。';throw error}}
+}
+for(const b of document.querySelectorAll('[data-nav]'))b.onclick=()=>setView(b.dataset.nav);
+$('reloadMap').onclick=()=>loadMap().catch(showError);
+$('mapAllUsers').onclick=()=>{mapOwner='';mapOwnerName='';loadMap().catch(showError)};
+async function refresh(){const b=$('refresh');b.disabled=true;$('message').textContent='';try{await Promise.all([stats(),users(),plants()]);if(currentView==='map')await loadMap()}catch(e){showError(e)}finally{b.disabled=false}}
 $('refresh').onclick=refresh;$('userSearch').onsubmit=event=>{event.preventDefault();userPage=1;users().catch(showError)};
 for(const [id,change,fn] of [['usersPrev',()=>userPage--,users],['usersNext',()=>userPage++,users],['plantsPrev',()=>plantPage--,plants],['plantsNext',()=>plantPage++,plants]])$(id).onclick=()=>{change();fn().catch(showError)};
 $('clearOwner').onclick=()=>{owner='';ownerName='';plantPage=1;plants().catch(showError)};

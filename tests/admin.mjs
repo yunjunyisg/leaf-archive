@@ -43,7 +43,7 @@ test('admin can inspect records and photos while ordinary APIs keep original own
   assert.equal((await (await call(app,'/api/admin/plants/plant-a',admin)).json()).notes,'原记录');
   const photo=await call(app,'/api/admin/images/'+id,admin);assert.equal(photo.status,200);assert.match(photo.headers.get('Cache-Control'),/private, no-store/);assert.deepEqual(new Uint8Array(await photo.arrayBuffer()),bytes);
   assert.equal((await call(app,'/api/admin/images/'+id,original)).status,403);assert.equal((await call(app,'/images/'+id,admin)).status,404);assert.equal((await call(app,'/images/'+id,original)).status,200);
-  assert.deepEqual(await (await call(app,'/api/plants',admin)).json(),[]);assert.equal((await (await call(app,'/api/plants',original)).json()).length,1);
+  assert.equal((await call(app,'/api/plants',admin)).status,403);assert.equal((await (await call(app,'/api/plants',original)).json()).length,1);
   assert.equal((await call(app,'/api/admin/images/not-a-real-id',admin)).status,404);
  }finally{await f.close()}
 });
@@ -156,4 +156,48 @@ test('forced password change and deactivation persist after reopening the databa
   assert.equal((await login(app,'resetuser','000000')).headers.get('Location'),'/auth/change-password');
   assert.equal(cookie(await login(app,'closeduser')),undefined);assert.equal(app.database.sql.prepare('SELECT count(*) AS n FROM admin_audit').get().n,2);
  }finally{app.close();await fs.rm(f.directory,{recursive:true,force:true})}
+});
+
+test('administrator has only data, management and aggregate map entry points while normal user collection stays available',async()=>{
+ const f=await fixture(),{app}=f;
+ try{
+  await provisionAdmin(app.database.sql,{username:'operator',password});await setAccount(app.database.sql,{username:'visitor',password,owner:'visitor'});
+  const admin=cookie(await login(app,'operator')),user=cookie(await login(app,'visitor'));
+  for(const url of ['/','/origins','/origins/','/classification','/classification/','/auth/local','/auth/register']){
+   assert.equal((await call(app,url,admin)).headers.get('Location'),'/admin');assert.equal((await call(app,url,user)).status,200);
+  }
+  for(const url of ['/api/plants','/api/taxa','/api/images'])for(const method of ['GET','POST'])assert.equal((await call(app,url,admin,{method,body:method==='POST'?'{}':undefined})).status,403);
+  assert.equal((await call(app,'/api/plants',user)).status,200);assert.equal((await call(app,'/api/taxa',user)).status,200);
+  const page=await call(app,'/admin',admin),html=await page.text();assert.ok(!html.includes('进入我的收藏'));
+  for(const text of ['数据统计','账号管理','用户总植物地图','蜀ICP备2026066760号'])assert.ok(html.includes(text));
+  assert.match(page.headers.get('Content-Security-Policy'),/style-src 'self'/);assert.match(page.headers.get('Content-Security-Policy'),/https:\/\/tile.openstreetmap.org/);
+  assert.equal((await call(app,'/origin-map.js',admin)).status,200);assert.equal((await call(app,'/origin-map.css',admin)).status,200);
+ }finally{await f.close()}
+});
+
+test('aggregate map includes every user and historical owner with precise locations and protected photo links',async()=>{
+ const f=await fixture(),{app}=f;
+ try{
+  await provisionAdmin(app.database.sql,{username:'operator',password});await setAccount(app.database.sql,{username:'visitor',password,owner:'visitor'});
+  const admin=cookie(await login(app,'operator')),user=cookie(await login(app,'visitor')),id=randomUUID();
+  const location={lat:-15.98111,lon:128.4178,countryCode:'AU',state:'Western Australia',county:'Wyndham-East Kimberley',locality:'Kingston Rest',precision:'locality',source:'geonames'};
+  for(const [key,owner,originLocation] of [['first','visitor',location],['second','historical-owner',location],['third','visitor',null]])app.database.sql.prepare('INSERT INTO plants VALUES (?,?,?,?,?)').run(key,owner,key,JSON.stringify({name:key,originLocation,species:'test',photos:['/images/'+id],notes:'private note excluded from map'}),'2026-01-01');
+  assert.equal((await call(app,'/api/admin/map-plants')).status,401);assert.equal((await call(app,'/api/admin/map-plants',user)).status,403);
+  const response=await call(app,'/api/admin/map-plants',admin);assert.match(response.headers.get('Cache-Control'),/private, no-store/);const data=await response.json();
+  assert.equal(data.plants.length,3);assert.equal(data.nextCursor,null);assert.deepEqual(data.plants[0].originLocation,location);assert.equal(data.plants[0].photos[0],'/api/admin/images/'+id);assert.equal(data.plants[0].username,'visitor');assert.equal(data.plants[1].username,'历史归属');assert.equal(data.plants[2].originLocation,null);
+  assert.ok(!JSON.stringify(data).includes('private note'));assert.equal((await (await call(app,'/api/admin/map-plants?owner=visitor',admin)).json()).plants.length,2);
+  assert.equal((await (await call(app,'/api/plants',user)).json()).length,2);
+ }finally{await f.close()}
+});
+
+test('aggregate map keyset pagination does not omit plants above the first 500 records',async()=>{
+ const f=await fixture(),{app}=f;
+ try{
+  await provisionAdmin(app.database.sql,{username:'operator',password});const admin=cookie(await login(app,'operator'));
+  const insert=app.database.sql.prepare('INSERT INTO plants VALUES (?,?,?,?,?)');app.database.sql.exec('BEGIN');
+  for(let i=0;i<503;i++){const id=String(i).padStart(4,'0');insert.run(id,'history',id,JSON.stringify({name:id}),'2026-01-01')}app.database.sql.exec('COMMIT');
+  const first=await (await call(app,'/api/admin/map-plants',admin)).json();assert.equal(first.plants.length,500);assert.equal(first.nextCursor,'0499');
+  const second=await (await call(app,'/api/admin/map-plants?after='+first.nextCursor,admin)).json();assert.equal(second.plants.length,3);assert.equal(second.nextCursor,null);
+  assert.equal(new Set([...first.plants,...second.plants].map(p=>p.id)).size,503);
+ }finally{await f.close()}
 });
