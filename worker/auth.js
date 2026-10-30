@@ -1,3 +1,4 @@
+import {downloadsAvailable} from '../shared/migration-delivery.js';
 const SESSION_COOKIE='__Host-leaf-session';
 const STATE_COOKIE='__Host-leaf-wechat-state';
 const json=(body,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
@@ -42,7 +43,7 @@ export async function authRoutes(request,env){
  const url=new URL(request.url);
  if(url.pathname==='/api/auth'&&request.method==='GET'){
   const user=await identity(request,env);
-  return json({user:user?{id:user.owner,nickname:user.nickname,provider:user.provider}:null,wechat:{web:available(env,'web'),mp:available(env,'mp')},legacyLogin:env.TRUST_SITES_IDENTITY==='true'});
+  return json({user:user?{id:user.owner,nickname:user.nickname,provider:user.provider}:null,wechat:{web:available(env,'web'),mp:available(env,'mp')},legacyLogin:env.TRUST_SITES_IDENTITY==='true',migrationDownloads:downloadsAvailable(env,user?.owner)});
  }
  if(url.pathname==='/api/auth/logout'&&request.method==='POST'){
   if(!sameOrigin(request))return json({error:'请求来源无效'},403);

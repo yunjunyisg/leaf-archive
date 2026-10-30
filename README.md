@@ -182,3 +182,5 @@ Windows 可下载 `/downloads/leaf-archive-shortcuts.zip`，解压后运行“�
 独立运行入口为 `standalone/server.mjs`，需要 Node.js 24 LTS，使用持久化 SQLite 和私有照片目录；网站密码账号由服务器管理员设置，保留原档案 owner，禁止信任外部 Sites 身份头。部署、最终数据导入和现有宝塔 Nginx 接入参见 [阿里云部署说明](docs/aliyun-deployment.md)。
 
 `node scripts/package-standalone.mjs /绝对路径/leaf-archive-aliyun.tar.gz` 在构建成功后生成无需服务器端 npm 安装的程序包，不包含真实档案、照片或凭据。该命令不执行服务器部署，也不迁移 DNS。迁移后微信登录仍需另行接入。
+
+原站迁移附件：`/migration-downloads` 在显式开启且未过期时，仅向原档案拥有者提供程序包和部署预演备份。附件分块保存在 R2 的 `temporary-migration-downloads/` 独立前缀中，不写入图片表、不进入植物照片导出范围，也不加入已生成的服务器程序包。支持私有流式下载、Range 续传与校验值展示；匿名和其他账号不可访问。上传密钥只在准备附件时短期开启，上传及完整下载校验后移除。迁移结束后清理附件对象及下载配置。
