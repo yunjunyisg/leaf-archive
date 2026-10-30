@@ -114,6 +114,7 @@ const demoOrigins=[{lat:19.4,lon:-96.8,countryCode:'MX',country:'墨西哥',stat
 examples.forEach((p,i)=>{p.originLocation={...demoOrigins[i],precision:'region',source:'demo',label:'示例代表位置 · '+demoOrigins[i].country};p.origin='示例分布地区：'+demoOrigins[i].country;p.notes+='地图为示例代表位置，不是精确采集点。';});
 let records=[],loading=true,section='all',tab='all',classification=null,view='grid',editing=null,photoDraft=[],logDraft=[],photoDateDraft={},uploading=false,selected=null,deleteId=null,editingRevision=null,deleteRevision=null;
 if(!classificationPage){const requestedSection=new URL(location.href).searchParams.get('section');if(['all','care','sources'].includes(requestedSection))section=requestedSection;}
+let taxonOpenEpoch=0;
 let authState=null,taxa=[],taxonomyNodes=new Map(),taxonEditing=null,taxonReferences=[],taxonUploading=false;
 
 let syncEpoch=0,syncWrites=0,syncRunning=false,autoDemo=false;
@@ -148,7 +149,7 @@ function renderTree(){
  const markup=n=>{
   const rank=rankInfo(n.rank),key=escape(n.key),editable=authState?.user&&!$('#demo').checked;
   return '<details class="taxon-node" data-key="'+key+'" open><summary><span class="rank-badge">'+rank.label+'</span><strong>'+escape(n.name)+'</strong><small>'+rank.latin+'</small></summary><div class="taxon-body">'+
-   (editable?'<div class="taxon-actions">'+(childRanks(n.path).length?'<button type="button" data-child="'+key+'">＋ 添加下级</button>':'')+(referenceRank(n.rank)?'<button type="button" data-reference="'+key+'">参考图 · '+n.references.length+'</button>':'')+'</div>':'')+
+   (editable?'<div class="taxon-actions"><button type="button" data-tax-edit="'+key+'">编辑分类</button><button type="button" class="danger-text" data-tax-delete="'+key+'">删除分类</button>'+(childRanks(n.path).length?'<button type="button" data-child="'+key+'">＋ 添加下级</button>':'')+(referenceRank(n.rank)?'<button type="button" data-reference="'+key+'">参考图 · '+n.references.length+'</button>':'')+'</div>':'')+
    (n.references.length?'<div class="taxon-gallery">'+n.references.map(url=>'<a href="'+escape(url)+'" target="_blank" rel="noopener"><img src="'+escape(url)+'" loading="lazy" decoding="async" alt="'+escape(n.name)+'参考图"></a>').join('')+'</div>':'')+
    n.plants.map(p=>'<button class="taxonomy-plant" data-id="'+escape(p.id)+'"><span><strong>'+escape(p.name)+'</strong><i>'+escape(p.latin)+'</i></span><small>'+escape(p.number)+'</small></button>').join('')+
    n.children.filter(visible).map(markup).join('')+'</div></details>';
@@ -156,7 +157,12 @@ function renderTree(){
  const openKeys=new Map($$('#tree details').map(d=>[d.dataset.key,d.open]));
  $('#tree').innerHTML=tree.roots.filter(visible).map(markup).join('')||'<p class="classification-empty">'+(q?'没有找到匹配的分类或植物。':'还没有分类。点击“添加分类”建立分类树，或新增植物填写分类信息。')+'</p>';
  if(!q)$$('#tree details').forEach(d=>{if(openKeys.has(d.dataset.key))d.open=openKeys.get(d.dataset.key)});
+ const unclassified=data().filter(p=>p.taxonomyDetached&&(!q||[p.name,p.latin,p.number].join(' ').toLowerCase().includes(q)));
+ if(unclassified.length)$('#tree').insertAdjacentHTML('beforeend','<section class="unclassified-plants"><h3>未分类植物 · '+unclassified.length+' 株</h3><p>档案与照片仍保留。编辑植物的分类字段后，可重新归类。</p>'+unclassified.map(p=>'<button class="taxonomy-plant" data-id="'+escape(p.id)+'"><span><strong>'+escape(p.name)+'</strong><i>'+escape(p.latin)+'</i></span><small>'+escape(p.number)+'</small></button><button type="button" data-reclassify="'+escape(p.id)+'">重新归类</button>').join('')+'</section>');
  bindCards();
+ $$('[data-tax-edit]').forEach(b=>b.onclick=()=>openTaxon([],taxonomyNodes.get(b.dataset.taxEdit)));
+ $$('[data-tax-delete]').forEach(b=>b.onclick=()=>deleteTaxonomyNode(taxonomyNodes.get(b.dataset.taxDelete)));
+ $$('[data-reclassify]').forEach(b=>b.onclick=()=>openEditor(records.find(p=>p.id===b.dataset.reclassify)));
  $$('[data-child]').forEach(b=>b.onclick=()=>openTaxon(taxonomyNodes.get(b.dataset.child).path));
  $$('[data-reference]').forEach(b=>b.onclick=()=>openTaxon([],taxonomyNodes.get(b.dataset.reference)));
 }
@@ -218,10 +224,10 @@ function renderPhotos(){
 }
 function openEditor(p=null){if(!authState?.user){toast('请先登录，再建立自己的植物档案');return;}editingRevision=p?._revision||'legacy';editing=p?.demo?null:p?.id||null;$('#plantForm').reset();$('#formError').textContent='';$('#uploadStatus').textContent='';$('#editorTitle').textContent=editing?'编辑植物档案':p?.demo?'用此示例新建档案':'新增植物';for(const f of fields)$('#plantForm').elements[f].value=(f==='identification'?(p?.[f]||'species'):p?.[f])??(f==='identification'?'species':f==='status'?'生长中':f==='date'?today():'');if(!p){let n=records.length+1;while(records.some(x=>x.number==='PL-'+String(n).padStart(3,'0')))n++;$('#plantForm').elements.number.value='PL-'+String(n).padStart(3,'0')}updateIdentification();photoDraft=[...(p?.photos||[])];logDraft=[...(p?.logs||[])];photoDateDraft={...(p?.photoDates||{})};originDraft=p?.originLocation?structuredClone(p.originLocation):null;renderOriginDraft();renderPhotos();modal('editor')}
 $('#photos').onchange=async e=>{const files=[...e.target.files];e.target.value='';if(photoDraft.length+files.length>12){$('#uploadStatus').textContent='每份档案最多添加 12 张照片。';return}uploading=true;$('#savePlant').disabled=true;$('#photos').disabled=true;for(let i=0;i<files.length;i++){const file=files[i];$('#uploadStatus').textContent='正在导入 '+(i+1)+' / '+files.length+' 张照片…';try{if(file.size>8*1024*1024)throw new Error('图片超过 8 MB：'+file.name);const f=new FormData();f.append('file',file);const d=await api('/api/images',{method:'POST',body:f});photoDraft.push(d.url);renderPhotos()}catch(err){$('#uploadStatus').textContent=err.message;break}}uploading=false;$('#savePlant').disabled=false;$('#photos').disabled=false;if(photoDraft.length&&$('#uploadStatus').textContent.startsWith('正在'))$('#uploadStatus').textContent='照片已导入，保存档案后完成。'};
-$('#plantForm').onsubmit=async e=>{e.preventDefault();if(uploading)return;const form=$('#plantForm');const p=Object.fromEntries(fields.map(f=>[f,form.elements[f].value]));if(p.identification==='unresolved'){p.variety='';p.form='';p.infraspecific=''}else if(['aff','cf'].includes(p.identification)){p.variety='';p.form=''}else p.infraspecific='';p.photos=photoDraft;p.logs=logDraft;p.photoDates=photoDateDraft;p.originLocation=originDraft;$('#savePlant').disabled=true;$('#savePlant').textContent='正在保存…';try{const saved=await api('/api/plants'+(editing?'/'+editing:''),{method:editing?'PUT':'POST',headers:{'Content-Type':'application/json',...(editing?{'If-Match':'"'+editingRevision+'"'}:{})},body:JSON.stringify(p)});if(editing)records=records.map(x=>x.id===editing?saved:x);else records.unshift(saved);$('#demo').checked=false;autoDemo=false;classification=null;$('#search').value='';$('#locationFilter').value='';tab='all';$$('[data-tab]').forEach(b=>b.classList.toggle('selected',b.dataset.tab==='all'));render();close('editor');if($('#detail').open){close('detail');openDetail(saved.id)}toast('植物档案已保存')}catch(err){$('#formError').textContent=err.message}finally{$('#savePlant').disabled=false;$('#savePlant').textContent='保存档案'}};
+$('#plantForm').onsubmit=async e=>{e.preventDefault();if(uploading)return;const form=$('#plantForm');const p=Object.fromEntries(fields.map(f=>[f,form.elements[f].value]));p.taxonomyDetached=Boolean(records.find(r=>r.id===editing)?.taxonomyDetached)&&![...taxonomyFields.filter(f=>f!=='identification'),'family','genus'].some(f=>p[f]?.trim());if(['unresolved','hybrid'].includes(p.identification)){p.variety='';p.form='';p.infraspecific=''}else if(['aff','cf'].includes(p.identification)){p.variety='';p.form=''}else p.infraspecific='';p.photos=photoDraft;p.logs=logDraft;p.photoDates=photoDateDraft;p.originLocation=originDraft;$('#savePlant').disabled=true;$('#savePlant').textContent='正在保存…';try{const saved=await api('/api/plants'+(editing?'/'+editing:''),{method:editing?'PUT':'POST',headers:{'Content-Type':'application/json',...(editing?{'If-Match':'"'+editingRevision+'"'}:{})},body:JSON.stringify(p)});if(editing)records=records.map(x=>x.id===editing?saved:x);else records.unshift(saved);$('#demo').checked=false;autoDemo=false;classification=null;$('#search').value='';$('#locationFilter').value='';tab='all';$$('[data-tab]').forEach(b=>b.classList.toggle('selected',b.dataset.tab==='all'));render();close('editor');if($('#detail').open){close('detail');openDetail(saved.id)}toast('植物档案已保存')}catch(err){$('#formError').textContent=err.message}finally{$('#savePlant').disabled=false;$('#savePlant').textContent='保存档案'}};
 function openDetail(id){
  const p=[...records,...examples].find(x=>x.id===id);if(!p)return;selected=p;
- const pairs=[['收藏编号',p.number],['来源编号',p.sourceNumber],['购入价格',p.price===''?'未填写':'¥ '+money(p.price)],['科',p.family],['属',p.genus],...ranks.filter(r=>!['family','genus','aff','cf','unresolved'].includes(r.key)).map(r=>[r.label,p[r.key]]),['鉴定类别',rankInfo(p.identification||'species')?.label],['aff. / cf. 名称',p.infraspecific],['购入日期',p.date],['购入来源',p.source],['产地',p.origin],...(p.originLocation?[['地图位置',locationLabel(p.originLocation)],...(p.originLocation.locality?[['小地名',p.originLocation.locality]]:[]),...(p.originLocation.featureType?[['地物类别',p.originLocation.featureType]]:[]),['位置精度',precisionLabels[p.originLocation.precision||'point']]]:[]),['摆放位置',p.location],['生长状态',p.status],['光照需求',p.light],['浇水建议',p.water],['栽培介质',p.substrate],['上次浇水',p.lastWater],['下次养护',p.nextWater]];
+ const pairs=[['收藏编号',p.number],['来源编号',p.sourceNumber],['购入价格',p.price===''?'未填写':'¥ '+money(p.price)],['科',p.family],['属',p.genus],...ranks.filter(r=>!['family','genus','aff','cf','unresolved','hybrid'].includes(r.key)).map(r=>[r.label,p[r.key]]),['种级类别 / 鉴定',rankInfo(p.identification||'species')?.label],['aff. / cf. 名称',p.infraspecific],['购入日期',p.date],['购入来源',p.source],['产地',p.origin],...(p.originLocation?[['地图位置',locationLabel(p.originLocation)],...(p.originLocation.locality?[['小地名',p.originLocation.locality]]:[]),...(p.originLocation.featureType?[['地物类别',p.originLocation.featureType]]:[]),['位置精度',precisionLabels[p.originLocation.precision||'point']]]:[]),['摆放位置',p.location],['生长状态',p.status],['光照需求',p.light],['浇水建议',p.water],['栽培介质',p.substrate],['上次浇水',p.lastWater],['下次养护',p.nextWater]];
  $('#detailContent').innerHTML='<div class="detail-top">'+(p.photos?.length?'<img class="detail-image" id="bigPhoto" src="'+escape(p.photos[0])+'" alt="'+escape(p.name)+'">':'')+'<button class="icon-button detail-close" id="closeDetail" aria-label="关闭">×</button></div><div class="detail-body"><div class="detail-heading"><div><div class="eyebrow">'+(p.demo?'EXAMPLE PROFILE':'PLANT PROFILE')+'</div><h2>'+escape(p.name)+'</h2><div class="latin">'+escape(p.latin)+'</div></div><button class="primary" id="editDetail">'+(p.demo?'用此示例新建':'编辑档案')+'</button></div>'+(p.photos?.length>1?'<div class="gallery">'+p.photos.map(url=>'<button data-photo="'+escape(url)+'" aria-label="查看植物照片"><img src="'+escape(url)+'" alt="'+escape(p.name)+'" loading="lazy" decoding="async"></button>').join('')+'</div>':'')+'<p class="detail-description">'+escape(p.description||'尚未填写简介。')+'</p><dl class="detail-fields">'+pairs.map(([k,v])=>'<div><dt>'+k+'</dt><dd>'+escape(v||'未填写')+'</dd></div>').join('')+'</dl>'+(p.originLocation?'<a class="origin-detail-link" href="/origins?plant='+encodeURIComponent(p.id)+(p.demo?'&demo=1':'')+'">在产地地图中查看</a>':'')+'<h3>个体信息</h3><p class="detail-description individual-info">'+escape(p.individualInfo||'尚未填写个体信息。')+'</p>'+(p.notes?'<h3>备注</h3><p class="detail-description">'+escape(p.notes)+'</p>':'')+statusMarkup(p)+growthMarkup(p)+(!p.demo?'<div class="detail-actions"><button class="secondary" id="waterToday">记录今天浇水</button><button class="danger-text" id="deletePlant">删除档案</button></div>':'<p class="detail-description">这是示例档案。点击“用此示例新建”可保存到自己的收藏中。</p>')+'</div>';
  if(!$('#detail').open)modal('detail');$('#closeDetail').onclick=()=>{if(growthBusy){toast('请等待生长记录保存完成');return}close('detail')};$('#editDetail').onclick=()=>openEditor(records.find(x=>x.id===p.id)||p);$$('[data-photo]').forEach(b=>b.onclick=()=>$('#bigPhoto').src=b.dataset.photo);
  bindGrowth(p);bindStatus(p);if(p.demo)return;
@@ -324,7 +330,9 @@ $('#detail').addEventListener('cancel',e=>{if(growthBusy)e.preventDefault()});
 
 function updateIdentification(){
  const kind=$('#plantForm').elements.identification.value;
- $('#plantForm').elements.species.required=['aff','cf'].includes(kind);
+ $('#plantForm').elements.species.required=['aff','cf','hybrid'].includes(kind);
+ $('#speciesLabel').textContent=kind==='hybrid'?'杂交种名 / 亲本组合':'种（基础种名）';
+ $('#plantForm').elements.species.placeholder=kind==='hybrid'?'如：Nepenthes lowii × veitchii':'';
  $$('[data-infra]').forEach(label=>{const enabled=label.dataset.infra==='infraspecific'?['aff','cf'].includes(kind):kind==='species';label.hidden=!enabled;label.querySelector('input').disabled=!enabled;});
 }
 $('#plantForm').elements.identification.onchange=updateIdentification;
@@ -338,23 +346,32 @@ function updateTaxonRanks(){
  updateReferenceBox();
 }
 function updateReferenceBox(){
- const rank=taxonEditing?.rank||$('#taxonRank').value;
+ const rank=$('#taxonRank').value;
  $('#taxonReferenceBox').hidden=!referenceRank(rank);
- $('#taxonPath').textContent=taxonEditing?taxonEditing.path.map(p=>rankInfo(p.rank).label+'：'+p.name).join(' / '):'';
+ $('#taxonPath').textContent=taxonEditing?taxonEditing.path.map(p=>rankInfo(p.rank).label+'：'+p.name).join(' / ')+'；关联 '+taxonEditing.plantCount+' 份植物档案，改名或移动时一并更新分类。':'';
 }
-function openTaxon(parent=[],node=null){
+async function openTaxon(parent=[],node=null){
  if(!authState?.user||$('#demo').checked){toast('请登录并切换到个人档案后添加分类');return;}
- taxonEditing=node?{...node,record:node.record?{...node.record}:null}:null;
- taxonReferences=[...(node?.references||[])];taxonUploading=false;
+ if(taxonUploading)return;const epoch=++taxonOpenEpoch;
+ let snapshot=null;try{if(node)snapshot=await api('/api/taxonomy/branch?path='+encodeURIComponent(node.key))}catch(error){toast(error.message);return}if(epoch!==taxonOpenEpoch)return;
+ taxonEditing=node?{...node,...snapshot}:null;taxonReferences=[...(snapshot?.references||[])];taxonUploading=false;
  $('#taxonError').textContent='';$('#referenceStatus').textContent='';$('#referenceFiles').value='';
- $('#taxonIdentity').hidden=Boolean(node);$('#taxonName').required=!node;
- $('#taxonTitle').textContent=node?'管理参考图 · '+node.name:'添加分类';
- $('#taxonParent').innerHTML='<option value="[]">无上级（根分类）</option>'+[...taxonomyNodes.values()].filter(n=>childRanks(n.path).length).map(n=>'<option value="'+escape(n.key)+'">'+escape(n.path.map(p=>p.name).join(' / '))+'</option>').join('');
- $('#taxonParent').value=pathKey(parent);$('#taxonName').value='';updateTaxonRanks();renderReferences();modal('taxonEditor');
+ $('#taxonIdentity').hidden=false;$('#taxonName').required=true;$('#taxonTitle').textContent=node?'编辑分类 · '+node.name:'添加分类';
+ $('#taxonParent').innerHTML='<option value="[]">无上级（根分类）</option>'+[...taxonomyNodes.values()].filter(n=>childRanks(n.path).length&&(!node||pathKey(n.path.slice(0,node.path.length))!==node.key)).map(n=>'<option value="'+escape(n.key)+'">'+escape(n.path.map(p=>p.name).join(' / '))+'</option>').join('');
+ $('#taxonParent').value=pathKey(node?node.path.slice(0,-1):parent);$('#taxonName').value=node?.name||'';updateTaxonRanks();if(node)$('#taxonRank').value=node.rank;updateReferenceBox();renderReferences();modal('taxonEditor');
 }
+async function deleteTaxonomyNode(node){
+ if(taxonUploading||!node)return;taxonUploading=true;
+ try{
+  const snapshot=await api('/api/taxonomy/branch?path='+encodeURIComponent(node.key));
+  if(!confirm('删除“'+node.name+'”及其下级，共 '+snapshot.nodeCount+' 个分类节点？'+(snapshot.plantCount?'关联的 '+snapshot.plantCount+' 份植物档案将移到“未分类植物”。':'')+'植物档案与照片不会删除。'))return;
+  const saved=await api('/api/taxonomy/branch',{method:'DELETE',headers:{'Content-Type':'application/json','If-Match':'"'+snapshot.revision+'"'},body:JSON.stringify({path:node.path,confirmation:'删除分类'})});records=saved.plants;taxa=saved.taxa;render();toast('分类已删除，植物档案保留');
+ }catch(error){toast(error.message)}finally{taxonUploading=false}
+}
+
 if(classificationPage){
  $('#newTaxon').onclick=()=>openTaxon();$('#taxonParent').onchange=updateTaxonRanks;$('#taxonRank').onchange=updateReferenceBox;
- const busy=value=>{taxonUploading=value;$('#saveTaxon').disabled=value;$('#referenceFiles').disabled=value;$('#taxonParent').disabled=value;$('#taxonRank').disabled=value;renderReferences()};
+ const busy=value=>{taxonUploading=value;$('#saveTaxon').disabled=value;$('#referenceFiles').disabled=value;$('#taxonParent').disabled=value;$('#taxonRank').disabled=value;$('#taxonName').disabled=value;renderReferences()};
  $('#referenceFiles').onchange=async e=>{
   const files=[...e.target.files];e.target.value='';
   busy(true);
@@ -367,13 +384,14 @@ if(classificationPage){
  };
  $('#taxonForm').onsubmit=async e=>{
   e.preventDefault();if(taxonUploading)return;
-  const path=taxonEditing?.path||[...JSON.parse($('#taxonParent').value),{rank:$('#taxonRank').value,name:$('#taxonName').value.trim()}];
+  const path=[...JSON.parse($('#taxonParent').value),{rank:$('#taxonRank').value,name:$('#taxonName').value.trim()}];
   const references=referenceRank(path.at(-1).rank)?taxonReferences:[];
-  const existing=taxonEditing?.record;
+  const existing=taxonEditing;
+  if(existing&&pathKey(path)!==existing.key&&!confirm('将修改此分类及其下级，并更新 '+existing.plantCount+' 份植物档案的分类。是否继续？'))return;
   busy(true);$('#taxonError').textContent='';
   try{
-   const saved=await api('/api/taxa'+(existing?'/'+existing.id:''),{method:existing?'PUT':'POST',headers:{'Content-Type':'application/json',...(existing?{'If-Match':'"'+existing._revision+'"'}:{})},body:JSON.stringify({path,references})});
-   taxa=existing?taxa.map(t=>t.id===saved.id?saved:t):[...taxa,saved];renderTree();close('taxonEditor');toast('分类与参考图已保存到云端');
+   const saved=existing?await api('/api/taxonomy/branch',{method:'PUT',headers:{'Content-Type':'application/json','If-Match':'"'+existing.revision+'"'},body:JSON.stringify({path:existing.path,newPath:path,references})}):await api('/api/taxa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path,references})});
+   if(existing){records=saved.plants;taxa=saved.taxa}else taxa=[...taxa,saved];render();close('taxonEditor');toast('分类与参考图已保存到云端');
   }catch(error){$('#taxonError').textContent=error.message}finally{busy(false)}
  };
  $('#taxonEditor').addEventListener('cancel',e=>{if(taxonUploading)e.preventDefault()});

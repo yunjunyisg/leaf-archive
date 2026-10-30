@@ -5,7 +5,7 @@ on:
       version:
         description: 发布版本号
         required: true
-        default: '1.1.1'
+        default: '1.2.0'
   push:
     branches: [main]
     paths: [.github/workflows/publish-apps.yml]
@@ -20,6 +20,6 @@ jobs:
       - name: 核对文件并发布安装附件
         env:
           GH_TOKEN: ${{ github.token }}
-          LEAF_RELEASE_VERSION: ${{ inputs.version || '1.1.1' }}
+          LEAF_RELEASE_VERSION: ${{ inputs.version || '1.2.0' }}
           GH_REPO: ${{ github.repository }}
         run: python3 apps/distribution/publish.py "$LEAF_RELEASE_VERSION"

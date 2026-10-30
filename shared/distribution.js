@@ -1,10 +1,12 @@
 // Distribution is derived only from the current account's confirmed origin records.
 export const foldRegion=s=>String(s||'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]/gu,'');
 export function taxonName(p,rank='species'){
+ if(p.taxonomyDetached)return rank==='genus'?'未分类':(p.name||'未命名植物')+' · 未分类';
  const genus=p.genus?.trim();if(rank==='genus')return genus||'未填写属';
  const kind=p.identification||'species';if(kind==='unresolved')return (genus||'植物')+' · 未定种';
  let name=p.species?.trim()||p.latin?.trim()||p.name?.trim()||'未命名植物';
  if(p.species&&genus&&!foldRegion(name).startsWith(foldRegion(genus)))name=genus+' '+name;
+ if(kind==='hybrid')return name+' · 杂交种';
  return ['aff','cf'].includes(kind)?name+' '+kind+'. '+(p.infraspecific||'待核实'):name;
 }
 export function taxonColor(key){let hash=2166136261;for(const c of key)hash=Math.imul(hash^c.codePointAt(0),16777619);const hue=(hash>>>0)%360,saturation=.42+((hash>>>10)%12)/100,light=.44+((hash>>>16)%7)/100,a=saturation*Math.min(light,1-light);const channel=n=>{const k=(n+hue/30)%12;return Math.round(255*(light-a*Math.max(-1,Math.min(k-3,9-k,1)))).toString(16).padStart(2,'0')};return '#'+channel(0)+channel(8)+channel(4)}

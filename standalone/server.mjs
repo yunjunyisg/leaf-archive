@@ -1,3 +1,4 @@
+import {taxonomyRoutes} from './taxonomy.mjs';
 import {profileRoutes} from './profile.mjs';
 import {withAccountUi,accountUiClient} from './account-ui.mjs';
 import {accountDeletionRoutes,cleanupDeletedObjects} from './account-deletion.mjs';
@@ -34,6 +35,7 @@ export function createApp({dataDirectory,origin,env={}}){
    if(url.pathname.startsWith('/api/')||url.pathname.startsWith('/images/'))return Response.json({error:'请先修改密码',code:'PASSWORD_CHANGE_REQUIRED',redirect:'/auth/change-password'},{status:403,headers});
    return new Response(null,{status:303,headers:{...headers,Location:'/auth/change-password'}});
   }
+  const taxonomy=await taxonomyRoutes(request,{sql:database.sql,session});if(taxonomy)return taxonomy;
   const personal=await profileRoutes(request,{sql:database.sql,bucket:BUCKET,session});if(personal)return withFilingFooter(personal);
   const deletion=await accountDeletionRoutes(request,{sql:database.sql,bucket:BUCKET,session,ip});if(deletion)return withFilingFooter(deletion);
   if(session&&isAdmin(database.sql,session.owner)){

@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import fs from 'node:fs';
 import {ranks,validPath,plantPath,buildTree,pathKey} from '../shared/taxonomy.js';
+import {taxonName,taxonColor} from '../shared/distribution.js';
 import worker from '../dist/server/index.js';
 const path=[{rank:'genus',name:'茅膏菜属'},{rank:'species',name:'Drosera burmannii'}];
 test('all ranks, optional ranks, species peers and qualifiers preserve their hierarchy',()=>{
- const full=ranks.filter(r=>r.key!=='unresolved'&&!['aff','cf'].includes(r.key)).map(r=>({rank:r.key,name:r.label}));
+ const full=ranks.filter(r=>!['unresolved','hybrid','aff','cf'].includes(r.key)).map(r=>({rank:r.key,name:r.label}));
  assert.deepEqual(validPath(full),full);
  assert.deepEqual(validPath([...path,{rank:'aff',name:'D. aff. burmannii'}]).at(-1).rank,'aff');
  assert.throws(()=>validPath([...path,{rank:'unresolved',name:'sp.'}]));
@@ -60,4 +61,24 @@ test('reference image counts above twelve survive creation, update and reload',a
  const reloaded=await (await call('GET','/api/taxa')).json();assert.deepEqual(reloaded[0].references,references);
  assert.equal((await call('POST','/api/taxa',{path:[{rank:'species',name:'invalid'}],references:['https://example.test/image.png']})).status,400);
  sql.close();
+});
+
+test('hybrids are species-level peers, accept references and retain distinct distribution groups',async()=>{
+ const hybridPath=[{rank:'genus',name:'猪笼草属'},{rank:'hybrid',name:'Nepenthes lowii × veitchii'}];
+ assert.deepEqual(validPath(hybridPath),hybridPath);
+ assert.throws(()=>validPath([...path,{rank:'hybrid',name:'不能放在种以下'}]));
+ assert.throws(()=>validPath([...hybridPath,{rank:'variety',name:'种下节点'}]));
+ const hybrid={id:'hybrid-a',name:'交种个体',genus:'猪笼草属',species:'Nepenthes lowii × veitchii',identification:'hybrid'};
+ assert.equal(plantPath(hybrid).at(-1).rank,'hybrid');
+ const natural={...hybrid,id:'natural-a',identification:'species'},tree=buildTree([hybrid,natural]);
+ assert.equal(tree.roots[0].children.length,2);assert.notEqual(taxonName(hybrid),taxonName(natural));assert.equal(taxonColor(taxonName(hybrid)),taxonColor(taxonName({...hybrid})));
+ const {sql,call}=setup();try{
+  const photo='/images/'+crypto.randomUUID();sql.prepare('INSERT INTO images VALUES (?,?,?)').run(photo.split('/').pop(),'owner','image/png');
+  const created=await call('POST','/api/taxa',{path:hybridPath,references:[photo]});assert.equal(created.status,201);
+  const record=await call('POST','/api/plants',{...hybrid,number:'HYBRID-1'});assert.equal(record.status,201);const saved=await record.json();assert.equal(saved.identification,'hybrid');assert.equal(saved.species,hybrid.species);
+  const loaded=(await (await call('GET','/api/plants')).json())[0];assert.equal(plantPath(loaded).at(-1).rank,'hybrid');assert.equal(loaded.species,hybrid.species);
+  assert.equal((await call('POST','/api/plants',{name:'缺少名称',number:'HYBRID-2',identification:'hybrid'})).status,400);
+  assert.equal((await call('POST','/api/plants',{...hybrid,number:'HYBRID-3',variety:'不支持'})).status,400);
+  assert.deepEqual(await (await call('GET','/api/taxa',null,null,'another')).json(),[]);
+ }finally{sql.close()}
 });

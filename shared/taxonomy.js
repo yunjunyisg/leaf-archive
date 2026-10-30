@@ -5,7 +5,7 @@ export const ranks=[
  ['family','科','family / familia',4],['tribe','族','tribe / tribus',5],
  ['genus','属','genus',6],['section','组','section / sectio',7],
  ['series','系','series',8],['species','种','species',9],
- ['unresolved','未定种','sp.',9],['variety','变种','var. / varietas',10],
+ ['unresolved','未定种','sp.',9],['hybrid','杂交种','hybrid / ×',9],['variety','变种','var. / varietas',10],
  ['form','变型','f. / forma',11],['aff','近缘种','aff.',10],['cf','近似种','cf.',10]
 ].map(([key,label,latin,level])=>({key,label,latin,level}));
 export const rankInfo=key=>ranks.find(r=>r.key===key);
@@ -30,10 +30,11 @@ export function validPath(path){
 }
 export const pathKey=path=>JSON.stringify(path);
 export function plantPath(p){
+ if(p.taxonomyDetached)return [];
  const path=[];
  for(const r of ranks.filter(r=>r.level<9))if(p[r.key]?.trim())path.push({rank:r.key,name:p[r.key].trim()});
  if(!path.length)path.push({rank:'family',name:'未填写科'});
- const rank=p.identification==='unresolved'?'unresolved':'species';
+ const rank=['unresolved','hybrid'].includes(p.identification)?p.identification:'species';
  path.push({rank,name:p.species?.trim()||p.latin?.trim()||p.name});
  if(rank==='species'){
   if(['aff','cf'].includes(p.identification))path.push({rank:p.identification,name:p.infraspecific?.trim()||p.name});
@@ -52,7 +53,22 @@ export function buildTree(plants,taxa=[]){
   });return node;
  }
  for(const t of taxa){const n=add(t.path);n.references=t.references||[];n.record=t;}
- for(const p of plants)add(plantPath(p)).plants.push(p);
+ for(const p of plants){const path=plantPath(p);if(path.length)add(path).plants.push(p);}
  function sort(children){children.sort((a,b)=>rankInfo(a.rank).level-rankInfo(b.rank).level||a.name.localeCompare(b.name,'zh'));children.forEach(n=>sort(n.children));}
  sort(roots);return {roots,nodes};
+}
+
+export function detachClassification(plant){
+ const next={...plant,taxonomyDetached:true,identification:'species'};
+ for(const key of [...ranks.filter(r=>r.level<9).map(r=>r.key),'species','variety','form','infraspecific'])next[key]='';
+ return next;
+}
+export function applyClassificationPath(plant,path){
+ const next=detachClassification(plant);delete next.taxonomyDetached;
+ for(const part of validPath(path)){
+  if(['species','hybrid','unresolved'].includes(part.rank)){next.species=part.name;next.identification=part.rank}
+  else if(['aff','cf'].includes(part.rank)){next.identification=part.rank;next.infraspecific=part.name}
+  else next[part.rank]=part.name;
+ }
+ return next;
 }

@@ -8,9 +8,18 @@ fi
 update_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 source_dir="$update_root/standalone"
 target_dir=/opt/leaf-archive/standalone
-for name in server.mjs profile.mjs profile-page.html profile-client.js account-ui.mjs account-ui.js account-deletion.mjs filing.mjs storage.mjs local-auth.mjs access.mjs admin.mjs admin-account.mjs admin-page.html admin-client.js; do
+for name in server.mjs taxonomy.mjs profile.mjs profile-page.html profile-client.js account-ui.mjs account-ui.js account-deletion.mjs filing.mjs storage.mjs local-auth.mjs access.mjs admin.mjs admin-account.mjs admin-page.html admin-client.js; do
     test -f "$source_dir/$name" || { echo '更新文件不完整，尚未修改服务器。'; exit 1; }
 done
+core_source="$update_root/dist/server/index.js"
+core_target=/opt/leaf-archive/dist/server/index.js
+has_core=0
+if [ -d "$update_root/dist" ]; then
+    test -f "$core_source" || { echo '页面及接口更新文件不完整，尚未修改服务器。'; exit 1; }
+    test -f "$core_target"
+    /usr/bin/node --check --input-type=module < "$core_source"
+    has_core=1
+fi
 test -f "$target_dir/server.mjs"
 test -f /var/lib/leaf-archive/archive.sqlite
 id www >/dev/null
@@ -26,6 +35,8 @@ install -d -m 700 "$backup_root"
 backup_dir="$backup_root/runtime-$(date +%Y%m%d-%H%M%S)-$$"
 install -d -m 700 "$backup_dir"
 cp -a "$target_dir/." "$backup_dir/"
+core_backup="$backup_dir-core.js"
+if [ "$has_core" -eq 1 ]; then cp -a "$core_target" "$core_backup"; fi
 was_active=0
 if systemctl is-active --quiet leaf-archive; then was_active=1; fi
 changed=0
@@ -39,6 +50,7 @@ rollback() {
             if [ ! -e "$backup_dir/$name" ]; then rm -f -- "$target_dir/$name"; fi
         done
         cp -a "$backup_dir/." "$target_dir/"
+        if [ "$has_core" -eq 1 ]; then cp -a "$core_backup" "$core_target"; fi
         if [ "$was_active" -eq 1 ]; then systemctl restart leaf-archive || true; fi
         echo '更新检查失败，已恢复旧程序。数据库没有回滚，原有数据和已创建账号均保留。'
     fi
@@ -48,6 +60,11 @@ trap rollback EXIT
 systemctl stop leaf-archive
 changed=1
 cp -a "$source_dir/." "$target_dir/"
+if [ "$has_core" -eq 1 ]; then
+    cp -a "$core_source" "$core_target"
+    chown root:www "$core_target"
+    chmod 640 "$core_target"
+fi
 chown -R root:www "$target_dir"
 find "$target_dir" -type d -exec chmod 750 {} +
 find "$target_dir" -type f -exec chmod 640 {} +

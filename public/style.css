@@ -56,3 +56,5 @@ a.nav{text-decoration:none}
 
 /* 账号操作集中到“我的”，手机不再显示额外操作栏。 */
 @media(max-width:760px){.main>header{display:none!important}}.account-controls #logout,.account-controls #deleteAccount{display:none!important}.stats>[hidden]{display:none!important}a.side-bottom{text-decoration:none}.nav[href="/account"]{min-height:44px}
+
+.unclassified-plants{margin-top:24px;padding:20px;border:1px dashed #cbd7c1;border-radius:10px;background:#f8faf5}.unclassified-plants p{font-size:14px;color:#74836a}.unclassified-plants [data-reclassify]{padding:10px 14px;border:1px solid #ccd8c2;border-radius:7px;margin:4px 0 12px;min-height:44px}
