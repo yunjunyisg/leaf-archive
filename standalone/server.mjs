@@ -1,3 +1,4 @@
+import {accountDeletionRoutes,cleanupDeletedObjects,withDeletionEntry} from './account-deletion.mjs';
 import {withFilingFooter} from './filing.mjs';
 import {sessionAccount,isAdmin,recordActivity,accountSecurity} from './access.mjs';
 import {adminRoutes} from './admin.mjs';
@@ -12,7 +13,7 @@ import {openDatabase,diskBucket} from './storage.mjs';
 import {createLocalAuth} from './local-auth.mjs';
 export function createApp({dataDirectory,origin,env={}}){
  const site=new URL(origin);if(site.protocol!=='https:'||site.pathname!=='/'||site.search||site.hash)throw Error('SITE_ORIGIN 必须是 HTTPS 网站根地址');
- const database=openDatabase(dataDirectory),BUCKET=diskBucket(path.join(dataDirectory,'objects')),login=createLocalAuth(database.sql);
+ const database=openDatabase(dataDirectory),BUCKET=diskBucket(path.join(dataDirectory,'objects'),{sql:database.sql}),login=createLocalAuth(database.sql);
  // Ignore caller-supplied identity and runtime TRUST_SITES_IDENTITY, including forwarded headers.
  const bindings={...env,DB:database.DB,BUCKET,TRUST_SITES_IDENTITY:'false'};
  return {database,BUCKET,origin:site.origin,async fetch(request,ip){
@@ -30,6 +31,7 @@ export function createApp({dataDirectory,origin,env={}}){
    if(url.pathname.startsWith('/api/')||url.pathname.startsWith('/images/'))return Response.json({error:'请先修改密码',code:'PASSWORD_CHANGE_REQUIRED',redirect:'/auth/change-password'},{status:403,headers});
    return new Response(null,{status:303,headers:{...headers,Location:'/auth/change-password'}});
   }
+  const deletion=await accountDeletionRoutes(request,{sql:database.sql,bucket:BUCKET,session,ip});if(deletion)return withFilingFooter(deletion);
   if(session&&isAdmin(database.sql,session.owner)){
    if(['/', '/origins','/origins/','/classification','/classification/','/offline.html'].includes(url.pathname))return new Response(null,{status:303,headers:{Location:'/admin','Cache-Control':'private, no-store'}});
    if(/^\/api\/(plants|taxa|images)(\/|$)/.test(url.pathname))return Response.json({error:'管理员账号仅提供数据、管理和用户总植物地图功能'},{status:403,headers:{'Cache-Control':'private, no-store'}});
@@ -37,7 +39,7 @@ export function createApp({dataDirectory,origin,env={}}){
   const administrative=await adminRoutes(request,{sql:database.sql,bucket:BUCKET,dataDirectory,session});if(administrative)return withFilingFooter(administrative);
   const response=await worker.fetch(request,bindings);
   if(url.pathname==='/api/auth'&&response.ok){const state=await response.json();return Response.json({...state,passwordLogin:true,legacyLogin:false,isAdmin:Boolean(session&&isAdmin(database.sql,session.owner))},{headers:{'Cache-Control':'no-store'}})}
-  return withFilingFooter(response);
+  return withFilingFooter(await withDeletionEntry(response,{sql:database.sql,session}));
  },close:()=>database.close()};
 }
 export function httpServer(app){
@@ -63,6 +65,8 @@ export function httpServer(app){
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  process.umask(0o077);
  const app=createApp({dataDirectory:process.env.LEAF_DATA_DIR||'/var/lib/leaf-archive',origin:process.env.SITE_ORIGIN||'https://gloriouscarnivorousplants.top',env:process.env});
+ await cleanupDeletedObjects(app.database.sql,app.BUCKET);
+ const cleanupTimer=setInterval(()=>cleanupDeletedObjects(app.database.sql,app.BUCKET).catch(()=>{}),30000);cleanupTimer.unref();
  const server=httpServer(app),port=Number(process.env.PORT||3100);server.listen(port,'127.0.0.1',()=>console.log('Leaf Archive listening on 127.0.0.1:'+port));
- for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>{server.close(()=>{app.close();process.exit(0)});setTimeout(()=>process.exit(1),10000).unref()});
+ for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>{clearInterval(cleanupTimer);server.close(()=>{app.close();process.exit(0)});setTimeout(()=>process.exit(1),10000).unref()});
 }

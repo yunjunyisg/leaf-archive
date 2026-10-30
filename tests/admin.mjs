@@ -115,23 +115,23 @@ test('admin reset revokes every session and forces a password change across page
  }finally{await f.close()}
 });
 
-test('deactivation is admin-only, preserves archives, blocks sessions and cannot be undone through registration or reset',async()=>{
+test('account deletion is admin-only, erases archives and sessions and allows a new independent registration',async()=>{
  const f=await fixture(),{app}=f;
  try{
   await setAccount(app.database.sql,{username:'visitor',password,owner:'visitor-owner'});await provisionAdmin(app.database.sql,{username:'operator',password});
   const admin=cookie(await login(app,'operator')),visitor=cookie(await login(app,'visitor')),operator=app.database.sql.prepare('SELECT owner FROM local_admins').get().owner;
   app.database.sql.prepare('INSERT INTO plants VALUES (?,?,?,?,?)').run('preserved','visitor-owner','PL-1',JSON.stringify({name:'保留档案',photos:[]}),'2026-01-01');
-  const action=(name,target,session=admin)=>call(app,'/api/admin/users/'+name,session,{method:'POST',body:JSON.stringify(target)});
+  const action=(name,target,session=admin)=>call(app,'/api/admin/users/'+name,session,{method:'POST',body:JSON.stringify({...target,confirmation:'确认注销'})});
   for(const name of ['deactivate','reset-password'])assert.equal((await action(name,{owner:operator,username:'operator'})).status,403);
   const target={owner:'visitor-owner',username:'visitor'};
   assert.equal((await action('deactivate',target,visitor)).status,403);assert.equal((await action('deactivate',target)).status,200);
   assert.equal(cookie(await login(app,'visitor')),undefined);assert.equal((await call(app,'/auth/change-password',visitor)).headers.get('Location'),'/auth/local');
   assert.equal(app.database.sql.prepare('SELECT count(*) AS n FROM auth_sessions WHERE owner=?').get(target.owner).n,0);
-  assert.equal(app.database.sql.prepare('SELECT count(*) AS n FROM plants WHERE owner=?').get(target.owner).n,1);
-  for(const name of ['deactivate','reset-password'])assert.equal((await action(name,target)).status,409);
-  const registration=await call(app,'/auth/register',null,{method:'POST',body:new URLSearchParams({username:'VISITOR',password,confirmPassword:password})});assert.equal(registration.status,409);
-  const list=await (await call(app,'/api/admin/users',admin)).json();assert.equal(list.users.find(u=>u.username==='visitor').disabled,1);
-  assert.equal((await (await call(app,'/api/admin/plants?owner=visitor-owner',admin)).json()).total,1);
+  assert.equal(app.database.sql.prepare('SELECT count(*) AS n FROM plants WHERE owner=?').get(target.owner).n,0);
+  for(const name of ['deactivate','reset-password'])assert.equal((await action(name,target)).status,404);
+  const registration=await call(app,'/auth/register',null,{method:'POST',body:new URLSearchParams({username:'VISITOR',password,confirmPassword:password})});assert.equal(registration.status,303);
+  const list=await (await call(app,'/api/admin/users',admin)).json();assert.notEqual(list.users.find(u=>u.username==='visitor').owner,target.owner);
+  assert.equal((await (await call(app,'/api/admin/plants?owner=visitor-owner',admin)).json()).total,0);
  }finally{await f.close()}
 });
 
@@ -151,7 +151,7 @@ test('forced password change and deactivation persist after reopening the databa
  try{
   await provisionAdmin(app.database.sql,{username:'operator',password});const admin=cookie(await login(app,'operator'));
   for(const username of ['resetuser','closeduser'])await setAccount(app.database.sql,{username,password,owner:username});
-  for(const [username,action] of [['resetuser','reset-password'],['closeduser','deactivate']])assert.equal((await call(app,'/api/admin/users/'+action,admin,{method:'POST',body:JSON.stringify({owner:username,username})})).status,200);
+  for(const [username,action] of [['resetuser','reset-password'],['closeduser','deactivate']])assert.equal((await call(app,'/api/admin/users/'+action,admin,{method:'POST',body:JSON.stringify({owner:username,username,confirmation:'确认注销'})})).status,200);
   app.close();app=createApp({dataDirectory:f.directory,origin});
   assert.equal((await login(app,'resetuser','000000')).headers.get('Location'),'/auth/change-password');
   assert.equal(cookie(await login(app,'closeduser')),undefined);assert.equal(app.database.sql.prepare('SELECT count(*) AS n FROM admin_audit').get().n,2);

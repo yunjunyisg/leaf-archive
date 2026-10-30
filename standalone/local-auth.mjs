@@ -10,6 +10,9 @@ export async function passwordRecord(password,salt=randomBytes(32).toString('hex
  if(typeof password!=='string'||password.length<6||password.length>256)throw Error('密码应为 6 至 256 个字符');
  return {salt,password_hash:Buffer.from(await derive(password,salt,64)).toString('hex')};
 }
+export async function verifyPassword(password,row){
+ return typeof password==='string'&&password.length<=256&&Boolean(row)&&timingSafeEqual(Buffer.from(await derive(password,row.salt,64)),Buffer.from(row.password_hash,'hex'));
+}
 export async function setAccount(sql,{username,password,owner,nickname=username}){
  if(!validUsername(username))throw Error('账号须为 3 至 64 位字母、数字、点、下划线或横线');
  if(typeof owner!=='string'||!owner||owner.length>512)throw Error('无效账号归属');

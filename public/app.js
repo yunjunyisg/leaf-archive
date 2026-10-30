@@ -180,7 +180,7 @@ function showAccount(state){
  authState=state;const user=state.user;
  $('#accountName').textContent=user?user.nickname:'未登录';
  let downloads=$('#migrationDownloadLink');if(state.migrationDownloads){if(!downloads){downloads=document.createElement('a');downloads.id='migrationDownloadLink';downloads.className='export';downloads.href='/migration-downloads';downloads.textContent='迁移文件下载';$('#export').before(downloads)}}else downloads?.remove();
- $('#wechatLogin').hidden=true;$('#logout').hidden=!user;
+ $('#wechatLogin').hidden=true;$('#logout').hidden=!user;if($('#deleteAccount'))$('#deleteAccount').hidden=!user;
  $('#newPlant').disabled=!user;if($('#newTaxon'))$('#newTaxon').disabled=!user;
  const notice=$('#authNotice');notice.hidden=Boolean(user);
  if(!user){

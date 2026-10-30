@@ -21,15 +21,16 @@ async function stats(){
 }
 async function users(){
  const attempt=++usersEpoch,data=await api('/api/admin/users?page='+userPage+'&q='+encodeURIComponent($('userQuery').value.trim()));if(attempt!==usersEpoch)return;
- $('userCount').textContent='共 '+data.total+' 个账号';$('users').replaceChildren();for(const u of data.users){const tr=document.createElement('tr');cell(tr,u.username).append(Object.assign(document.createElement('small'),{textContent:u.nickname}));cell(tr,u.disabled?'已注销':u.mustChange?'待修改密码':u.role==='admin'?'管理员':'普通账号');cell(tr,u.plantCount+' / '+u.imageCount+' / '+u.taxonCount);cell(tr,date(u.registeredAt));cell(tr,date(u.lastLogin));cell(tr,date(u.lastSeen));button(cell(tr,''),'查看档案',()=>{owner=u.owner;ownerName=u.username;plantPage=1;setView('manage');plants().catch(showError);$('plantsTitle').scrollIntoView({behavior:'smooth',block:'start'})});button(tr.lastElementChild,'查看地图',()=>{mapOwner=u.owner;mapOwnerName=u.username;setView('map',true)});if(u.role!=='admin'&&!u.disabled){button(tr.lastElementChild,'重置密码',()=>manageUser(u,'reset-password').catch(showError));button(tr.lastElementChild,'注销账号',()=>manageUser(u,'deactivate').catch(showError));}$('users').append(tr)}pager('users',data);
+ $('userCount').textContent='共 '+data.total+' 个账号';$('users').replaceChildren();for(const u of data.users){const tr=document.createElement('tr');cell(tr,u.username).append(Object.assign(document.createElement('small'),{textContent:u.nickname}));cell(tr,u.disabled?'已注销':u.mustChange?'待修改密码':u.role==='admin'?'管理员':'普通账号');cell(tr,u.plantCount+' / '+u.imageCount+' / '+u.taxonCount);cell(tr,date(u.registeredAt));cell(tr,date(u.lastLogin));cell(tr,date(u.lastSeen));button(cell(tr,''),'查看档案',()=>{owner=u.owner;ownerName=u.username;plantPage=1;setView('manage');plants().catch(showError);$('plantsTitle').scrollIntoView({behavior:'smooth',block:'start'})});button(tr.lastElementChild,'查看地图',()=>{mapOwner=u.owner;mapOwnerName=u.username;setView('map',true)});if(u.role!=='admin'){if(!u.disabled)button(tr.lastElementChild,'重置密码',()=>manageUser(u,'reset-password').catch(showError));button(tr.lastElementChild,u.disabled?'删除账号及数据':'注销账号',()=>manageUser(u,'deactivate').catch(showError));}$('users').append(tr)}pager('users',data);
 }
 let managing=false;
 async function manageUser(user,action){
  if(managing)return;
- const reset=action==='reset-password',question=reset?'将账号 '+user.username+' 的密码重置为 000000？现有登录将失效，用户必须修改密码后才能使用网站。':'确定注销账号 '+user.username+'？该账号将无法登录，现有登录立即失效；植物档案和照片保留。';
+ const reset=action==='reset-password',question=reset?'将账号 '+user.username+' 的密码重置为 000000？现有登录将失效，用户必须修改密码后才能使用网站。':'永久注销账号 '+user.username+' 并删除全部植物档案、分类、产地坐标和照片？所有登录立即失效，网站内无法恢复。';
  if(!confirm(question))return;
+ if(!reset&&prompt('此操作会永久删除数据，请输入要注销的账号确认：')!==user.username)return;
  managing=true;
- try{const data=await api('/api/admin/users/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({owner:user.owner,username:user.username})});await Promise.all([users(),stats()]);$('message').textContent=data.message}finally{managing=false}
+ try{const data=await api('/api/admin/users/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({owner:user.owner,username:user.username,confirmation:reset?'':'确认注销'})});mapEpoch++;mapController?.destroy();mapController=null;mapRecords=[];await Promise.all([users(),stats(),plants()]);$('message').textContent=data.message}finally{managing=false}
 }
 async function plants(){
  const attempt=++plantsEpoch,data=await api('/api/admin/plants?page='+plantPage+(owner?'&owner='+encodeURIComponent(owner):''));if(attempt!==plantsEpoch)return;

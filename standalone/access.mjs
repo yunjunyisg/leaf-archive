@@ -6,7 +6,14 @@ export function ensureAccessSchema(sql){
  CREATE INDEX IF NOT EXISTS activity_days_day ON activity_days(day);
  CREATE TABLE IF NOT EXISTS account_security (owner TEXT PRIMARY KEY REFERENCES local_accounts(owner) ON DELETE CASCADE, disabled INTEGER NOT NULL DEFAULT 0, must_change INTEGER NOT NULL DEFAULT 0);
  CREATE TABLE IF NOT EXISTS admin_audit (id INTEGER PRIMARY KEY, actor TEXT NOT NULL, target TEXT NOT NULL, action TEXT NOT NULL, created INTEGER NOT NULL);
+ CREATE TABLE IF NOT EXISTS deleted_owners (owner TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL);
+ CREATE TABLE IF NOT EXISTS account_objects (key TEXT PRIMARY KEY, owner TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS object_deletions (key TEXT PRIMARY KEY);
  CREATE TABLE IF NOT EXISTS activity_meta (key TEXT PRIMARY KEY, value INTEGER NOT NULL);`);
+ for(const table of ['plants','taxa','images','auth_sessions','local_accounts','wechat_identities','account_activity','activity_days']){
+  for(const operation of ['INSERT','UPDATE'])sql.exec(`CREATE TRIGGER IF NOT EXISTS deleted_owner_${table}_${operation} BEFORE ${operation} ON ${table} WHEN EXISTS(SELECT 1 FROM deleted_owners WHERE owner=NEW.owner) BEGIN SELECT RAISE(ABORT,'account deleted'); END;`);
+ }
+
 }
 export const dayInChina=(now=Date.now())=>new Date(now+8*3600000).toISOString().slice(0,10);
 export function sessionAccount(sql,request){
@@ -16,6 +23,7 @@ export function sessionAccount(sql,request){
 }
 export function isAdmin(sql,owner){return Boolean(owner&&sql.prepare('SELECT owner FROM local_admins WHERE owner=?').get(owner));}
 export function recordActivity(sql,owner,{registered=false,login=false,now=Date.now()}={}){
+ if(sql.prepare('SELECT 1 FROM deleted_owners WHERE owner=?').get(owner))return;
  sql.prepare('INSERT INTO activity_meta VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=min(value,excluded.value)').run('started_at',now);
  const old=sql.prepare('SELECT last_seen FROM account_activity WHERE owner=?').get(owner);
  if(!registered&&!login&&old?.last_seen>now-60000&&dayInChina(old.last_seen)===dayInChina(now))return;

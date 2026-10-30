@@ -1,3 +1,4 @@
+import {eraseAccount,cleanupDeletedObjects} from './account-deletion.mjs';
 import {readFileSync} from 'node:fs';
 import {readdir,stat} from 'node:fs/promises';
 import path from 'node:path';
@@ -26,6 +27,7 @@ export async function adminRoutes(request,{sql,bucket,dataDirectory,session}){
   const body=await request.text();if(body.length>2048)return json({error:'提交内容过长'},413);
   let input;try{input=JSON.parse(body)}catch{return json({error:'提交内容无效'},400)}
   if(!input||typeof input.owner!=='string'||typeof input.username!=='string')return json({error:'请选择账号并确认操作'},400);
+  if(action[1]==='deactivate'&&input.confirmation!=='确认注销')return json({error:'注销将永久删除该账号全部档案和照片，请刷新页面后明确确认'},400);
   const target=sql.prepare('SELECT owner,username FROM local_accounts WHERE owner=?').get(input.owner);
   if(!target||target.username!==input.username)return json({error:'账号不存在或确认账号不符'},404);
   if(isAdmin(sql,target.owner)||target.owner===session.owner)return json({error:'不能通过后台注销或重置管理员账号'},403);
@@ -36,16 +38,17 @@ export async function adminRoutes(request,{sql,bucket,dataDirectory,session}){
    if(!fresh||fresh.username!==input.username){sql.exec('ROLLBACK');return json({error:'账号状态已改变'},409)}
    if(isAdmin(sql,target.owner)){sql.exec('ROLLBACK');return json({error:'不能操作管理员账号'},403)}
    const state=sql.prepare('SELECT disabled FROM account_security WHERE owner=?').get(target.owner);
-   if(state?.disabled){sql.exec('ROLLBACK');return json({error:'该账号已注销，不能再次操作'},409)}
+   if(state?.disabled&&reset){sql.exec('ROLLBACK');return json({error:'该账号已注销，不能再次操作'},409)}
    if(reset){
     sql.prepare('UPDATE local_accounts SET salt=?,password_hash=? WHERE owner=?').run(p.salt,p.password_hash,target.owner);
     sql.prepare('INSERT INTO account_security(owner,must_change) VALUES (?,1) ON CONFLICT(owner) DO UPDATE SET must_change=1').run(target.owner);
-   }else sql.prepare('INSERT INTO account_security(owner,disabled) VALUES (?,1) ON CONFLICT(owner) DO UPDATE SET disabled=1').run(target.owner);
+   }else eraseAccount(sql,{owner:target.owner,actor:current.owner,action:'delete-account'});
    sql.prepare('DELETE FROM auth_sessions WHERE owner=?').run(target.owner);
-   sql.prepare('INSERT INTO admin_audit(actor,target,action,created) VALUES (?,?,?,?)').run(current.owner,target.owner,action[1],Date.now());
+   if(reset)sql.prepare('INSERT INTO admin_audit(actor,target,action,created) VALUES (?,?,?,?)').run(current.owner,target.owner,action[1],Date.now());
    sql.exec('COMMIT');
   }catch(e){sql.exec('ROLLBACK');throw e}
-  return json({ok:true,message:reset?'密码已重置为 000000，用户登录后必须立即修改密码。':'账号已注销，现有登录已失效；植物档案和照片保留。'});
+  const pending=reset?0:await cleanupDeletedObjects(sql,bucket);
+  return json({ok:true,pendingPhotoCleanup:pending,message:reset?'密码已重置为 000000，用户登录后必须立即修改密码。':'账号及其植物档案、分类和产地记录已删除，所有登录已失效。'+(pending?'照片正在后台清理。':'照片已清理。')});
  }
  if(request.method!=='GET'&&request.method!=='HEAD')return json({error:'不支持此操作'},405);
  if(route==='/admin'||route==='/admin/')return new Response(request.method==='HEAD'?null:page,{headers:{...headers,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"}});
