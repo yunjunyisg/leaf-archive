@@ -1,17 +1,17 @@
 # 阿里云 ECS / 宝塔部署
 
-目标域名 gloriouscarnivorousplants.top，已核对公网 IP 121.40.59.222，Ubuntu 24.04 x86_64、2 核 2GB。服务器已有宝塔、Nginx、HTTPS 和 MySQL；本程序不使用或覆盖现有 MySQL、证书、Nginx 全局配置。原 Sites 网站与新站是独立部署。
+目标域名 gloriouscarnivorousplants.top，已核对公网 IP 121.40.59.222，Ubuntu 24.04 x86_64、2 核 2GB。服务器已有宝塔、Nginx、HTTPS 和 MySQL；本程序不使用或覆盖现有 MySQL、证书、Nginx 全局配置。这是当前唯一主站；原 Sites 环境为迁移来源，不再作为默认开发或发布目标。
 
 ## 当前交付范围
 
 `standalone/` 提供 Node.js 24 LTS 运行适配、SQLite 持久化、私有文件图片存储、网站账号密码登录和完整备份导入器。用户已选择先用网站账号密码，之后接微信。新站明确忽略外部 Sites 身份头，不自动把旧账号档案交给第一个登录者。新用户可在注册页创建独立空账号，原档案归属仍须由管理员在交互配置时明确选择。
 
-程序包不包含真实档案、照片、会话、网站密码或云密钥。完整数据备份另行私密交付。本站尚需上传文件、导入最终快照、设置账号、启动服务和配置反向代理；生成部署包不代表域名已迁移。
+程序包不包含真实档案、照片、会话、网站密码或云密钥。完整数据备份另行私密交付。已确认服务器已导入部署预演数据、建立原档案账号并启动后台，域名已接入反向代理。登录修复和多人注册代码及更新包已交付，用户是否已在服务器应用最新更新尚待线上核验；下文是可重现安装及后续运维步骤，不能据此宣称每项更新均已上线。
 
 ## 准备
 
 1. 在宝塔“软件商店”安装 Node.js 版本管理器，并安装、启用 Node.js **24 LTS**。也可使用官方 Node.js 24 x64 发行版；不要用 Ubuntu 仓库中版本较老的 Node 18。
-2. 确认 `node -v` 显示 v24.x；记录 `command -v node` 返回的真实绝对路径。`deploy/leaf-archive.service` 中的 ExecStart 必须替换成这个路径，不能假设宝塔的 node 位于 `/usr/local/bin/node`。
+2. 确认 `node -v` 显示 v24.x；记录 `command -v node` 返回的真实绝对路径。当前已核对 Node 路径为 `/usr/bin/node`，服务模板已采用该路径；其他服务器安装时按实际结果调整。
 3. 使用宝塔文件管理器或 Workbench 文件传输，把程序包上传至 `/opt/leaf-archive-release.tar.gz`，完整数据包上传至 `/root/leaf-migration-backup.tar.gz`。禁止把数据库或备份放进 `/www/wwwroot/` 等网站公开目录。
 4. 对现有宝塔网站配置和数据建立备份。若 `/opt/leaf-archive` 已存在，先核对版本，不覆盖运行中的目录。
 

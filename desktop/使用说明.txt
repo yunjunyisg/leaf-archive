@@ -2,10 +2,10 @@
 
 Windows：解压全部文件后，双击“安装到桌面.cmd”。桌面会出现使用植物图标的“植藏”快捷方式，不需要管理员权限。
 图标保存在当前用户的 LocalAppData\LeafArchive\plant.ico，解压目录可在安装后删除。
-桌面快捷方式打开原网站，使用默认浏览器及原来的登录账号，访问与保存档案需要联网。
+桌面快捷方式打开当前主站，使用默认浏览器及网站专用账号密码，访问与保存档案需要联网。
 删除桌面“植藏”快捷方式即可移除入口；个人云端档案不会被删除。
 
 手机：用 Chrome（Android）或 Safari（iPhone/iPad）打开网站，在浏览器菜单中选择“安装应用”或“添加到主屏幕”。
 电脑：Chrome/Edge 也可通过浏览器菜单“安装植藏”安装独立窗口。
 
-网站：https://leaf-archive-oct03.giving-rook-4847.chatgpt.site/
+网站：https://gloriouscarnivorousplants.top/

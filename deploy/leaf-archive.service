@@ -10,7 +10,7 @@ Environment=NODE_ENV=production
 Environment=SITE_ORIGIN=https://gloriouscarnivorousplants.top
 Environment=LEAF_DATA_DIR=/var/lib/leaf-archive
 Environment=PORT=3100
-ExecStart=/usr/local/bin/node /opt/leaf-archive/standalone/server.mjs
+ExecStart=/usr/bin/node /opt/leaf-archive/standalone/server.mjs
 Restart=on-failure
 RestartSec=5
 UMask=0077
