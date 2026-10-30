@@ -385,11 +385,12 @@ load();
 (()=>{
  let prompt=null;
  const button=$('#installApp'),install=$('#installNow');
- const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+ const standalone=()=>Boolean(window.leafApp||window.LeafDownloads||/\bElectron\/|; wv\)/.test(navigator.userAgent||'')||matchMedia('(display-mode: standalone)').matches||navigator.standalone===true);
  const refresh=()=>{button.hidden=standalone();install.hidden=!prompt;};
  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();prompt=e;refresh();});
  window.addEventListener('appinstalled',()=>{prompt=null;refresh();close('installDialog');toast('植藏已添加到桌面');});
  button.onclick=()=>{
+  if(standalone())return;
   const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   const android=/Android/.test(navigator.userAgent);
   $('#installGuide').textContent=prompt?'点击“安装植藏”，即可使用植物图标从桌面打开。':ios?'请用 Safari 打开本站，点击“分享”，选择“添加到主屏幕”。':android?'请用 Chrome 打开本站，在右上角菜单选择“安装应用”或“添加到主屏幕”。':'请用 Chrome 或 Edge 打开本站，在地址栏或浏览器菜单选择“安装植藏”或“将此站点安装为应用”。';

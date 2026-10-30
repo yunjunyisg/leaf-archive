@@ -1,4 +1,8 @@
 (()=>{
+ const installed=()=>Boolean(window.leafApp||window.LeafDownloads||/\bElectron\/|; wv\)/.test(navigator.userAgent||'')||navigator.standalone===true||window.matchMedia?.('(display-mode: standalone)').matches);
+ function hideInstall(){if(!installed())return;document.documentElement.classList.add('leaf-installed-app');let style=document.getElementById('leaf-installed-style');if(!style){style=document.createElement('style');style.id='leaf-installed-style';style.textContent='html.leaf-installed-app #installApp,html.leaf-installed-app #installDialog{display:none!important}';document.head.append(style)}const dialog=document.getElementById('installDialog');if(dialog?.open)dialog.close()}
+ hideInstall();window.addEventListener('leaf-app-ready',hideInstall);setTimeout(hideInstall,500);setTimeout(hideInstall,1500);
+ document.addEventListener('click',event=>{if(installed()&&event.target.closest?.('#installApp')){event.preventDefault();event.stopImmediatePropagation();hideInstall()}},true);
  document.addEventListener('click',event=>{if(event.target.closest?.('a.brand,[data-leaf-refresh]')){event.preventDefault();location.reload()}});
  const sidebar=document.querySelector('.sidebar');if(sidebar&&!sidebar.querySelector('a[href="/account"]')){const link=document.createElement('a');link.className='nav';link.href='/account';link.textContent='◉ 我的';const install=sidebar.querySelector('#installApp');if(install)install.before(link);else sidebar.append(link)}
  for(const id of ['statPrice','statFamilies']){const node=document.getElementById(id);if(node?.parentElement)node.parentElement.hidden=true}
