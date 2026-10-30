@@ -1,0 +1,19 @@
+name: 发布已校验的应用安装包
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/publish-apps.yml]
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: 核对文件并发布安装附件
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 apps/distribution/publish.py
