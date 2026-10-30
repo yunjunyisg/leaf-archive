@@ -14,11 +14,11 @@
 
 Windows 和安卓软件无需重装。本次涉及页面、校验与接口，必须安装完整包，不能只替换独立运行层。
 
-下载 [完整更新包](https://github.com/yunjunyisg/leaf-archive/releases/download/taxonomy-20261031-v1/leaf-archive-taxonomy-20261031-v1.tar.gz)，上传至服务器 `/root/leaf-migration/`，在服务器终端执行：
+下载 [完整更新包](https://github.com/yunjunyisg/leaf-archive/releases/download/taxonomy-20261031-v2/leaf-archive-taxonomy-20261031-v2.tar.gz)，上传至服务器 `/root/leaf-migration/`，在服务器终端执行：
 
 ```bash
 install -d -m 700 /root/leaf-migration/taxonomy-update
-tar -xzf /root/leaf-migration/leaf-archive-taxonomy-20261031-v1.tar.gz -C /root/leaf-migration/taxonomy-update
+tar -xzf /root/leaf-migration/leaf-archive-taxonomy-20261031-v2.tar.gz -C /root/leaf-migration/taxonomy-update
 bash /root/leaf-migration/taxonomy-update/deploy/apply-standalone-update.sh
 ```
 

@@ -13,7 +13,8 @@ import originMapHtml from '../public/origins.html';
 import originMapJs from '../public/origin-map.js';
 import originMapCss from '../public/origin-map.css';
 import leafletCss from '../node_modules/leaflet/dist/leaflet.css';
-import {validPath,referenceRank,pathKey,plantPath} from '../shared/taxonomy.js';
+import {plantPath,buildTree,detachClassification,applyClassificationPath,validPath,referenceRank,pathKey} from '../shared/taxonomy.js';
+export {validPath,pathKey,plantPath,buildTree,detachClassification,applyClassificationPath};
 import taxonomyJs from '../shared/taxonomy.js?raw';
 import {authRoutes, identity} from './auth.js';
 import html from '../public/index.html';
@@ -129,7 +130,10 @@ function valid(p){
  if(out.status&&!plantStatuses.includes(out.status))throw new Error('植物状态无效');
  if(!out.name||!out.number)throw new Error('请填写中文名和收藏编号');
  if(out.price!==''&&(!Number.isFinite(Number(out.price))||Number(out.price)<0))throw new Error('价格应为非负数字');
- if(!['','species','unresolved','aff','cf'].includes(out.identification))throw new Error('鉴定类别无效');
+ if(!['','species','unresolved','hybrid','aff','cf'].includes(out.identification))throw new Error('鉴定类别无效');
+ if(p.taxonomyDetached===true)Object.assign(out,detachClassification(out));
+ if(out.identification==='hybrid'&&!out.species)throw new Error('杂交种请填写名称或亲本组合');
+ if(out.identification==='hybrid'&&(out.variety||out.form||out.infraspecific))throw new Error('杂交种暂不支持种下分类');
  if(out.identification==='unresolved'&&(out.variety||out.form||out.infraspecific))throw new Error('未定种不能添加种下分类');
  if(['aff','cf'].includes(out.identification)&&(out.variety||out.form))throw new Error('aff. 和 cf. 不能同时填写变种或变型');
  if(['aff','cf'].includes(out.identification)&&!out.species)throw new Error('aff. 和 cf. 请填写基础种名');
@@ -232,4 +236,4 @@ if(u.pathname.startsWith('/api/plants/')&&['PUT','DELETE'].includes(request.meth
 if(u.pathname==='/api/images'&&request.method==='POST'){const f=await request.formData();const file=f.get('file');if(!file||!['image/jpeg','image/png','image/webp'].includes(file.type))return json({error:'请选择 JPG、PNG 或 WebP 图片'},400);if(file.size>8*1024*1024)return json({error:'每张图片请小于 8 MB'},400);if(!env.BUCKET)throw new Error('图片存储暂时不可用');const bytes=await file.arrayBuffer();const b=new Uint8Array(bytes);const magic=(file.type==='image/jpeg'&&b[0]===255&&b[1]===216)||(file.type==='image/png'&&b[0]===137&&b[1]===80&&b[2]===78&&b[3]===71)||(file.type==='image/webp'&&new TextDecoder().decode(b.slice(0,4))==='RIFF'&&new TextDecoder().decode(b.slice(8,12))==='WEBP');if(!magic)return json({error:'图片格式不匹配'},400);const id=crypto.randomUUID();await env.BUCKET.put(who+'/'+id,bytes,{httpMetadata:{contentType:file.type}});await db(env).prepare('INSERT INTO images (id,owner,mime) VALUES (?,?,?)').bind(id,who,file.type).run();return json({url:'/images/'+id})}
 if(u.pathname.startsWith('/images/')&&request.method==='GET'){const id=u.pathname.split('/').pop();const row=await db(env).prepare('SELECT mime FROM images WHERE id = ? AND owner = ?').bind(id,who).first();if(!row)return new Response('Not found',{status:404});const object=await env.BUCKET.get(who+'/'+id);if(!object)return new Response('Not found',{status:404});return new Response(object.body,{headers:{'Content-Type':row.mime,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}})}
 return json({error:'未找到此操作'},404);
-}catch(e){console.error(e);if(['产地来源链接无效','产地位置无效','产地经纬度无效','产地位置内容过长','产地国家代码无效','产地位置精度无效','植物状态无效','状态变更日期无效','状态变更备注最多 3000 字','aff. 和 cf. 请填写基础种名','分类路径无效','分类层级或名称无效','鉴定类别无效','未定种不能添加种下分类','aff. 和 cf. 不能同时填写变种或变型','分类名称最多 200 字','照片日期无效','生长记录日期无效','每株植物最多保存 300 条生长记录'].includes(e.message))return json({error:e.message},400);const duplicate=String(e).includes('UNIQUE');return json({error:duplicate?(u.pathname.startsWith('/api/taxa')?'该分类已存在，请在分类树中管理参考图。':'收藏编号已存在，请使用其他编号。'):e.message==='档案存储暂时不可用'||e.message==='图片存储暂时不可用'?e.message:'操作未完成，请检查填写内容后重试。'},duplicate?409:500)}}};
+}catch(e){console.error(e);if(['产地来源链接无效','产地位置无效','产地经纬度无效','产地位置内容过长','产地国家代码无效','产地位置精度无效','植物状态无效','状态变更日期无效','状态变更备注最多 3000 字','aff. 和 cf. 请填写基础种名','分类路径无效','分类层级或名称无效','鉴定类别无效','杂交种请填写名称或亲本组合','杂交种暂不支持种下分类','未定种不能添加种下分类','aff. 和 cf. 不能同时填写变种或变型','分类名称最多 200 字','照片日期无效','生长记录日期无效','每株植物最多保存 300 条生长记录'].includes(e.message))return json({error:e.message},400);const duplicate=String(e).includes('UNIQUE');return json({error:duplicate?(u.pathname.startsWith('/api/taxa')?'该分类已存在，请在分类树中管理参考图。':'收藏编号已存在，请使用其他编号。'):e.message==='档案存储暂时不可用'||e.message==='图片存储暂时不可用'?e.message:'操作未完成，请检查填写内容后重试。'},duplicate?409:500)}}};
