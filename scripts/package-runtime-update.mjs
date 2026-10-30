@@ -1,6 +1,6 @@
 import {mkdtemp,cp,mkdir,rm,writeFile,readdir,readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';import os from 'node:os';import path from 'node:path';import {spawnSync} from 'node:child_process';
-const target=path.resolve(process.argv[2]||'leaf-archive-account-management-20261030-v1.tar.gz'),temp=await mkdtemp(path.join(os.tmpdir(),'leaf-runtime-package-'));
+const target=path.resolve(process.argv[2]||'leaf-archive-filing-20261030-v1.tar.gz'),temp=await mkdtemp(path.join(os.tmpdir(),'leaf-runtime-package-'));
 try{
  await cp('standalone',path.join(temp,'standalone'),{recursive:true});await mkdir(path.join(temp,'deploy'));
  await cp('deploy/apply-standalone-update.sh',path.join(temp,'deploy/apply-standalone-update.sh'));

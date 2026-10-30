@@ -8,7 +8,7 @@ fi
 update_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 source_dir="$update_root/standalone"
 target_dir=/opt/leaf-archive/standalone
-for name in server.mjs storage.mjs local-auth.mjs access.mjs admin.mjs admin-account.mjs admin-page.html admin-client.js; do
+for name in server.mjs filing.mjs storage.mjs local-auth.mjs access.mjs admin.mjs admin-account.mjs admin-page.html admin-client.js; do
     test -f "$source_dir/$name" || { echo '更新文件不完整，尚未修改服务器。'; exit 1; }
 done
 test -f "$target_dir/server.mjs"
