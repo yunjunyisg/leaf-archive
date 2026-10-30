@@ -1,7 +1,8 @@
 import {readFileSync} from 'node:fs';
 import {readdir,stat} from 'node:fs/promises';
 import path from 'node:path';
-import {isAdmin,dayInChina} from './access.mjs';
+import {isAdmin,dayInChina,sessionAccount} from './access.mjs';
+import {passwordRecord} from './local-auth.mjs';
 const page=readFileSync(new URL('./admin-page.html',import.meta.url),'utf8'),client=readFileSync(new URL('./admin-client.js',import.meta.url),'utf8');
 const headers={'Cache-Control':'private, no-store','Referrer-Policy':'same-origin','X-Content-Type-Options':'nosniff'};
 const json=(body,status=200)=>Response.json(body,{status,headers});
@@ -18,7 +19,35 @@ export async function adminRoutes(request,{sql,bucket,dataDirectory,session}){
  if(route!=='/admin'&&!route.startsWith('/admin/')&&!isApi)return null;
  if(!session){return isApi?json({error:'请先登录管理员账号'},401):new Response(null,{status:303,headers:{...headers,Location:'/auth/local'}})}
  if(!isAdmin(sql,session.owner))return isApi?json({error:'仅管理员可以访问'},403):new Response('<!doctype html><meta charset="utf-8"><p>仅管理员可以访问此页面。</p><a href="/">返回我的收藏</a>',{status:403,headers:{...headers,'Content-Type':'text/html; charset=utf-8'}});
- if(request.method!=='GET'&&request.method!=='HEAD')return json({error:'此后台仅提供数据查看'},405);
+ const action=/^\/api\/admin\/users\/(reset-password|deactivate)$/.exec(route);
+ if(action){
+  if(request.method!=='POST')return json({error:'此操作需要提交确认'},405);
+  if(request.headers.get('Origin')!==url.origin)return json({error:'请求来源无效'},403);
+  const body=await request.text();if(body.length>2048)return json({error:'提交内容过长'},413);
+  let input;try{input=JSON.parse(body)}catch{return json({error:'提交内容无效'},400)}
+  if(!input||typeof input.owner!=='string'||typeof input.username!=='string')return json({error:'请选择账号并确认操作'},400);
+  const target=sql.prepare('SELECT owner,username FROM local_accounts WHERE owner=?').get(input.owner);
+  if(!target||target.username!==input.username)return json({error:'账号不存在或确认账号不符'},404);
+  if(isAdmin(sql,target.owner)||target.owner===session.owner)return json({error:'不能通过后台注销或重置管理员账号'},403);
+  const reset=action[1]==='reset-password',p=reset?await passwordRecord('000000'):null;
+  sql.exec('BEGIN IMMEDIATE');try{
+   const current=sessionAccount(sql,request),fresh=sql.prepare('SELECT username FROM local_accounts WHERE owner=?').get(target.owner);
+   if(!current||!isAdmin(sql,current.owner)){sql.exec('ROLLBACK');return json({error:'管理员登录已过期'},401)}
+   if(!fresh||fresh.username!==input.username){sql.exec('ROLLBACK');return json({error:'账号状态已改变'},409)}
+   if(isAdmin(sql,target.owner)){sql.exec('ROLLBACK');return json({error:'不能操作管理员账号'},403)}
+   const state=sql.prepare('SELECT disabled FROM account_security WHERE owner=?').get(target.owner);
+   if(state?.disabled){sql.exec('ROLLBACK');return json({error:'该账号已注销，不能再次操作'},409)}
+   if(reset){
+    sql.prepare('UPDATE local_accounts SET salt=?,password_hash=? WHERE owner=?').run(p.salt,p.password_hash,target.owner);
+    sql.prepare('INSERT INTO account_security(owner,must_change) VALUES (?,1) ON CONFLICT(owner) DO UPDATE SET must_change=1').run(target.owner);
+   }else sql.prepare('INSERT INTO account_security(owner,disabled) VALUES (?,1) ON CONFLICT(owner) DO UPDATE SET disabled=1').run(target.owner);
+   sql.prepare('DELETE FROM auth_sessions WHERE owner=?').run(target.owner);
+   sql.prepare('INSERT INTO admin_audit(actor,target,action,created) VALUES (?,?,?,?)').run(current.owner,target.owner,action[1],Date.now());
+   sql.exec('COMMIT');
+  }catch(e){sql.exec('ROLLBACK');throw e}
+  return json({ok:true,message:reset?'密码已重置为 000000，用户登录后必须立即修改密码。':'账号已注销，现有登录已失效；植物档案和照片保留。'});
+ }
+ if(request.method!=='GET'&&request.method!=='HEAD')return json({error:'不支持此操作'},405);
  if(route==='/admin'||route==='/admin/')return new Response(request.method==='HEAD'?null:page,{headers:{...headers,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"}});
  if(route==='/admin/app.js')return new Response(request.method==='HEAD'?null:client,{headers:{...headers,'Content-Type':'text/javascript; charset=utf-8'}});
  if(route==='/api/admin/stats'){
@@ -29,9 +58,9 @@ export async function adminRoutes(request,{sql,bucket,dataDirectory,session}){
  }
  if(route==='/api/admin/users'){
   const {page,pageSize,offset}=pagination(url),q=(url.searchParams.get('q')||'').trim().slice(0,100),condition='instr(lower(a.username),lower(?))>0 OR instr(lower(a.nickname),lower(?))>0';
-  const users=sql.prepare(`SELECT a.username,a.owner,a.nickname,CASE WHEN m.owner IS NULL THEN 'user' ELSE 'admin' END AS role,t.registered_at AS registeredAt,t.last_login AS lastLogin,t.last_seen AS lastSeen,
+  const users=sql.prepare(`SELECT a.username,a.owner,a.nickname,CASE WHEN m.owner IS NULL THEN 'user' ELSE 'admin' END AS role,COALESCE(s.disabled,0) AS disabled,COALESCE(s.must_change,0) AS mustChange,t.registered_at AS registeredAt,t.last_login AS lastLogin,t.last_seen AS lastSeen,
    (SELECT count(*) FROM plants p WHERE p.owner=a.owner) AS plantCount,(SELECT count(*) FROM images i WHERE i.owner=a.owner) AS imageCount,(SELECT count(*) FROM taxa x WHERE x.owner=a.owner) AS taxonCount
-   FROM local_accounts a LEFT JOIN local_admins m ON m.owner=a.owner LEFT JOIN account_activity t ON t.owner=a.owner WHERE ${condition} ORDER BY a.username COLLATE NOCASE LIMIT ? OFFSET ?`).all(q,q,pageSize,offset);
+   FROM local_accounts a LEFT JOIN local_admins m ON m.owner=a.owner LEFT JOIN account_activity t ON t.owner=a.owner LEFT JOIN account_security s ON s.owner=a.owner WHERE ${condition} ORDER BY a.username COLLATE NOCASE LIMIT ? OFFSET ?`).all(q,q,pageSize,offset);
   return json({users,total:number(sql,'SELECT count(*) AS n FROM local_accounts a WHERE '+condition,q,q),page,pageSize});
  }
  if(route==='/api/admin/plants'){

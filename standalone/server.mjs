@@ -1,4 +1,4 @@
-import {sessionAccount,isAdmin,recordActivity} from './access.mjs';
+import {sessionAccount,isAdmin,recordActivity,accountSecurity} from './access.mjs';
 import {adminRoutes} from './admin.mjs';
 import {createServer} from 'node:http';
 import {Readable} from 'node:stream';
@@ -22,6 +22,11 @@ export function createApp({dataDirectory,origin,env={}}){
   if(!['GET','HEAD','OPTIONS'].includes(request.method)&&request.headers.get('Origin')!==site.origin)return new Response('请求来源无效',{status:403});
   const authenticated=await login(request,ip);if(authenticated)return authenticated;
   const session=sessionAccount(database.sql,request);if(session)recordActivity(database.sql,session.owner);
+  if(session&&accountSecurity(database.sql,session.owner).must_change&&url.pathname!=='/api/auth/logout'){
+   const headers={'Cache-Control':'private, no-store'};
+   if(url.pathname.startsWith('/api/')||url.pathname.startsWith('/images/'))return Response.json({error:'请先修改密码',code:'PASSWORD_CHANGE_REQUIRED',redirect:'/auth/change-password'},{status:403,headers});
+   return new Response(null,{status:303,headers:{...headers,Location:'/auth/change-password'}});
+  }
   const administrative=await adminRoutes(request,{sql:database.sql,bucket:BUCKET,dataDirectory,session});if(administrative)return administrative;
   const response=await worker.fetch(request,bindings);
   if(url.pathname==='/api/auth'&&response.ok){const state=await response.json();return Response.json({...state,passwordLogin:true,legacyLogin:false,isAdmin:Boolean(session&&isAdmin(database.sql,session.owner))},{headers:{'Cache-Control':'no-store'}})}

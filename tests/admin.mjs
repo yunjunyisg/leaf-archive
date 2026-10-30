@@ -82,3 +82,78 @@ test('activity tracking records a new Beijing day even inside the one-minute thr
   const days=f.app.database.sql.prepare('SELECT day FROM activity_days WHERE owner=? ORDER BY day').all('midnight-user');assert.deepEqual(days.map(row=>row.day),['2026-10-30','2026-10-31']);
  }finally{await f.close()}
 });
+
+test('admin reset revokes every session and forces a password change across pages, APIs and photos',async()=>{
+ const f=await fixture(),{app}=f;
+ try{
+  await setAccount(app.database.sql,{username:'visitor',password,owner:'visitor-owner'});await provisionAdmin(app.database.sql,{username:'operator',password});
+  const admin=cookie(await login(app,'operator')),old=cookie(await login(app,'visitor')),other=cookie(await login(app,'visitor'));
+  const act=(session,body,options={})=>call(app,'/api/admin/users/reset-password',session,{method:'POST',body:JSON.stringify(body),...options});
+  const target={owner:'visitor-owner',username:'visitor'};
+  assert.equal((await act(old,target)).status,403);assert.equal((await act(null,target)).status,401);
+  for(const Origin of ['null','https://foreign.example',''])assert.equal((await act(admin,target,{headers:{Origin}})).status,403);
+  assert.equal((await act(admin,{...target,username:'wrong'})).status,404);
+  assert.equal((await act(admin,target)).status,200);
+  for(const s of [old,other])assert.equal((await call(app,'/api/admin/stats',s)).status,401);
+  assert.equal(cookie(await login(app,'visitor',password)),undefined);
+  const signIn=await login(app,'visitor','000000'),forced=cookie(signIn);assert.equal(signIn.headers.get('Location'),'/auth/change-password');
+  for(const url of ['/','/admin','/admin/app.js'])assert.equal((await call(app,url,forced)).headers.get('Location'),'/auth/change-password');
+  for(const url of ['/api/plants','/api/auth','/api/taxa','/images/00000000-0000-0000-0000-000000000000']){const response=await call(app,url,forced);assert.equal(response.status,403);assert.equal((await response.json()).code,'PASSWORD_CHANGE_REQUIRED')}
+  const change=(currentPassword,newPassword,confirmPassword=newPassword,headers={})=>call(app,'/auth/change-password',forced,{method:'POST',body:new URLSearchParams({currentPassword,password:newPassword,confirmPassword}),headers});
+  assert.equal((await call(app,'/auth/change-password',forced)).status,200);
+  assert.equal((await change('000000','new-password','new-password',{Origin:'null'})).status,403);
+  assert.equal((await change('incorrect','new-password')).status,400);
+  assert.equal((await change('000000','000000')).status,400);
+  assert.equal((await change('000000','short')).status,400);
+  assert.equal((await change('000000','new-password','different')).status,400);
+  const changed=await change('000000','new-password'),fresh=cookie(changed);assert.equal(changed.status,303);assert.equal(changed.headers.get('Location'),'/');assert.notEqual(fresh,forced);
+  assert.equal((await call(app,'/auth/change-password',forced)).headers.get('Location'),'/auth/local');
+  assert.equal((await call(app,'/api/plants',fresh)).status,200);
+  assert.equal(cookie(await login(app,'visitor','000000')),undefined);
+  assert.equal((await login(app,'visitor','new-password')).headers.get('Location'),'/');
+  const audit=app.database.sql.prepare('SELECT * FROM admin_audit').all();assert.equal(audit.length,1);assert.equal(audit[0].action,'reset-password');assert.ok(!JSON.stringify(audit).includes('000000'));
+ }finally{await f.close()}
+});
+
+test('deactivation is admin-only, preserves archives, blocks sessions and cannot be undone through registration or reset',async()=>{
+ const f=await fixture(),{app}=f;
+ try{
+  await setAccount(app.database.sql,{username:'visitor',password,owner:'visitor-owner'});await provisionAdmin(app.database.sql,{username:'operator',password});
+  const admin=cookie(await login(app,'operator')),visitor=cookie(await login(app,'visitor')),operator=app.database.sql.prepare('SELECT owner FROM local_admins').get().owner;
+  app.database.sql.prepare('INSERT INTO plants VALUES (?,?,?,?,?)').run('preserved','visitor-owner','PL-1',JSON.stringify({name:'保留档案',photos:[]}),'2026-01-01');
+  const action=(name,target,session=admin)=>call(app,'/api/admin/users/'+name,session,{method:'POST',body:JSON.stringify(target)});
+  for(const name of ['deactivate','reset-password'])assert.equal((await action(name,{owner:operator,username:'operator'})).status,403);
+  const target={owner:'visitor-owner',username:'visitor'};
+  assert.equal((await action('deactivate',target,visitor)).status,403);assert.equal((await action('deactivate',target)).status,200);
+  assert.equal(cookie(await login(app,'visitor')),undefined);assert.equal((await call(app,'/auth/change-password',visitor)).headers.get('Location'),'/auth/local');
+  assert.equal(app.database.sql.prepare('SELECT count(*) AS n FROM auth_sessions WHERE owner=?').get(target.owner).n,0);
+  assert.equal(app.database.sql.prepare('SELECT count(*) AS n FROM plants WHERE owner=?').get(target.owner).n,1);
+  for(const name of ['deactivate','reset-password'])assert.equal((await action(name,target)).status,409);
+  const registration=await call(app,'/auth/register',null,{method:'POST',body:new URLSearchParams({username:'VISITOR',password,confirmPassword:password})});assert.equal(registration.status,409);
+  const list=await (await call(app,'/api/admin/users',admin)).json();assert.equal(list.users.find(u=>u.username==='visitor').disabled,1);
+  assert.equal((await (await call(app,'/api/admin/plants?owner=visitor-owner',admin)).json()).total,1);
+ }finally{await f.close()}
+});
+
+test('concurrent reset cannot issue a session authenticated by a stale password',async()=>{
+ const f=await fixture(),{app}=f;
+ try{
+  await setAccount(app.database.sql,{username:'visitor',password,owner:'visitor-owner'});await provisionAdmin(app.database.sql,{username:'operator',password});const admin=cookie(await login(app,'operator'));
+  const pending=login(app,'visitor');
+  const reset=await call(app,'/api/admin/users/reset-password',admin,{method:'POST',body:JSON.stringify({owner:'visitor-owner',username:'visitor'})});assert.equal(reset.status,200);
+  const response=await pending,old=cookie(response);if(old)assert.equal((await call(app,'/api/plants',old)).status,401);
+  const forced=cookie(await login(app,'visitor','000000'));assert.equal((await call(app,'/api/plants',forced)).status,403);
+ }finally{await f.close()}
+});
+
+test('forced password change and deactivation persist after reopening the database',async()=>{
+ const f=await fixture();let app=f.app;
+ try{
+  await provisionAdmin(app.database.sql,{username:'operator',password});const admin=cookie(await login(app,'operator'));
+  for(const username of ['resetuser','closeduser'])await setAccount(app.database.sql,{username,password,owner:username});
+  for(const [username,action] of [['resetuser','reset-password'],['closeduser','deactivate']])assert.equal((await call(app,'/api/admin/users/'+action,admin,{method:'POST',body:JSON.stringify({owner:username,username})})).status,200);
+  app.close();app=createApp({dataDirectory:f.directory,origin});
+  assert.equal((await login(app,'resetuser','000000')).headers.get('Location'),'/auth/change-password');
+  assert.equal(cookie(await login(app,'closeduser')),undefined);assert.equal(app.database.sql.prepare('SELECT count(*) AS n FROM admin_audit').get().n,2);
+ }finally{app.close();await fs.rm(f.directory,{recursive:true,force:true})}
+});
