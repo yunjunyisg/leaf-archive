@@ -54,5 +54,5 @@ a.nav{text-decoration:none}
 .plant-card{content-visibility:auto;contain-intrinsic-size:auto 410px}
 .map-plant{content-visibility:auto;contain-intrinsic-size:auto 80px}
 
-/* 手机端保留账号操作，避免旧布局隐藏整个顶部栏。 */
-@media(max-width:760px){.main>header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;height:auto;min-height:62px;padding:10px 14px}.main>header .breadcrumb,.main>header .header-note{display:none}.main>header .account-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-left:0;width:100%}.main>header .account-controls button,.main>header .account-controls a{min-height:44px;padding:10px 12px;border:1px solid #ccd7c8;border-radius:7px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}.main>header .account-controls [hidden]{display:none!important}.main>header #accountName{margin-right:auto;max-width:130px}.main>header #logout{background:#244b39;color:#fff}.main>header .cloud-sync{font-size:12px}}
+/* 账号操作集中到“我的”，手机不再显示额外操作栏。 */
+@media(max-width:760px){.main>header{display:none!important}}.account-controls #logout,.account-controls #deleteAccount{display:none!important}.stats>[hidden]{display:none!important}a.side-bottom{text-decoration:none}.nav[href="/account"]{min-height:44px}

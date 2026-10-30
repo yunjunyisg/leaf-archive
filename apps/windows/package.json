@@ -1,10 +1,17 @@
 {
   "name": "leaf-archive-desktop",
   "productName": "植藏",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "植藏植物档案桌面应用",
   "private": true,
   "main": "src/main.cjs",
-  "scripts": {"start": "electron .", "package": "node build.mjs", "test": "node --test test/*.cjs"},
-  "devDependencies": {"@electron/packager": "20.3.0", "electron": "45.1.0"}
+  "scripts": {
+    "start": "electron .",
+    "package": "node build.mjs",
+    "test": "node --test test/*.cjs"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "45.1.0"
+  }
 }

@@ -7,3 +7,5 @@ test('external navigation permits HTTPS only and downloads stay on the site',()=
  assert.equal(isExternal('https://beian.miit.gov.cn/'),true);assert.equal(isExternal('file:///tmp/test'),false);assert.equal(isExternal('https://gloriouscarnivorousplants.top'),false);
  assert.equal(isDownload('blob:https://gloriouscarnivorousplants.top/uuid'),true);assert.equal(isDownload('https://gloriouscarnivorousplants.top/images/uuid'),true);assert.equal(isDownload('blob:https://evil.example/uuid'),false);
 });
+
+test('only the trusted main frame may request application exit',()=>{const {isTrustedMainFrame}=require('../src/policy.cjs');const main={url:'https://gloriouscarnivorousplants.top/account'},child={url:main.url},foreign={url:'https://evil.example'};assert.equal(isTrustedMainFrame(main,main),true);assert.equal(isTrustedMainFrame(child,main),false);assert.equal(isTrustedMainFrame(foreign,foreign),false);assert.equal(isTrustedMainFrame(null,main),false)});

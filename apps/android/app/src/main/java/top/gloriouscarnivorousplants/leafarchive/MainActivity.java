@@ -22,6 +22,7 @@ public class MainActivity extends Activity {
     private WebView web;
     private LinearLayout root;
     private TextView notice;
+    private Button retryButton;
     private ValueCallback<Uri[]> photoCallback;
     private byte[] pendingFile;
     private String downloadScript;
@@ -38,13 +39,8 @@ public class MainActivity extends Activity {
             else view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
             return insets;
         });
-        LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(dp(8),0,dp(8),0);
-        Button back=new Button(this);back.setText("返回");back.setOnClickListener(v->goBack());bar.addView(back);
-        TextView title=new TextView(this);title.setText("植藏");title.setTextSize(20);title.setTextColor(Color.rgb(36,75,57));title.setGravity(Gravity.CENTER);bar.addView(title,new LinearLayout.LayoutParams(0,dp(52),1));
-        Button refresh=new Button(this);refresh.setText("刷新");refresh.setOnClickListener(v->{notice.setVisibility(View.GONE);web.setVisibility(View.VISIBLE);if(trusted(Uri.parse(web.getUrl()==null?ORIGIN:web.getUrl())))web.reload();else web.loadUrl(ORIGIN);});bar.addView(refresh);
-        for(Button b:new Button[]{back,refresh}){b.setMinWidth(dp(55));b.setMinimumWidth(dp(55));b.setTextSize(14);}
-        Button logout=new Button(this);logout.setText("退出登录");logout.setTextSize(14);logout.setMinWidth(dp(82));logout.setMinimumWidth(dp(82));logout.setOnClickListener(v->confirmLogout());bar.addView(logout);root.addView(bar);
-        notice=new TextView(this);notice.setText("暂时无法连接植藏，请检查网络后点击上方刷新。");notice.setPadding(dp(24),dp(40),dp(24),dp(40));notice.setTextSize(17);notice.setVisibility(View.GONE);root.addView(notice);
+        notice=new TextView(this);notice.setText("暂时无法连接植藏，请检查网络后重试。");notice.setPadding(dp(24),dp(40),dp(24),dp(40));notice.setTextSize(17);notice.setVisibility(View.GONE);root.addView(notice);
+        retryButton=new Button(this);retryButton.setText("重新连接");retryButton.setVisibility(View.GONE);retryButton.setOnClickListener(v->{notice.setVisibility(View.GONE);retryButton.setVisibility(View.GONE);web.setVisibility(View.VISIBLE);String url=web.getUrl();web.loadUrl(url!=null&&trusted(Uri.parse(url))?url:ORIGIN);});root.addView(retryButton);
         web=new WebView(this);root.addView(web,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
         WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(true);settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);settings.setGeolocationEnabled(false);settings.setSupportMultipleWindows(true);settings.setJavaScriptCanOpenWindowsAutomatically(false);settings.setSafeBrowsingEnabled(true);
         CookieManager.getInstance().setAcceptCookie(true);CookieManager.getInstance().setAcceptThirdPartyCookies(web,false);WebView.setWebContentsDebuggingEnabled(false);
@@ -52,6 +48,7 @@ public class MainActivity extends Activity {
         if(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))WebViewCompat.addWebMessageListener(web,"LeafDownloads",java.util.Collections.singleton(ORIGIN),(view,message,source,isMainFrame,reply)->{
             if(!isMainFrame||!trusted(source)||!trusted(Uri.parse(view.getUrl()==null?"":view.getUrl())))return;
             String raw=message.getData();if(raw==null||raw.length()>MAX_FILE*4/3+4096)return;
+            try{JSONObject signal=new JSONObject(raw);if("quit".equals(signal.optString("type"))){finishAndRemoveTask();return;}}catch(Exception ignored){return;}
             if(pendingFile!=null){toast("请先完成当前文件保存");return;}
             io.execute(()->{
                 try{
@@ -90,15 +87,9 @@ public class MainActivity extends Activity {
         if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::goBack);
         if(saved==null||web.restoreState(saved)==null)web.loadUrl(ORIGIN);
     }
-    private void confirmLogout(){
-        new AlertDialog.Builder(this).setTitle("退出登录").setMessage("退出当前账号？尚未保存的内容将丢失。").setPositiveButton("退出登录",(dialog,which)->{
-            if(!trusted(Uri.parse(web.getUrl()==null?"":web.getUrl()))){toast("请先恢复网络连接后重试");return;}
-            web.evaluateJavascript("fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'}).then(r=>{if(!r.ok)throw Error();location.replace('/auth/local')}).catch(()=>alert('退出登录失败，请检查网络后重试。'))",null);
-        }).setNegativeButton("取消",null).show();
-    }
     private void toast(String text){if(!destroyed)Toast.makeText(this,text,Toast.LENGTH_LONG).show();}
-    private void showOffline(){notice.setVisibility(View.VISIBLE);web.setVisibility(View.GONE);}
-    private void goBack(){if(web.canGoBack()){notice.setVisibility(View.GONE);web.setVisibility(View.VISIBLE);web.goBack();}else finish();}
+    private void showOffline(){notice.setVisibility(View.VISIBLE);retryButton.setVisibility(View.VISIBLE);web.setVisibility(View.GONE);}
+    private void goBack(){if(web.canGoBack()){notice.setVisibility(View.GONE);retryButton.setVisibility(View.GONE);web.setVisibility(View.VISIBLE);web.goBack();}else finish();}
     @Override public void onBackPressed(){goBack();}
     private void openExternal(Uri url){if(!"https".equals(url.getScheme())||url.getUserInfo()!=null)return;try{startActivity(new Intent(Intent.ACTION_VIEW,url));}catch(ActivityNotFoundException e){toast("无法打开外部链接");}}
     private void saveHttpDownload(String url,String mime,String agent){

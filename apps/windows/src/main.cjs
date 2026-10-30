@@ -1,12 +1,12 @@
-const {app,BrowserWindow,Menu,shell,session,dialog}=require('electron');
+const {app,BrowserWindow,Menu,shell,session,dialog,ipcMain}=require('electron');
 const path=require('node:path');
-const {ORIGIN,isTrusted,isExternal,isDownload}=require('./policy.cjs');
+const {ORIGIN,isTrusted,isExternal,isDownload,isTrustedMainFrame}=require('./policy.cjs');
 app.setName('植藏');app.setAppUserModelId('top.gloriouscarnivorousplants.leafarchive');
 const lock=app.requestSingleInstanceLock();if(!lock)app.quit();
 let window;
 function openExternal(url){if(isExternal(url))shell.openExternal(url).catch(()=>{})}
 function createWindow(){
- window=new BrowserWindow({width:1320,height:900,minWidth:800,minHeight:600,title:'植藏',icon:path.join(__dirname,'../assets/plant.ico'),backgroundColor:'#f8f9f5',show:false,webPreferences:{partition:'persist:leaf-archive',nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,allowRunningInsecureContent:false,webviewTag:false,devTools:false}});
+ window=new BrowserWindow({width:1320,height:900,minWidth:800,minHeight:600,title:'植藏',icon:path.join(__dirname,'../assets/plant.ico'),backgroundColor:'#f8f9f5',show:false,webPreferences:{preload:path.join(__dirname,'preload.cjs'),partition:'persist:leaf-archive',nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,allowRunningInsecureContent:false,webviewTag:false,devTools:false}});
  const contents=window.webContents;
  contents.on('will-navigate',(event,url)=>{if(!isTrusted(url)){event.preventDefault();openExternal(url)}});
  contents.on('will-redirect',(event,url)=>{if(!isTrusted(url)){event.preventDefault();openExternal(url)}});
@@ -23,6 +23,7 @@ function createWindow(){
 }
 app.on('second-instance',()=>{if(window){if(window.isMinimized())window.restore();window.focus()}});
 app.whenReady().then(()=>{
+ ipcMain.on('leaf:quit',event=>{if(window&&!window.isDestroyed()&&isTrustedMainFrame(event.senderFrame,window.webContents.mainFrame))app.quit()});
  const partition=session.fromPartition('persist:leaf-archive');partition.setPermissionRequestHandler((contents,permission,callback)=>callback(false));partition.setPermissionCheckHandler(()=>false);
  partition.on('will-download',async(event,item,contents)=>{
   if(!isTrusted(contents.getURL())||!item.getURLChain().every(isDownload)){event.preventDefault();return;}

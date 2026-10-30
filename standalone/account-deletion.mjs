@@ -45,13 +45,3 @@ export async function accountDeletionRoutes(request,{sql,bucket,session}){
  await cleanupDeletedObjects(sql,bucket);
  return new Response(null,{status:303,headers:{...headers,Location:'/auth/local','Set-Cookie':'__Host-leaf-session=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0'}});
 }
-
-// 为服务器旧版页面同样提供入口，无需重建整个网站。
-export async function withDeletionEntry(response,{sql,session}){
- if(!session||isAdmin(sql,session.owner)||!response.body||!response.headers.get('Content-Type')?.includes('text/html'))return response;
- const html=await response.text();
- let output=html.includes('id="deleteAccount"')?html.replace('id="deleteAccount" href="/account/delete" hidden','id="deleteAccount" href="/account/delete"'):html.replace('<div class="account-controls">','<div class="account-controls"><a id="deleteAccount" href="/account/delete">注销账号</a>');
- const mobileStyle=`<style id="mobile-account-controls">@media(max-width:760px){.main>header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;height:auto;min-height:62px;padding:10px 14px}.main>header .breadcrumb,.main>header .header-note{display:none}.main>header .account-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-left:0;width:100%}.main>header .account-controls button,.main>header .account-controls a{min-height:44px;padding:10px 12px;border:1px solid #ccd7c8;border-radius:7px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}.main>header .account-controls [hidden]{display:none!important}.main>header #accountName{margin-right:auto;max-width:130px}.main>header #logout{background:#244b39;color:#fff}.main>header .cloud-sync{font-size:12px}}</style>`;
- output=output.replace('</head>',mobileStyle+'</head>').replace('id="logout" type="button" hidden>退出</button>','id="logout" type="button" hidden>退出登录</button>');
- const copy=new Headers(response.headers);copy.delete('Content-Length');copy.delete('ETag');return new Response(output,{status:response.status,statusText:response.statusText,headers:copy});
-}

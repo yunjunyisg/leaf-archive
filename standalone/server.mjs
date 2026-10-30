@@ -1,4 +1,6 @@
-import {accountDeletionRoutes,cleanupDeletedObjects,withDeletionEntry} from './account-deletion.mjs';
+import {profileRoutes} from './profile.mjs';
+import {withAccountUi,accountUiClient} from './account-ui.mjs';
+import {accountDeletionRoutes,cleanupDeletedObjects} from './account-deletion.mjs';
 import {withFilingFooter} from './filing.mjs';
 import {sessionAccount,isAdmin,recordActivity,accountSecurity} from './access.mjs';
 import {adminRoutes} from './admin.mjs';
@@ -22,6 +24,7 @@ export function createApp({dataDirectory,origin,env={}}){
   request=new Request(request,{headers});
   if(url.pathname==='/healthz')return Response.json({status:'ok'},{headers:{'Cache-Control':'no-store'}});
   if(!['GET','HEAD','OPTIONS'].includes(request.method)&&request.headers.get('Origin')!==site.origin)return new Response('请求来源无效',{status:403});
+  if(url.pathname==='/account-ui.js')return new Response(accountUiClient,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'}});
   const session=sessionAccount(database.sql,request);
   if(request.method==='GET'&&session&&isAdmin(database.sql,session.owner)&&['/auth/local','/auth/register'].includes(url.pathname))return new Response(null,{status:303,headers:{Location:accountSecurity(database.sql,session.owner).must_change?'/auth/change-password':'/admin','Cache-Control':'private, no-store'}});
   const authenticated=await login(request,ip);if(authenticated)return withFilingFooter(authenticated);
@@ -31,6 +34,7 @@ export function createApp({dataDirectory,origin,env={}}){
    if(url.pathname.startsWith('/api/')||url.pathname.startsWith('/images/'))return Response.json({error:'请先修改密码',code:'PASSWORD_CHANGE_REQUIRED',redirect:'/auth/change-password'},{status:403,headers});
    return new Response(null,{status:303,headers:{...headers,Location:'/auth/change-password'}});
   }
+  const personal=await profileRoutes(request,{sql:database.sql,bucket:BUCKET,session});if(personal)return withFilingFooter(personal);
   const deletion=await accountDeletionRoutes(request,{sql:database.sql,bucket:BUCKET,session,ip});if(deletion)return withFilingFooter(deletion);
   if(session&&isAdmin(database.sql,session.owner)){
    if(['/', '/origins','/origins/','/classification','/classification/','/offline.html'].includes(url.pathname))return new Response(null,{status:303,headers:{Location:'/admin','Cache-Control':'private, no-store'}});
@@ -38,8 +42,8 @@ export function createApp({dataDirectory,origin,env={}}){
   }
   const administrative=await adminRoutes(request,{sql:database.sql,bucket:BUCKET,dataDirectory,session});if(administrative)return withFilingFooter(administrative);
   const response=await worker.fetch(request,bindings);
-  if(url.pathname==='/api/auth'&&response.ok){const state=await response.json();return Response.json({...state,passwordLogin:true,legacyLogin:false,isAdmin:Boolean(session&&isAdmin(database.sql,session.owner))},{headers:{'Cache-Control':'no-store'}})}
-  return withFilingFooter(await withDeletionEntry(response,{sql:database.sql,session}));
+  if(url.pathname==='/api/auth'&&response.ok){const state=await response.json();if(state.user&&session){const local=database.sql.prepare('SELECT nickname FROM local_accounts WHERE owner=?').get(session.owner);if(local)state.user.nickname=local.nickname}return Response.json({...state,passwordLogin:true,legacyLogin:false,isAdmin:Boolean(session&&isAdmin(database.sql,session.owner))},{headers:{'Cache-Control':'no-store'}})}
+  return withFilingFooter(await withAccountUi(response));
  },close:()=>database.close()};
 }
 export function httpServer(app){
