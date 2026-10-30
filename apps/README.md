@@ -6,7 +6,7 @@
 
 下载页：https://github.com/yunjunyisg/leaf-archive/releases/tag/apps-v1.0.0
 
-- 电脑：下载 `LeafArchive-Windows-x64-1.0.0.zip`，完整解压，双击其中的 `LeafArchive.exe`。支持 Windows 10/11 的六十四位系统，必须保留解压目录内的其他文件。可将这个程序的快捷方式发送到桌面。
+- 电脑：下载 `LeafArchive-Windows-x64-1.0.0.exe`，双击选择解压位置，完成后打开文件夹内的 `LeafArchive.exe`。这是自解压便携版。支持 Windows 10/11 的六十四位系统，必须保留解压目录内的其他文件。可将这个程序的快捷方式发送到桌面。
 - 安卓：下载 `LeafArchive-Android-1.0.0.apk`，在手机文件管理器中打开安装。支持安卓十及以上，系统网页组件需保持更新。首次安装时按系统提示允许当前下载工具安装此应用。
 - 两端均需联网。软件功能跟随当前网站已安装版本；应用安装不会自动部署此前提供的网站服务器更新。
 
@@ -33,7 +33,7 @@ npm test
 npm run package
 ```
 
-输出为 `apps/windows/out/LeafArchive-Windows-x64-1.0.0.zip`。构建脚本只复制该应用的代码与图标到临时目录，不复制仓库其他文件、历史备份或网站数据库。压缩步骤在非 Windows 系统需要 Python，在 Windows 使用系统压缩命令。
+输出为 `apps/windows/out/LeafArchive-Windows-x64-1.0.0.zip`。构建脚本只复制该应用的代码与图标到临时目录，不复制仓库其他文件、历史备份或网站数据库。压缩步骤在非 Windows 系统需要 Python，在 Windows 使用系统压缩命令。若需自解压版，额外使用官方压缩工具、自解压模块和许可文件，配置 `LEAF_7ZIP_BINARY`、`LEAF_7ZIP_SFX`、`LEAF_7ZIP_LICENSE` 后运行 `node build-self-extract.mjs`。自解压包内保留对应许可。
 
 ## 构建安卓版本
 

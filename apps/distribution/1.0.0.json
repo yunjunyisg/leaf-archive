@@ -1,0 +1,15 @@
+{
+  "tag": "apps-v1.0.0",
+  "files": [
+    {
+      "name": "LeafArchive-Windows-x64-1.0.0.exe",
+      "url": "https://tmpfiles.org/wUAtHMqT2qC9/leafarchive-windows-x64-1.0.0.exe",
+      "sha256": "f6d8d9d8a7baf3ca4e43bf2528d845e553ffa3e43308ae2ad1d35fc7c8272ac4"
+    },
+    {
+      "name": "LeafArchive-Android-1.0.0.apk",
+      "url": "https://tmpfiles.org/wUA2HYqe2k2C/leafarchive-android-1.0.0.apk",
+      "sha256": "276ed3101b5e805d0b033cde26cc5ab827b31be7e789ca03f791c1f4191b4039"
+    }
+  ]
+}

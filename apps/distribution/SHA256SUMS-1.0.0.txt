@@ -1,0 +1,2 @@
+f6d8d9d8a7baf3ca4e43bf2528d845e553ffa3e43308ae2ad1d35fc7c8272ac4  LeafArchive-Windows-x64-1.0.0.exe
+276ed3101b5e805d0b033cde26cc5ab827b31be7e789ca03f791c1f4191b4039  LeafArchive-Android-1.0.0.apk
