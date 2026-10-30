@@ -185,6 +185,7 @@ function showAccount(state){
  if(!user){
   notice.textContent='登录后查看自己的植物档案。你也可以先浏览示例。';
   if(state.legacyLogin)notice.innerHTML+=' <a href="/auth/sites">原网站账号登录</a>';
+  if(state.passwordLogin)notice.innerHTML+=' <a href="/auth/local">账号密码登录</a>';
   $('#wechatLogin').disabled=true;
  }
 }

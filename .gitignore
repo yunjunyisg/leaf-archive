@@ -9,3 +9,9 @@ dist/
 *.zip
 
 !public/downloads/leaf-archive-shortcuts.zip
+
+# Standalone runtime data and migration payloads stay outside source control.
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+migration-private/

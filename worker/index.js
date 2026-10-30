@@ -1,3 +1,4 @@
+import {migrationPhoto} from './migration-photos.js';
 import admin1Countries from 'leaf:admin1-countries';
 import {publicAsset} from './public-assets.js';
 import admin1Json from '../data/boundaries/admin1.json.gz';
@@ -158,6 +159,7 @@ function recordStatusChange(p,current,change={}){
 }
 export default {async fetch(request,env){const u=new URL(request.url);try{
 const authResponse=await authRoutes(request,env);if(authResponse)return authResponse;
+const migrationResponse=await migrationPhoto(request,env);if(migrationResponse)return migrationResponse;
 if(u.pathname==='/manifest.webmanifest')return new Response(JSON.stringify(manifest),{headers:{'Content-Type':'application/manifest+json; charset=utf-8','Cache-Control':'no-cache'}});
 if(u.pathname==='/sw.js')return new Response(serviceWorker,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-cache','Service-Worker-Allowed':'/'}});
 if(u.pathname==='/offline.html')return new Response(offline,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'}});

@@ -176,3 +176,9 @@ Windows 可下载 `/downloads/leaf-archive-shortcuts.zip`，解压后运行“�
 - 地图悬停只恢复当前分区样式，分区提示按需生成；缩放时复用未变化的标点和列表 DOM。地理底图仅在用户勾选后请求。
 - 公共脚本、样式和标识支持内容 ETag 与 304 校验；个人档案、登录响应和照片仍不进入公共缓存。预览图采用延迟加载和异步解码，屏幕外卡片跳过绘制；搜索输入合并处理。
 - `npm test` 包含真实 workerd HTTP 单次 gzip 解压、按国家边界完整性、公共缓存/未登录照片保护，以及国家→省州→县区→国家的着色与局部悬停恢复检查。上述字节数属于资源测量，不代表用户实际网络延迟。
+
+### 阿里云独立服务器版本
+
+独立运行入口为 `standalone/server.mjs`，需要 Node.js 24 LTS，使用持久化 SQLite 和私有照片目录；网站密码账号由服务器管理员设置，保留原档案 owner，禁止信任外部 Sites 身份头。部署、最终数据导入和现有宝塔 Nginx 接入参见 [阿里云部署说明](docs/aliyun-deployment.md)。
+
+`node scripts/package-standalone.mjs /绝对路径/leaf-archive-aliyun.tar.gz` 在构建成功后生成无需服务器端 npm 安装的程序包，不包含真实档案、照片或凭据。该命令不执行服务器部署，也不迁移 DNS。迁移后微信登录仍需另行接入。
