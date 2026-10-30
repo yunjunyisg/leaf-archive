@@ -12,7 +12,7 @@
 
 ## 更新现有服务器
 
-可在构建机运行 `node scripts/package-runtime-update.mjs /绝对路径/leaf-archive-admin-update.tar.gz` 生成仅含独立运行层的更新包。也可由仓库所有者在已登录 GitHub 的浏览器中下载本私有仓库源码压缩包，在服务器私有目录仅提取 `standalone/` 与 `deploy/apply-standalone-update.sh`。
+可在构建机运行 `node scripts/package-runtime-update.mjs /绝对路径/leaf-archive-account-management-20261030-v1.tar.gz` 生成仅含独立运行层的更新包。也可由仓库所有者在已登录 GitHub 的浏览器中下载本私有仓库源码压缩包，在服务器私有目录仅提取 `standalone/` 与 `deploy/apply-standalone-update.sh`。
 
 上传到服务器 `/root/leaf-migration`，保持目录仅管理员可访问。不要把源码压缩包放进网站公开目录；整个仓库的历史个人备份也不需要解压到应用目录。
 
@@ -49,10 +49,10 @@ runuser -u www -- env LEAF_DATA_DIR=/var/lib/leaf-archive /usr/bin/node /opt/lea
 
 ### 已有管理员安装本次更新
 
-下载私有仓库的最新源码压缩包：
-https://github.com/yunjunyisg/leaf-archive/archive/refs/heads/main.zip
+下载本次账号管理更新的固定版本源码包，文件名为 `leaf-archive-account-management-20261030-v1.zip`，与之前的源码包区分：
+https://github.com/yunjunyisg/leaf-archive/archive/refs/tags/account-management-20261030-v1.zip
 
-上传为 `/root/leaf-migration/leaf-archive-main.zip`，在服务器终端执行以下命令。仅提取独立运行层和更新脚本，不导入仓库中的历史备份，不重新创建管理员。
+上传为 `/root/leaf-migration/leaf-archive-account-management-20261030-v1.zip`，在服务器终端执行以下命令。仅提取独立运行层和更新脚本，不导入仓库中的历史备份，不重新创建管理员。
 
 ```bash
 (
@@ -63,7 +63,7 @@ python3 - <<'PYTHON'
 from pathlib import Path, PurePosixPath
 from zipfile import ZipFile
 root = Path('/root/leaf-migration/account-management-update')
-with ZipFile('leaf-archive-main.zip') as archive:
+with ZipFile('leaf-archive-account-management-20261030-v1.zip') as archive:
     for item in archive.infolist():
         parts = PurePosixPath(item.filename).parts
         if item.is_dir() or len(parts) < 3:
