@@ -1,3 +1,4 @@
+import {ensureAccessSchema} from './access.mjs';
 import {DatabaseSync} from 'node:sqlite';
 import fs from 'node:fs';
 import {readFile,writeFile,mkdir,rename,unlink} from 'node:fs/promises';
@@ -15,6 +16,7 @@ export function openDatabase(directory,{migrations=new URL('../drizzle/',import.
   sql.exec('BEGIN IMMEDIATE');try{sql.exec(text);sql.prepare('INSERT INTO standalone_migrations VALUES (?,?)').run(name,hash);sql.exec('COMMIT')}catch(e){sql.exec('ROLLBACK');sql.close();throw e}
  }
  sql.exec('CREATE TABLE IF NOT EXISTS local_accounts (username TEXT PRIMARY KEY, owner TEXT NOT NULL UNIQUE, nickname TEXT NOT NULL, salt TEXT NOT NULL, password_hash TEXT NOT NULL); CREATE TABLE IF NOT EXISTS local_login_limits (key TEXT PRIMARY KEY, attempts INTEGER NOT NULL, expires INTEGER NOT NULL)');
+ ensureAccessSchema(sql);
  const DB={prepare(query){const statement=sql.prepare(query);const bind=(...args)=>({async all(){return {results:statement.all(...args)}},async first(){return statement.get(...args)||null},async run(){const r=statement.run(...args);return {meta:{changes:Number(r.changes),last_row_id:Number(r.lastInsertRowid)}}}});return {bind,...bind()}}};
  return {sql,DB,close:()=>sql.close()};
 }

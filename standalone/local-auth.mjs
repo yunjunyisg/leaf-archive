@@ -1,3 +1,4 @@
+import {isAdmin,recordActivity} from './access.mjs';
 import {randomBytes,randomUUID,createHash,scrypt,timingSafeEqual} from 'node:crypto';
 import {promisify} from 'node:util';
 const derive=promisify(scrypt),SESSION='__Host-leaf-session';
@@ -24,8 +25,8 @@ function page(error='',{register=false,username='',status=200}={}){
  const title=register?'创建你的植物档案账号':'登录你的植物档案',route=register?'/auth/register':'/auth/local';
  return new Response(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${register?'注册':'登录'} · 植藏</title><style>body{font:16px system-ui;background:#f8f9f5;color:#244b39;margin:0}main{max-width:380px;margin:8vh auto;padding:28px}h1{font-size:28px}label{display:block;margin-top:20px}input,button{box-sizing:border-box;width:100%;padding:13px;border-radius:8px;font:inherit}input{border:1px solid #cdd7c8;margin-top:8px}button{border:0;background:#244b39;color:white;margin:24px 0 12px}p{line-height:1.7}.hint{font-size:14px;color:#687666}.error{color:#9f3428}a{color:inherit}.links{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}</style><main><p>植藏 · 植物档案</p><h1>${title}</h1>${register?'<p class="hint">注册后将创建属于你的空白收藏，记录自己的植物和照片。</p>':''}<form method="post" action="${route}"><label>账号<input name="username" autocomplete="username" minlength="3" maxlength="64" value="${escape(username)}" required></label>${register?'<p class="hint">三至六十四位，可用英文字母、数字、点、下划线和横线。账号不区分英文字母大小写。</p>':''}<label>密码<input type="password" name="password" autocomplete="${register?'new-password':'current-password'}" ${register?'minlength="6" ':''}maxlength="256" required></label>${register?'<p class="hint">至少六位。</p><label>再次输入密码<input type="password" name="confirmPassword" autocomplete="new-password" minlength="6" maxlength="256" required></label>':''}<p class="error" role="alert">${escape(error)}</p><button>${register?'注册并进入我的收藏':'登录'}</button></form><p class="links">${register?'<a href="/auth/local">已有账号，前往登录</a>':'<a href="/auth/register">注册新账号</a>'}<a href="/">返回首页</a></p></main></html>`,{status,headers:{...noStore,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
 }
-function sessionResponse(token){
- const headers=new Headers({...noStore,Location:'/'});headers.append('Set-Cookie',`${SESSION}=${token}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=604800`);headers.append('Set-Cookie','__Host-leaf-logged-out=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0');
+function sessionResponse(token,{admin=false}={}){
+ const headers=new Headers({...noStore,Location:admin?'/admin':'/'});headers.append('Set-Cookie',`${SESSION}=${token}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=604800`);headers.append('Set-Cookie','__Host-leaf-logged-out=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0');
  return new Response(null,{status:303,headers});
 }
 export function createLocalAuth(sql){
@@ -61,7 +62,7 @@ export function createLocalAuth(sql){
    sql.exec('BEGIN IMMEDIATE');try{
     if(exists()){sql.exec('ROLLBACK');return page('该账号已被使用，请换一个账号。',{register:true,username,status:409})}
     sql.prepare('INSERT INTO local_accounts VALUES (?,?,?,?,?)').run(name,owner,username,p.salt,p.password_hash);
-    saveSession(owner,username,token,now);sql.exec('COMMIT');
+    saveSession(owner,username,token,now);recordActivity(sql,owner,{registered:true,login:true,now});sql.exec('COMMIT');
    }catch(e){sql.exec('ROLLBACK');throw e}
    return sessionResponse(token);
   }
@@ -72,9 +73,9 @@ export function createLocalAuth(sql){
   const actual=Buffer.from(await derive(password,record.salt,64)),valid=timingSafeEqual(actual,Buffer.from(record.password_hash,'hex'));
   if(!row||!valid)return page('账号或密码不正确。');
   const token=randomBytes(32).toString('hex');sql.exec('BEGIN IMMEDIATE');try{
-   saveSession(row.owner,row.nickname,token,now);
+   saveSession(row.owner,row.nickname,token,now);recordActivity(sql,row.owner,{login:true,now});
    for(const key of keys)sql.prepare('DELETE FROM local_login_limits WHERE key=?').run(key);sql.exec('COMMIT');
   }catch(e){sql.exec('ROLLBACK');throw e}
-  return sessionResponse(token);
+  return sessionResponse(token,{admin:isAdmin(sql,row.owner)});
  };
 }

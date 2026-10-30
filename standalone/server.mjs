@@ -1,3 +1,5 @@
+import {sessionAccount,isAdmin,recordActivity} from './access.mjs';
+import {adminRoutes} from './admin.mjs';
 import {createServer} from 'node:http';
 import {Readable} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
@@ -19,8 +21,10 @@ export function createApp({dataDirectory,origin,env={}}){
   if(url.pathname==='/healthz')return Response.json({status:'ok'},{headers:{'Cache-Control':'no-store'}});
   if(!['GET','HEAD','OPTIONS'].includes(request.method)&&request.headers.get('Origin')!==site.origin)return new Response('请求来源无效',{status:403});
   const authenticated=await login(request,ip);if(authenticated)return authenticated;
+  const session=sessionAccount(database.sql,request);if(session)recordActivity(database.sql,session.owner);
+  const administrative=await adminRoutes(request,{sql:database.sql,bucket:BUCKET,dataDirectory,session});if(administrative)return administrative;
   const response=await worker.fetch(request,bindings);
-  if(url.pathname==='/api/auth'&&response.ok){const state=await response.json();return Response.json({...state,passwordLogin:true,legacyLogin:false},{headers:{'Cache-Control':'no-store'}})}
+  if(url.pathname==='/api/auth'&&response.ok){const state=await response.json();return Response.json({...state,passwordLogin:true,legacyLogin:false,isAdmin:Boolean(session&&isAdmin(database.sql,session.owner))},{headers:{'Cache-Control':'no-store'}})}
   return response;
  },close:()=>database.close()};
 }
