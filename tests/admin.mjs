@@ -201,3 +201,18 @@ test('aggregate map keyset pagination does not omit plants above the first 500 r
   assert.equal(new Set([...first.plants,...second.plants].map(p=>p.id)).size,503);
  }finally{await f.close()}
 });
+
+test('mobile logout endpoint expires the current cookie and invalidates ordinary and administrator sessions',async()=>{
+ const f=await fixture(),{app}=f;try{
+  await provisionAdmin(app.database.sql,{username:'operator',password});await setAccount(app.database.sql,{username:'visitor',password,owner:'visitor'});
+  for(const username of ['operator','visitor']){
+   const current=cookie(await login(app,username)),other=cookie(await login(app,username));
+   const invalid=await call(app,'/api/auth/logout',current,{method:'POST',headers:{Origin:'null'}});assert.equal(invalid.status,403);
+   assert.equal((await (await call(app,'/api/auth',current)).json()).user.nickname,username==='operator'?'管理员':'visitor');
+   const result=await call(app,'/api/auth/logout',current,{method:'POST'});assert.equal(result.status,200);assert.match(result.headers.getSetCookie().join(';'),/__Host-leaf-session=;.*Max-Age=0/);
+   assert.equal((await (await call(app,'/api/auth',current)).json()).user,null);
+   assert.ok((await (await call(app,'/api/auth',other)).json()).user);
+   if(username==='operator')assert.equal((await call(app,'/api/admin/stats',current)).status,401);else assert.equal((await call(app,'/api/plants',current)).status,401);
+  }
+ }finally{await f.close()}
+});

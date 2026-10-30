@@ -41,7 +41,9 @@ public class MainActivity extends Activity {
         LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(dp(8),0,dp(8),0);
         Button back=new Button(this);back.setText("返回");back.setOnClickListener(v->goBack());bar.addView(back);
         TextView title=new TextView(this);title.setText("植藏");title.setTextSize(20);title.setTextColor(Color.rgb(36,75,57));title.setGravity(Gravity.CENTER);bar.addView(title,new LinearLayout.LayoutParams(0,dp(52),1));
-        Button refresh=new Button(this);refresh.setText("刷新");refresh.setOnClickListener(v->{notice.setVisibility(View.GONE);web.setVisibility(View.VISIBLE);if(trusted(Uri.parse(web.getUrl()==null?ORIGIN:web.getUrl())))web.reload();else web.loadUrl(ORIGIN);});bar.addView(refresh);root.addView(bar);
+        Button refresh=new Button(this);refresh.setText("刷新");refresh.setOnClickListener(v->{notice.setVisibility(View.GONE);web.setVisibility(View.VISIBLE);if(trusted(Uri.parse(web.getUrl()==null?ORIGIN:web.getUrl())))web.reload();else web.loadUrl(ORIGIN);});bar.addView(refresh);
+        for(Button b:new Button[]{back,refresh}){b.setMinWidth(dp(55));b.setMinimumWidth(dp(55));b.setTextSize(14);}
+        Button logout=new Button(this);logout.setText("退出登录");logout.setTextSize(14);logout.setMinWidth(dp(82));logout.setMinimumWidth(dp(82));logout.setOnClickListener(v->confirmLogout());bar.addView(logout);root.addView(bar);
         notice=new TextView(this);notice.setText("暂时无法连接植藏，请检查网络后点击上方刷新。");notice.setPadding(dp(24),dp(40),dp(24),dp(40));notice.setTextSize(17);notice.setVisibility(View.GONE);root.addView(notice);
         web=new WebView(this);root.addView(web,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
         WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(true);settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);settings.setGeolocationEnabled(false);settings.setSupportMultipleWindows(true);settings.setJavaScriptCanOpenWindowsAutomatically(false);settings.setSafeBrowsingEnabled(true);
@@ -64,7 +66,7 @@ public class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){Uri url=request.getUrl();if(trusted(url))return false;if(request.isForMainFrame())openExternal(url);return true;}
             @Override public void onPageStarted(WebView view,String url,android.graphics.Bitmap icon){if(!trusted(Uri.parse(url))){view.stopLoading();openExternal(Uri.parse(url));}}
-            @Override public void onPageFinished(WebView view,String url){CookieManager.getInstance().flush();if(trusted(Uri.parse(url))&&WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))view.evaluateJavascript(downloadScript,null);}
+            @Override public void onPageFinished(WebView view,String url){CookieManager.getInstance().flush();if(Uri.parse(url).getPath()!=null&&Uri.parse(url).getPath().equals("/auth/local"))view.clearHistory();if(trusted(Uri.parse(url))&&WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))view.evaluateJavascript(downloadScript,null);}
             @Override public void onReceivedError(WebView view,WebResourceRequest request,WebResourceError error){if(request.isForMainFrame())showOffline();}
             @Override public void onReceivedHttpError(WebView view,WebResourceRequest request,WebResourceResponse response){if(request.isForMainFrame()&&response.getStatusCode()>=500)showOffline();}
         });
@@ -87,6 +89,12 @@ public class MainActivity extends Activity {
         web.setDownloadListener((url,userAgent,disposition,mime,length)->{if(!url.startsWith("blob:"))saveHttpDownload(url,mime,userAgent);});
         if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::goBack);
         if(saved==null||web.restoreState(saved)==null)web.loadUrl(ORIGIN);
+    }
+    private void confirmLogout(){
+        new AlertDialog.Builder(this).setTitle("退出登录").setMessage("退出当前账号？尚未保存的内容将丢失。").setPositiveButton("退出登录",(dialog,which)->{
+            if(!trusted(Uri.parse(web.getUrl()==null?"":web.getUrl()))){toast("请先恢复网络连接后重试");return;}
+            web.evaluateJavascript("fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'}).then(r=>{if(!r.ok)throw Error();location.replace('/auth/local')}).catch(()=>alert('退出登录失败，请检查网络后重试。'))",null);
+        }).setNegativeButton("取消",null).show();
     }
     private void toast(String text){if(!destroyed)Toast.makeText(this,text,Toast.LENGTH_LONG).show();}
     private void showOffline(){notice.setVisibility(View.VISIBLE);web.setVisibility(View.GONE);}

@@ -1,7 +1,9 @@
 """从已校验的交付副本发布安装附件，不读取或上传签名私钥。"""
-import hashlib,json,os,pathlib,re,subprocess,tempfile,urllib.request
+import hashlib,json,os,pathlib,re,subprocess,tempfile,urllib.request,sys
 root=pathlib.Path(__file__).resolve().parent
-manifest=json.loads((root/'1.0.0.json').read_text())
+version=sys.argv[1] if len(sys.argv)>1 else '1.0.0'
+if not re.fullmatch(r'\d+\.\d+\.\d+',version):raise SystemExit('版本号无效')
+manifest=json.loads((root/(version+'.json')).read_text())
 if os.environ.get('GITHUB_ACTIONS')!='true':raise SystemExit('请在已授权的仓库发布工作流中运行')
 headers={'User-Agent':'LeafArchive-Publisher/1.0'}
 with tempfile.TemporaryDirectory() as directory:
@@ -17,5 +19,5 @@ with tempfile.TemporaryDirectory() as directory:
             while chunk:=response.read(1024*1024):output.write(chunk);digest.update(chunk)
         if digest.hexdigest()!=entry['sha256']:raise SystemExit('安装包校验失败，未上传')
         files.append(str(target));print('校验通过：'+name,flush=True)
-    subprocess.run(['gh','release','upload',manifest['tag'],*files,str(root/'SHA256SUMS-1.0.0.txt'),'--clobber'],check=True)
-    subprocess.run(['gh','release','edit',manifest['tag'],'--draft=false','--prerelease','--notes-file',str(root/'release-notes-1.0.0.md')],check=True)
+    subprocess.run(['gh','release','upload',manifest['tag'],*files,str(root/('SHA256SUMS-'+version+'.txt')),'--clobber'],check=True)
+    subprocess.run(['gh','release','edit',manifest['tag'],'--draft=false','--prerelease','--notes-file',str(root/('release-notes-'+version+'.md'))],check=True)

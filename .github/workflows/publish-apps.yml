@@ -1,6 +1,11 @@
 name: 发布已校验的应用安装包
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 发布版本号
+        required: true
+        default: '1.0.1'
   push:
     branches: [main]
     paths: [.github/workflows/publish-apps.yml]
@@ -15,5 +20,6 @@ jobs:
       - name: 核对文件并发布安装附件
         env:
           GH_TOKEN: ${{ github.token }}
+          LEAF_RELEASE_VERSION: ${{ inputs.version || '1.0.1' }}
           GH_REPO: ${{ github.repository }}
-        run: python3 apps/distribution/publish.py
+        run: python3 apps/distribution/publish.py "$LEAF_RELEASE_VERSION"
