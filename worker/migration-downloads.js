@@ -4,7 +4,7 @@ import {identity} from './auth.js';
 export function createMigrationDownloads(manifest){
 const root='/migration-downloads',admin='/api/migration-downloads/';
 const privateHeaders={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'};
-const key=(file,part)=>'temporary-migration-downloads/'+manifest.version+'/'+file.name+'/'+part;
+const key=(file,part)=>'temporary-migration-downloads/'+(file.storageVersion||manifest.version)+'/'+file.name+'/'+part;
 const missing=()=>new Response('Not found',{status:404,headers:privateHeaders});
 const sha256=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
 async function uploadAuthorized(request,env){
@@ -20,7 +20,8 @@ function byteRange(header,size){
 }
 async function download(request,bucket,file){
  if(!await bucket.head(key(file,'ready')))return new Response('文件正在准备，请稍后重试。',{status:503,headers:{...privateHeaders,'Retry-After':'15'}});
- const range=byteRange(request.headers.get('Range'),file.size);if(!range)return new Response(null,{status:416,headers:{...privateHeaders,'Content-Range':'bytes */'+file.size}});
+ const validator=request.headers.get('If-Range'),rangeHeader=validator&&validator!=='"'+file.sha256+'"'?null:request.headers.get('Range');
+ const range=byteRange(rangeHeader,file.size);if(!range)return new Response(null,{status:416,headers:{...privateHeaders,'Content-Range':'bytes */'+file.size}});
  const headers={...privateHeaders,'Content-Type':'application/gzip','Content-Disposition':'attachment; filename="'+file.name+'"','Content-Length':String(range.end-range.start+1),'Accept-Ranges':'bytes','ETag':'"'+file.sha256+'"'};
  if(range.status===206)headers['Content-Range']='bytes '+range.start+'-'+range.end+'/'+file.size;
  if(request.method==='HEAD')return new Response(null,{status:range.status,headers});
@@ -69,7 +70,7 @@ return async function migrationDownloads(request,env){
  if(!['GET','HEAD'].includes(request.method))return new Response(null,{status:405,headers:privateHeaders});
  if(pathname===root||pathname===root+'/'){
   const available=await Promise.all(manifest.files.map(async f=>({...f,ready:Boolean(await env.BUCKET.head(key(f,'ready')))})));
-  return new Response(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>迁移文件下载 · 植藏</title><style>body{font:16px system-ui;background:#f8f9f5;color:#244b39}main{max-width:700px;margin:8vh auto;padding:24px}article{background:white;border:1px solid #dce4d8;border-radius:12px;padding:22px;margin:20px 0}p{line-height:1.7}a{color:inherit}.download{display:inline-block;background:#244b39;color:white;padding:12px 18px;border-radius:8px;text-decoration:none}code{font-size:12px;overflow-wrap:anywhere}</style><main><a href="/">← 返回植物档案</a><h1>迁移文件下载</h1><p>这两个附件仅用于服务器迁移，不会作为新网站的内容迁入。私密备份含个人档案和照片，请保存在自己的设备或服务器私有目录。当前备份用于部署预演，正式切换前还需核对最新数据。</p>${available.map(f=>`<article><h2>${f.label}</h2><p>${f.name}<br>约 ${(f.size/1024/1024).toFixed(1)} MB</p>${f.ready?`<a class="download" href="${root}/${f.name}" download="${f.name}">下载${f.label}</a>`:'<p role="status">文件正在上传，请稍后刷新。</p>'}<p>SHA256：<code>${f.sha256}</code></p></article>`).join('')}<p>若下载中断，可使用同一原账号重新下载。文件访问仅向你的原账号开放。</p></main></html>`,{headers:{...privateHeaders,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"}});
+  return new Response(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>迁移文件下载 · 植藏</title><style>body{font:16px system-ui;background:#f8f9f5;color:#244b39}main{max-width:700px;margin:8vh auto;padding:24px}article{background:white;border:1px solid #dce4d8;border-radius:12px;padding:22px;margin:20px 0}p{line-height:1.7}a{color:inherit}.download{display:inline-block;background:#244b39;color:white;padding:12px 18px;border-radius:8px;text-decoration:none}code{font-size:12px;overflow-wrap:anywhere}</style><main><a href="/">← 返回植物档案</a><h1>迁移文件下载</h1><p>这些附件仅用于服务器迁移和功能更新，不会作为新网站的内容迁入。私密备份含个人档案和照片，请保存在自己的设备或服务器私有目录。当前备份用于部署预演，正式切换前还需核对最新数据。</p>${available.map(f=>`<article><h2>${f.label}</h2><p>${f.name}<br>约 ${(f.size/1024/1024).toFixed(1)} MB</p>${f.ready?`<a class="download" href="${root}/${f.name}" download="${f.name}">下载${f.label}</a>`:'<p role="status">文件正在上传，请稍后刷新。</p>'}<p>SHA256：<code>${f.sha256}</code></p></article>`).join('')}<p>若下载中断，可使用同一原账号重新下载。文件访问仅向你的原账号开放。</p></main></html>`,{headers:{...privateHeaders,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"}});
  }
  const file=manifest.files.find(f=>pathname===root+'/'+f.name);return file?download(request,env.BUCKET,file):missing();
 }

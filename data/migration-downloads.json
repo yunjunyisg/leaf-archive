@@ -1,52 +1,52 @@
 {
-  "version": "20261030-login-origin-v3",
+  "version": "20261030-registration-v4",
   "chunkSize": 4194304,
   "files": [
     {
       "name": "leaf-archive-aliyun.tar.gz",
       "label": "网站程序包",
-      "size": 38376954,
-      "sha256": "62465ae5da4012f38c0a0a922f115560c5eb666a6d4a485eb82964cd0e07c062",
+      "size": 38379267,
+      "sha256": "c13b3211b7113c27023a5f1912219344f039bec937dcdf81161d4fc69ba4cbc3",
       "parts": [
         {
           "size": 4194304,
-          "sha256": "6126d5c7c9e085c572864df93365ce012596db7e92f8d05db181f14499408c17"
+          "sha256": "3af7726ec1fffad713c6165ff2e6c6369a5b787cc44060bad5e87c2926b7f252"
         },
         {
           "size": 4194304,
-          "sha256": "3734f32311fdd38720beff22e4a146da41029ec3f85ab403592a182ceba3bfcf"
+          "sha256": "3393989a29586087b4e3c4743a0ee88f996e5ea4f35ec171adedd507413f2c86"
         },
         {
           "size": 4194304,
-          "sha256": "d9c44793f7bb178ebf6c28044466a86006ce4133c1d52297763f2b731cafa445"
+          "sha256": "fbe455e004fee6eb819c05e06e612d62e71f73f402df946c0e06b7a5d121ce5a"
         },
         {
           "size": 4194304,
-          "sha256": "aa11c99937cf9b91e856d307b16ae2a7717ebd26332de8be426b6e1e12b13641"
+          "sha256": "8d09e22fddf7c36382dbe6fc2fcdb69626a8014898ccc0b97aa78b6e31a5a634"
         },
         {
           "size": 4194304,
-          "sha256": "d415954fb3b9bb8ce4a16c6533aab7159126dfdaf44e8d1e1cc5a7ac807e41bb"
+          "sha256": "ff1e307a2558cab651115c8c9cfd15cfd0e9c097aa0d872f8cd65743e6b4c9db"
         },
         {
           "size": 4194304,
-          "sha256": "9e58bef077069fe9cf05eb2cf80803850a397986e78e05f2d0526a4bff781ac8"
+          "sha256": "259d95f532c5b97756d4ae762d550bbeca37a71a656600653a57800c906fcb5f"
         },
         {
           "size": 4194304,
-          "sha256": "1104af8922a691a8d4c2a6a3b3fa4c4a0107d34f1e2a5db8dfaf516c3552ca41"
+          "sha256": "fb28f7f6b9315571d72680c26eaf06cc1ea119a3bb7e44fd8de9944e6f11255c"
         },
         {
           "size": 4194304,
-          "sha256": "1de2a72ee4ceeab765dd140f667bc04e20d4d97b4b06148bb64a3e22e52e2fb6"
+          "sha256": "f08e5ef5947327b964289aecef12acd73897748e4a16b5cc97f9e1c8c7fa860e"
         },
         {
           "size": 4194304,
-          "sha256": "25b6d605a2303b875ee72df878c317f3a3378f60954e23eb8f4da1d006f269e3"
+          "sha256": "03b84bec0fa3da725985c63431379cdc88975e98d5731427523be292be20ab67"
         },
         {
-          "size": 628218,
-          "sha256": "00f00f5923475eb750992e3dbb70578b7aef8ccd6996fa9dda0dc1315a67a048"
+          "size": 630531,
+          "sha256": "ceecf1c16b252111eea2cdef096b9bdc9b7701d1a4ee8d18f0e75a075e3c00a2"
         }
       ]
     },
@@ -124,7 +124,20 @@
           "size": 3779075,
           "sha256": "e5d96d811c002ab665ca63625d49924d056e3d94f9de75b6af6c6a5e6d1fb624"
         }
-      ]
+      ],
+      "storageVersion": "20261030-login-origin-v3"
+    },
+    {
+      "name": "leaf-archive-registration-update.tar.gz",
+      "label": "多人注册功能更新包",
+      "parts": [
+        {
+          "size": 8352,
+          "sha256": "a82e7a4c790e0d9d2c29cca24bb3ff21cec6ffa7f9ba4dea652563a81f80d5b2"
+        }
+      ],
+      "size": 8352,
+      "sha256": "a82e7a4c790e0d9d2c29cca24bb3ff21cec6ffa7f9ba4dea652563a81f80d5b2"
     }
   ]
 }

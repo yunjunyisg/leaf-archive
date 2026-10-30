@@ -179,8 +179,10 @@ Windows 可下载 `/downloads/leaf-archive-shortcuts.zip`，解压后运行“�
 
 ### 阿里云独立服务器版本
 
-独立运行入口为 `standalone/server.mjs`，需要 Node.js 24 LTS，使用持久化 SQLite 和私有照片目录；网站密码账号由服务器管理员设置，保留原档案 owner，禁止信任外部 Sites 身份头。部署、最终数据导入和现有宝塔 Nginx 接入参见 [阿里云部署说明](docs/aliyun-deployment.md)。
+独立运行入口为 `standalone/server.mjs`，需要 Node.js 24 LTS，使用持久化 SQLite 和私有照片目录；新用户可自行注册独立空账号，原档案账号由管理员明确绑定并保留原 owner，禁止信任外部 Sites 身份头。部署、最终数据导入和现有宝塔 Nginx 接入参见 [阿里云部署说明](docs/aliyun-deployment.md)。
 
 `node scripts/package-standalone.mjs /绝对路径/leaf-archive-aliyun.tar.gz` 在构建成功后生成无需服务器端 npm 安装的程序包，不包含真实档案、照片或凭据。该命令不执行服务器部署，也不迁移 DNS。迁移后微信登录仍需另行接入。
 
 原站迁移附件：`/migration-downloads` 在显式开启且未过期时，仅向原档案拥有者提供程序包和部署预演备份。附件分块保存在 R2 的 `temporary-migration-downloads/` 独立前缀中，不写入图片表、不进入植物照片导出范围，也不加入已生成的服务器程序包。支持私有流式下载、Range 续传与校验值展示；匿名和其他账号不可访问。上传密钥只在准备附件时短期开启，上传及完整下载校验后移除。迁移结束后清理附件对象及下载配置。
+
+多人注册：独立站登录页可进入 `/auth/register`，新注册账号自动获得独立空白收藏并登录，不能指定或认领旧档案。账号不区分英文字母大小写，密码最低六位。已安装服务器可下载“多人注册功能更新包”，运行包内安装脚本；脚本验证模块、备份旧版本并重启后台，失败时恢复旧模块，不重导数据库。更新包可通过 `node scripts/package-registration-update.mjs /绝对路径/leaf-archive-registration-update.tar.gz` 重建。

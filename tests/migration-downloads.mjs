@@ -17,15 +17,16 @@ test('download page and both file paths are available only to the original verif
  f.env.LEAF_DOWNLOAD_EXPIRES='0';assert.equal((await f.call('/migration-downloads','GET',undefined,{'oai-authenticated-user-id':'owner'})).status,404);
 });
 test('pinned chunk uploads reject unknown tokens, corrupt data and incomplete commits; downloads stream and resume exactly',async()=>{
- const f=fixture(),prefix='/api/migration-downloads/';
+ const f=fixture(),prefix='/api/migration-downloads/';f.file.storageVersion='preserved-version';
  assert.equal((await f.call(prefix+'upload/fixture.tar.gz/0','PUT',Buffer.from('abcd'),{'Content-Length':'4'})).status,404);
  assert.equal((await f.call(prefix+'upload/fixture.tar.gz/0','PUT',Buffer.from('bad!'),{...f.admin,'Content-Length':'4'})).status,422);
  assert.equal((await f.call(prefix+'commit/fixture.tar.gz','POST',undefined,f.admin)).status,409);
  for(let i=0;i<f.file.parts.length;i++){const bytes=f.data.subarray(i*4,i*4+4);assert.equal((await f.call(prefix+'upload/fixture.tar.gz/'+i,'PUT',bytes,{...f.admin,'Content-Length':String(bytes.length)})).status,200)}
- assert.equal((await f.call(prefix+'commit/fixture.tar.gz','POST',undefined,f.admin)).status,200);
+ assert.equal((await f.call(prefix+'commit/fixture.tar.gz','POST',undefined,f.admin)).status,200);assert.ok([...f.objects.keys()].every(key=>key.includes('/preserved-version/')));
  const owner={'oai-authenticated-user-id':'owner'},route='/migration-downloads/fixture.tar.gz';
  const full=await f.call(route,'GET',undefined,owner);assert.equal(full.status,200);assert.match(full.headers.get('Content-Disposition'),/attachment/);assert.equal(full.headers.get('Content-Length'),'13');assert.deepEqual(Buffer.from(await full.arrayBuffer()),f.data);
  for(const [range,expected] of [['bytes=2-9','cdefghij'],['bytes=8-','ijklm'],['bytes=-3','klm']]){const r=await f.call(route,'GET',undefined,{...owner,Range:range});assert.equal(r.status,206);assert.equal(await r.text(),expected)}
+ const changed=await f.call(route,'GET',undefined,{...owner,Range:'bytes=2-9','If-Range':'"previous-package"'});assert.equal(changed.status,200);assert.deepEqual(Buffer.from(await changed.arrayBuffer()),f.data);
  assert.equal((await f.call(route,'GET',undefined,{...owner,Range:'bytes=100-'})).status,416);assert.equal((await f.call(route,'HEAD',undefined,owner)).body,null);
  f.env.LEAF_DOWNLOAD_UPLOAD_EXPIRES='0';assert.equal((await f.call(prefix+'verify/fixture.tar.gz','GET',undefined,f.admin)).status,404);assert.equal((await f.call(route,'GET',undefined,owner)).status,200);
  f.env.LEAF_DOWNLOAD_UPLOAD_EXPIRES=String(Date.now()+60000);assert.equal((await f.call(prefix+'cleanup','DELETE',undefined,f.admin)).status,200);assert.equal(f.objects.size,0);
