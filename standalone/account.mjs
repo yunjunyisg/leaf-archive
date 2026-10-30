@@ -21,6 +21,6 @@ try{
   const answer=await rl.question('输入序号；如要建立全新空账号，输入 new：');
   if(answer==='new')owner='local:'+randomUUID();else{const i=Number(answer)-1;if(!Number.isInteger(i)||!owners[i])throw Error('归属选择无效');owner=owners[i].owner}
  }else owner='local:'+randomUUID();
- rl.close();const password=await hidden('设置网站密码（至少 12 个字符，不显示）：'),again=await hidden('再次输入：');if(password!==again)throw Error('两次密码不一致');
+ rl.close();const password=await hidden('设置网站密码（至少 6 个字符，不显示）：'),again=await hidden('再次输入：');if(password!==again)throw Error('两次密码不一致');
  await setAccount(db.sql,{username,password,owner});console.log('网站账号已配置，未更改原档案归属。');
 }finally{db.close()}

@@ -33,7 +33,7 @@ node standalone/import.mjs /root/leaf-migration-backup
 node standalone/account.mjs
 ```
 
-先导入，再创建账号。根据提示设置网站专用账号和至少 12 个字符的密码，密码不回显；选择属于自己的原档案归属。账号创建和修改仅通过管理员终端进行；不开放首次访问认领。重复设置同一账号密码会撤销该归属的全部已有会话。
+先导入，再创建账号。根据提示设置网站专用账号和至少 6 个字符的密码，密码不回显；选择属于自己的原档案归属。账号创建和修改仅通过管理员终端进行；不开放首次访问认领。重复设置同一账号密码会撤销该归属的全部已有会话。
 
 备份格式：`database.json` 保留 sourceProjectId、四张持久表的 columns/rows；`objects.json` 为所有图片的 key、sha256、size 清单；对象位于 `objects/{sha256(逻辑键)}`。逻辑键保持原始 `owner/id`。导入器要求目标数据表为空、来源项目匹配、所有对象存在且校验一致，不导入旧会话、OAuth 状态和地名缓存。历史 `backups/personal/` 不能替代最终完整快照。
 

@@ -1,52 +1,52 @@
 {
-  "version": "20261030-preflight-v1",
+  "version": "20261030-password6-v2",
   "chunkSize": 4194304,
   "files": [
     {
       "name": "leaf-archive-aliyun.tar.gz",
       "label": "网站程序包",
-      "size": 38347224,
-      "sha256": "eef7a83febb1591a769f8babc91cc538a78460dfced5ec1085304d411c17e785",
+      "size": 38376585,
+      "sha256": "4535e1a7ac8e4eba2af7d07958392771bd0df6083e258259bd1f379526997ac5",
       "parts": [
         {
           "size": 4194304,
-          "sha256": "1f0a179a2789fad43b97f7e138718d8b6340031ce3310f675b5cd6b113735da0"
+          "sha256": "668ee6ca54ca3ae5b744278c2d39c2a469e164146912ed16ed51a6c135a777f5"
         },
         {
           "size": 4194304,
-          "sha256": "80dca37dcc18fb204064a99bf8604b7e8114991733f0d098960549045af5ac2e"
+          "sha256": "73265a3c01333022815271df5b4b3dec7cfdb8a409d6fc212683fcb276333cc2"
         },
         {
           "size": 4194304,
-          "sha256": "61facb011d544f8a75d5b4a0b236cc5df2f6cb94ee187789a46efb9c4f036661"
+          "sha256": "fee835d58228177bdda88cb07bdd9f10da126f6bda7594cf3067845ee1f9e650"
         },
         {
           "size": 4194304,
-          "sha256": "a6dcd8007f977c9789c62f0aa1d66ce13547c1830ba8c0ec7c59382e9fe9dfca"
+          "sha256": "4aed2eff6aa1901d008b2076ec8396258a6b81a8c2a1321aabfb336ba6457a6d"
         },
         {
           "size": 4194304,
-          "sha256": "95e8832fb162b3b0c7f74f1ec64e07c1b52c5e46803f17cda9eff41f68765c41"
+          "sha256": "ac31cf653136d66c8e580def541b24002ec0d6dae1021fad3fce6ec297eff2f8"
         },
         {
           "size": 4194304,
-          "sha256": "77e1fc88764c4dcf706ddfbdb5f5a9c829c688aade59a5d970b6651467695b41"
+          "sha256": "2a61e2323995cc70aae1475ff30da47071bfb02a36f0dfcb93610340c7e4b370"
         },
         {
           "size": 4194304,
-          "sha256": "eb431c5572ffc1dd64e8749cef56443d89384bf5f3fb6afe099c9cde121a66d7"
+          "sha256": "d3d519d7f633dc8218e61c6a28b1eafc80ef4c38dda7ca0e52514cd6c95403f5"
         },
         {
           "size": 4194304,
-          "sha256": "7fddcd5ea7fb23e58288e230540b917f7efbc2808b00abe918e01f739bdd4f0b"
+          "sha256": "cd49cef22a093ca3a9a5a9c79fb41c769daf8cc11c73c4bebd608a10e065098e"
         },
         {
           "size": 4194304,
-          "sha256": "123f5b59096b74b6b2129806bfe14abadcae184897f799836a5140eaac4bf6f2"
+          "sha256": "7291d1e58b207629818348658ac5bae111e1873c4ccedd4593ab4661ced686d0"
         },
         {
-          "size": 598488,
-          "sha256": "c1180e9b96b37376a4fb4902e465472562835c893ba6326c679e9c344447a4ee"
+          "size": 627849,
+          "sha256": "fa1a1e3b5bcdfd56aa3bb78083f56e880b1993578b0df973d3eac35c25901b03"
         }
       ]
     },

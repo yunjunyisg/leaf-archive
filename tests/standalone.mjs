@@ -8,12 +8,13 @@ import {createApp,httpServer} from '../standalone/server.mjs';
 import {setAccount} from '../standalone/local-auth.mjs';
 import {openDatabase,diskBucket} from '../standalone/storage.mjs';
 import {importSnapshot} from '../standalone/import.mjs';
-const origin='https://gloriouscarnivorousplants.top',password='test-only-password-2026';
+const origin='https://gloriouscarnivorousplants.top',password='Ab3!xy';
 const req=(route,{method='GET',cookie,body,headers={}}={})=>new Request(origin+route,{method,headers:{...(cookie?{Cookie:cookie}:{}),...(method!=='GET'?{Origin:origin}:{}),...(body?{'Content-Type':'application/json'}:{}),...headers},...(body?{body:typeof body==='string'?body:JSON.stringify(body)}:{})});
 async function signIn(app,username,passwordValue=password){const r=await app.fetch(req('/auth/local',{method:'POST',body:new URLSearchParams({username,password:passwordValue}).toString(),headers:{'Content-Type':'application/x-www-form-urlencoded'}}),'test-address');return {response:r,cookie:r.headers.getSetCookie()[0]?.split(';')[0]}}
 test('standalone password sessions persist archives and isolate accounts; forged Sites headers never authenticate',async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'leaf-standalone-'));let app=createApp({dataDirectory:dir,origin,env:{TRUST_SITES_IDENTITY:'true'}});
  try{
+  await assert.rejects(setAccount(app.database.sql,{username:'short',password:'Ab3!x',owner:'short'}),/6/);
   for(const username of ['alice','bob'])await setAccount(app.database.sql,{username,password,owner:username});
   assert.equal((await app.fetch(req('/api/plants',{headers:{'oai-authenticated-user-id':'alice'}}))).status,401);
   assert.equal((await app.fetch(req('/api/auth'))).status,200);assert.equal((await (await app.fetch(req('/api/auth'))).json()).passwordLogin,true);
