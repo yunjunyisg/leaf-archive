@@ -216,3 +216,23 @@ test('mobile logout endpoint expires the current cookie and invalidates ordinary
   }
  }finally{await f.close()}
 });
+
+test('admin image downloads preserve bytes, filter and paginate all uploads and stop after deletion or logout',async()=>{
+ const f=await fixture(),{app}=f;
+ try{
+  await provisionAdmin(app.database.sql,{username:'operator',password});await setAccount(app.database.sql,{username:'visitor',password,owner:'visitor'});
+  const admin=cookie(await login(app,'operator')),visitor=cookie(await login(app,'visitor')),ids=Array.from({length:32},()=>randomUUID()).sort(),bytes=new Uint8Array([137,80,78,71]);
+  for(const [index,id] of ids.entries())app.database.sql.prepare('INSERT INTO images VALUES (?,?,?)').run(id,index===31?'historical':'visitor','image/png');
+  await app.BUCKET.put('visitor/'+ids[0],bytes);
+  for(const url of ['/api/admin/images','/api/admin/images/'+ids[0]+'?download=1']){assert.equal((await call(app,url)).status,401);assert.equal((await call(app,url,visitor)).status,403)}
+  const first=await (await call(app,'/api/admin/images',admin)).json(),second=await (await call(app,'/api/admin/images?page=2',admin)).json();assert.equal(first.total,32);assert.equal(first.images.length,30);assert.equal(second.images.length,2);assert.equal(new Set([...first.images,...second.images].map(i=>i.id)).size,32);
+  const filtered=await (await call(app,'/api/admin/images?owner=historical',admin)).json();assert.equal(filtered.total,1);assert.equal(filtered.images[0].username,'历史归属');
+  const download=await call(app,'/api/admin/images/'+ids[0]+'?download=1',admin);assert.equal(download.status,200);assert.equal(download.headers.get('Content-Disposition'),'attachment; filename="leaf-image-'+ids[0]+'.png"');assert.match(download.headers.get('Cache-Control'),/private, no-store/);assert.deepEqual(new Uint8Array(await download.arrayBuffer()),bytes);
+  const head=await call(app,'/api/admin/images/'+ids[0]+'?download=1',admin,{method:'HEAD'});assert.equal(head.status,200);assert.equal(await head.text(),'');assert.equal(head.headers.get('Content-Disposition'),download.headers.get('Content-Disposition'));
+  assert.equal((await call(app,'/api/admin/images/'+ids[1]+'?download=1',admin)).status,404);
+  const html=await (await call(app,'/admin',admin)).text();assert.ok(!html.includes('data-leaf-refresh'));assert.ok(html.includes('id="refresh"'));assert.ok(html.includes('用户上传图片'));
+  await call(app,'/api/admin/users/deactivate',admin,{method:'POST',body:JSON.stringify({owner:'visitor',username:'visitor',confirmation:'确认注销'})});
+  assert.equal((await call(app,'/api/admin/images/'+ids[0]+'?download=1',admin)).status,404);assert.equal((await (await call(app,'/api/admin/images?owner=visitor',admin)).json()).total,0);
+  await call(app,'/api/auth/logout',admin,{method:'POST'});assert.equal((await call(app,'/api/admin/images',admin)).status,401);
+ }finally{await f.close()}
+});

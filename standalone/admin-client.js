@@ -1,5 +1,6 @@
 const $=id=>document.getElementById(id);
 let currentView='data',mapOwner='',mapOwnerName='',mapController=null,mapRecords=[],mapEpoch=0;
+let imagePage=1,imagesEpoch=0;
 let userPage=1,plantPage=1,owner='',ownerName='',epoch=0,usersEpoch=0,plantsEpoch=0,detailEpoch=0;
 const date=value=>value?new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',dateStyle:'short',timeStyle:'short'}).format(new Date(value)):'未记录';
 const bytes=value=>value<1024?value+' 字节':value<1024*1024?(value/1024).toFixed(1)+' 千字节':(value/1024/1024).toFixed(1)+' 兆字节';
@@ -21,7 +22,7 @@ async function stats(){
 }
 async function users(){
  const attempt=++usersEpoch,data=await api('/api/admin/users?page='+userPage+'&q='+encodeURIComponent($('userQuery').value.trim()));if(attempt!==usersEpoch)return;
- $('userCount').textContent='共 '+data.total+' 个账号';$('users').replaceChildren();for(const u of data.users){const tr=document.createElement('tr');cell(tr,u.username).append(Object.assign(document.createElement('small'),{textContent:u.nickname}));cell(tr,u.disabled?'已注销':u.mustChange?'待修改密码':u.role==='admin'?'管理员':'普通账号');cell(tr,u.plantCount+' / '+u.imageCount+' / '+u.taxonCount);cell(tr,date(u.registeredAt));cell(tr,date(u.lastLogin));cell(tr,date(u.lastSeen));button(cell(tr,''),'查看档案',()=>{owner=u.owner;ownerName=u.username;plantPage=1;setView('manage');plants().catch(showError);$('plantsTitle').scrollIntoView({behavior:'smooth',block:'start'})});button(tr.lastElementChild,'查看地图',()=>{mapOwner=u.owner;mapOwnerName=u.username;setView('map',true)});if(u.role!=='admin'){if(!u.disabled)button(tr.lastElementChild,'重置密码',()=>manageUser(u,'reset-password').catch(showError));button(tr.lastElementChild,u.disabled?'删除账号及数据':'注销账号',()=>manageUser(u,'deactivate').catch(showError));}$('users').append(tr)}pager('users',data);
+ $('userCount').textContent='共 '+data.total+' 个账号';$('users').replaceChildren();for(const u of data.users){const tr=document.createElement('tr');cell(tr,u.username).append(Object.assign(document.createElement('small'),{textContent:u.nickname}));cell(tr,u.disabled?'已注销':u.mustChange?'待修改密码':u.role==='admin'?'管理员':'普通账号');cell(tr,u.plantCount+' / '+u.imageCount+' / '+u.taxonCount);cell(tr,date(u.registeredAt));cell(tr,date(u.lastLogin));cell(tr,date(u.lastSeen));button(cell(tr,''),'查看档案',()=>{owner=u.owner;ownerName=u.username;plantPage=1;imagePage=1;setView('manage');Promise.all([plants(),images()]).catch(showError);$('plantsTitle').scrollIntoView({behavior:'smooth',block:'start'})});button(tr.lastElementChild,'查看地图',()=>{mapOwner=u.owner;mapOwnerName=u.username;setView('map',true)});if(u.role!=='admin'){if(!u.disabled)button(tr.lastElementChild,'重置密码',()=>manageUser(u,'reset-password').catch(showError));button(tr.lastElementChild,u.disabled?'删除账号及数据':'注销账号',()=>manageUser(u,'deactivate').catch(showError));}$('users').append(tr)}pager('users',data);
 }
 let managing=false;
 async function manageUser(user,action){
@@ -30,7 +31,7 @@ async function manageUser(user,action){
  if(!confirm(question))return;
  if(!reset&&prompt('此操作会永久删除数据，请输入要注销的账号确认：')!==user.username)return;
  managing=true;
- try{const data=await api('/api/admin/users/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({owner:user.owner,username:user.username,confirmation:reset?'':'确认注销'})});mapEpoch++;mapController?.destroy();mapController=null;mapRecords=[];await Promise.all([users(),stats(),plants()]);$('message').textContent=data.message}finally{managing=false}
+ try{const data=await api('/api/admin/users/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({owner:user.owner,username:user.username,confirmation:reset?'':'确认注销'})});mapEpoch++;mapController?.destroy();mapController=null;mapRecords=[];await Promise.all([users(),stats(),plants(),images()]);$('message').textContent=data.message}finally{managing=false}
 }
 async function plants(){
  const attempt=++plantsEpoch,data=await api('/api/admin/plants?page='+plantPage+(owner?'&owner='+encodeURIComponent(owner):''));if(attempt!==plantsEpoch)return;
@@ -41,8 +42,13 @@ async function detail(id){
  const attempt=++detailEpoch,p=await api('/api/admin/plants/'+encodeURIComponent(id));if(attempt!==detailEpoch)return;
  $('detailTitle').textContent=p.name||'植物档案';const pairs=[['收藏编号',p.number],['学名',p.latin],['科',p.family],['属',p.genus],['状态',p.status],['产地',p.origin],['位置',p.location],['简介',p.description],['个体信息',p.individualInfo],['备注',p.notes]];
  $('detailText').textContent=pairs.filter(([,v])=>v).map(([k,v])=>k+'：'+v).join('\n');$('detailPhotos').replaceChildren();const photos=[...new Set([...(p.photos||[]),...(p.logs||[]).flatMap(log=>log.photos||[])])];
- for(const url of photos){const personal=/^\/images\/[a-f0-9-]{36}$/.test(url),example=/^\/assets\/[A-Za-z0-9_]+\.jpg$/.test(url);if(!personal&&!example)continue;const image=document.createElement('img');image.src=personal?'/api/admin'+url:url;image.alt=p.name||'植物照片';image.loading='lazy';image.decoding='async';$('detailPhotos').append(image)}
+ for(const url of photos){const personal=/^\/images\/[a-f0-9-]{36}$/.test(url),example=/^\/assets\/[A-Za-z0-9_]+\.jpg$/.test(url);if(!personal&&!example)continue;const image=document.createElement('img');image.src=personal?'/api/admin'+url:url;image.alt=p.name||'植物照片';image.loading='lazy';image.decoding='async';const figure=document.createElement('figure');figure.append(image);if(personal){const link=document.createElement('a');link.href='/api/admin'+url+'?download=1';link.download='';link.textContent='下载原图';figure.append(link)}$('detailPhotos').append(figure)}
  if(!$('detail').open)$('detail').showModal();
+}
+async function images(){
+ const attempt=++imagesEpoch,data=await api('/api/admin/images?page='+imagePage+(owner?'&owner='+encodeURIComponent(owner):''));if(attempt!==imagesEpoch)return;
+ $('imagesTitle').textContent=owner?'用户 '+ownerName+' 的上传图片':'用户上传图片';$('imageCount').textContent='共 '+data.total+' 张图片';$('uploadedImages').replaceChildren();
+ for(const item of data.images){const figure=document.createElement('figure'),img=document.createElement('img'),caption=document.createElement('figcaption'),link=document.createElement('a');img.src='/api/admin/images/'+item.id;img.alt='用户上传图片';img.loading='lazy';img.decoding='async';caption.textContent=item.username+' · '+item.id;link.href=img.src+'?download=1';link.download='';link.textContent='下载原图';figure.append(img,caption,link);$('uploadedImages').append(figure)}pager('images',data);
 }
 function setView(view,reload=false){
  currentView=view;for(const node of document.querySelectorAll('[data-view]'))node.hidden=node.dataset.view!==view;
@@ -70,10 +76,10 @@ async function loadMap(){
 for(const b of document.querySelectorAll('[data-nav]'))b.onclick=()=>setView(b.dataset.nav);
 $('reloadMap').onclick=()=>loadMap().catch(showError);
 $('mapAllUsers').onclick=()=>{mapOwner='';mapOwnerName='';loadMap().catch(showError)};
-async function refresh(){const b=$('refresh');b.disabled=true;$('message').textContent='';try{await Promise.all([stats(),users(),plants()]);if(currentView==='map')await loadMap()}catch(e){showError(e)}finally{b.disabled=false}}
+async function refresh(){const b=$('refresh');b.disabled=true;$('message').textContent='';try{await Promise.all([stats(),users(),plants(),images()]);if(currentView==='map')await loadMap()}catch(e){showError(e)}finally{b.disabled=false}}
 $('refresh').onclick=refresh;$('userSearch').onsubmit=event=>{event.preventDefault();userPage=1;users().catch(showError)};
-for(const [id,change,fn] of [['usersPrev',()=>userPage--,users],['usersNext',()=>userPage++,users],['plantsPrev',()=>plantPage--,plants],['plantsNext',()=>plantPage++,plants]])$(id).onclick=()=>{change();fn().catch(showError)};
-$('clearOwner').onclick=()=>{owner='';ownerName='';plantPage=1;plants().catch(showError)};
+for(const [id,change,fn] of [['usersPrev',()=>userPage--,users],['usersNext',()=>userPage++,users],['plantsPrev',()=>plantPage--,plants],['plantsNext',()=>plantPage++,plants],['imagesPrev',()=>imagePage--,images],['imagesNext',()=>imagePage++,images]])$(id).onclick=()=>{change();fn().catch(showError)};
+$('clearOwner').onclick=()=>{owner='';ownerName='';plantPage=1;imagePage=1;Promise.all([plants(),images()]).catch(showError)};
 $('closeDetail').onclick=()=>{detailEpoch++;$('detail').close();$('detailPhotos').replaceChildren()};
 $('logout').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST'});location.href='/auth/local'}catch(e){showError(e)}};
 refresh();

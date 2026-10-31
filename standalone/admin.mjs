@@ -87,7 +87,12 @@ export async function adminRoutes(request,{sql,bucket,dataDirectory,session}){
  }
  const detail=/^\/api\/admin\/plants\/([^/]+)$/.exec(route);
  if(detail){const row=sql.prepare('SELECT id,owner,data FROM plants WHERE id=?').get(decodeURIComponent(detail[1]));if(!row)return json({error:'档案不存在'},404);return json({...JSON.parse(row.data),id:row.id,owner:row.owner})}
+ if(route==='/api/admin/images'){
+  const {page,pageSize,offset}=pagination(url),owner=(url.searchParams.get('owner')||'').slice(0,512),where=owner?' WHERE i.owner=?':'',args=owner?[owner]:[];
+  const images=sql.prepare("SELECT i.id,i.owner,i.mime,a.username FROM images i LEFT JOIN local_accounts a ON a.owner=i.owner"+where+' ORDER BY i.id LIMIT ? OFFSET ?').all(...args,pageSize,offset);
+  return json({images:images.map(i=>({...i,username:i.username||'历史归属'})),total:number(sql,'SELECT count(*) AS n FROM images i'+where,...args),page,pageSize});
+ }
  const image=/^\/api\/admin\/images\/([a-f0-9-]{36})$/.exec(route);
- if(image){const row=sql.prepare('SELECT owner,mime FROM images WHERE id=?').get(image[1]);if(!row)return json({error:'照片不存在'},404);const object=await bucket.get(row.owner+'/'+image[1]);if(!object)return json({error:'照片不存在'},404);return new Response(request.method==='HEAD'?null:object.body,{headers:{...headers,'Content-Type':row.mime}})}
+ if(image){const row=sql.prepare('SELECT owner,mime FROM images WHERE id=?').get(image[1]);if(!row)return json({error:'照片不存在'},404);const object=await bucket.get(row.owner+'/'+image[1]);if(!object)return json({error:'照片不存在'},404);return new Response(request.method==='HEAD'?null:object.body,{headers:{...headers,'Content-Type':row.mime,...(url.searchParams.get('download')==='1'?{'Content-Disposition':'attachment; filename="leaf-image-'+image[1]+'.'+({'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif'}[row.mime]||'bin')+'"'}:{})}})}
  return json({error:'未找到此后台页面'},404);
 }
