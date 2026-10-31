@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {gunzipSync} from 'node:zlib';
-import worker from '../dist/server/index.js';
+import worker from '../dist/worker/index.js';
 const request=(path,headers={})=>worker.fetch(new Request('https://example.test'+path,{headers}),{});
 test('per-country boundaries preserve full geometry and reduce the Australia download',async()=>{
  const global=JSON.parse(gunzipSync(fs.readFileSync('data/boundaries/admin1.json.gz')));

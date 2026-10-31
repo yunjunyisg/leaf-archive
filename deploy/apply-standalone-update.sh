@@ -8,16 +8,32 @@ fi
 update_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 source_dir="$update_root/standalone"
 target_dir=/opt/leaf-archive/standalone
-for name in server.mjs global-boundaries.mjs taxonomy.mjs profile.mjs profile-page.html profile-client.js account-ui.mjs account-ui.js account-deletion.mjs filing.mjs storage.mjs local-auth.mjs access.mjs admin.mjs admin-account.mjs admin-page.html admin-client.js; do
+for name in server.mjs file-response.mjs native-assets.mjs global-boundaries.mjs taxonomy.mjs profile.mjs profile-page.html profile-client.js account-ui.mjs account-ui.js account-deletion.mjs filing.mjs storage.mjs local-auth.mjs access.mjs admin.mjs admin-account.mjs admin-page.html admin-client.js; do
     test -f "$source_dir/$name" || { echo '更新文件不完整，尚未修改服务器。'; exit 1; }
 done
 core_source="$update_root/dist/server/index.js"
 core_target=/opt/leaf-archive/dist/server/index.js
 has_core=0
+had_core_assets=0
+core_assets="$target_dir/../dist/server/assets"
+core_assets_source="$update_root/dist/server/assets"
 if [ -d "$update_root/dist" ]; then
     test -f "$core_source" || { echo '页面及接口更新文件不完整，尚未修改服务器。'; exit 1; }
+    test -f "$core_assets_source/manifest.json" || { echo '静态资源缺失，请使用完整程序更新包。'; exit 1; }
     test -f "$core_target"
     /usr/bin/node --check --input-type=module < "$core_source"
+    /usr/bin/node --input-type=module - "$core_source" "$core_assets_source" <<'JS'
+import fs from 'node:fs';import path from 'node:path';import {createHash} from 'node:crypto';
+try{
+ const root=process.argv[3],manifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.json'),'utf8')),hash=data=>createHash('sha256').update(data).digest('hex');
+ if(hash(fs.readFileSync(process.argv[2]))!==manifest.entrySha256||!manifest.files||!Object.keys(manifest.files).length)throw Error();
+ for(const [name,meta] of Object.entries(manifest.files)){
+  if(!/^[a-f0-9]{64}\.[a-z0-9]+$/.test(name)||!meta||!Number.isSafeInteger(meta.size))throw Error();
+  const bytes=fs.readFileSync(path.join(root,name));if(bytes.length!==meta.size||hash(bytes)!==meta.sha256)throw Error();
+ }
+ console.log('程序与静态资源完整性校验通过。');
+}catch{console.error('程序与静态资源不完整或版本不匹配，尚未修改服务器。请重新下载完整优化包。');process.exit(1)}
+JS
     has_core=1
 fi
 if [ ! -f "$source_dir/boundary-data/catalog.json" ]; then
@@ -50,7 +66,10 @@ backup_dir="$backup_root/runtime-$(date +%Y%m%d-%H%M%S)-$$"
 install -d -m 700 "$backup_dir"
 cp -a "$target_dir/." "$backup_dir/"
 core_backup="$backup_dir-core.js"
-if [ "$has_core" -eq 1 ]; then cp -a "$core_target" "$core_backup"; fi
+if [ "$has_core" -eq 1 ]; then
+    cp -a "$core_target" "$core_backup"
+    if [ -d "$core_assets" ]; then cp -a "$core_assets" "$backup_dir-core-assets"; had_core_assets=1; fi
+fi
 was_active=0
 if systemctl is-active --quiet leaf-archive; then was_active=1; fi
 changed=0
@@ -68,7 +87,11 @@ rollback() {
             fi
         done
         cp -a "$backup_dir/." "$target_dir/"
-        if [ "$has_core" -eq 1 ]; then cp -a "$core_backup" "$core_target"; fi
+        if [ "$has_core" -eq 1 ]; then
+            cp -a "$core_backup" "$core_target"
+            if [ -d "$core_assets" ]; then find "$core_assets" -depth -delete; fi
+            if [ "$had_core_assets" -eq 1 ]; then cp -a "$backup_dir-core-assets" "$core_assets"; fi
+        fi
         if [ "$was_active" -eq 1 ]; then systemctl restart leaf-archive || true; fi
         echo '更新检查失败，已恢复旧程序。数据库没有回滚，原有数据和已创建账号均保留。'
     fi
@@ -79,6 +102,11 @@ systemctl stop leaf-archive
 changed=1
 cp -a "$source_dir/." "$target_dir/"
 if [ "$has_core" -eq 1 ]; then
+    if [ -d "$core_assets" ]; then find "$core_assets" -depth -delete; fi
+    cp -a "$core_assets_source" "$core_assets"
+    chown -R root:www "$core_assets"
+    find "$core_assets" -type d -exec chmod 750 {} +
+    find "$core_assets" -type f -exec chmod 640 {} +
     cp -a "$core_source" "$core_target"
     chown root:www "$core_target"
     chmod 640 "$core_target"

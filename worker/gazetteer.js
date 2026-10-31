@@ -1,3 +1,4 @@
+import {binaryBody} from './public-assets.js';
 import australianData from '../data/gazetteers/AU.ndjson.gz';
 import metadata from '../data/gazetteers/AU-metadata.json';
 
@@ -9,8 +10,7 @@ function adminContext(state,county){const key=state+'.'+county;if(!adminKeys.has
 export async function searchAustralianGazetteer(query,limit=12){
  const words=queryWords(query);if(!words.length)return [];
  const exact=foldPlace(query),compact=exact.replaceAll(' ',''),matches=[];
- const encoded=australianData.slice(australianData.indexOf(',')+1),decoded=atob(encoded),bytes=new Uint8Array(decoded.length);for(let i=0;i<decoded.length;i++)bytes[i]=decoded.charCodeAt(i);
- const reader=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')).pipeThrough(new TextDecoderStream()).getReader();let pending='';
+ const body=await binaryBody(australianData),reader=body.pipeThrough(new DecompressionStream('gzip')).pipeThrough(new TextDecoderStream()).getReader();let pending='';
  function consider(line){
   if(!line)return;const r=JSON.parse(line),key=r[7],nameCompact=r[1].toLowerCase().replace(/[^\p{L}\p{N}]/gu,'');
   const nameWords=words.filter(w=>key.includes(w)||nameCompact.includes(w));if(!nameWords.length)return;

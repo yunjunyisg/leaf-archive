@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {DatabaseSync} from 'node:sqlite';import fs from 'node:fs';
-import worker from '../dist/server/index.js';
+import worker from '../dist/worker/index.js';
 function setup(){const sql=new DatabaseSync(':memory:');for(const file of ['0000_harsh_ben_parker.sql','0001_polite_tarantula.sql'])sql.exec(fs.readFileSync(new URL('../drizzle/'+file,import.meta.url),'utf8'));const objects=new Map();return {sql,env:{WECHAT_WEB_APP_ID:'test-web',WECHAT_WEB_APP_SECRET:'test-secret',WECHAT_REDIRECT_URI:'https://example.test/auth/wechat/callback',DB:{prepare(query){return {bind(...args){return {async all(){return {results:sql.prepare(query).all(...args)}},async first(){return sql.prepare(query).get(...args)||null},async run(){return {meta:{changes:Number(sql.prepare(query).run(...args).changes)}}}}}}}},BUCKET:{async put(key,bytes){objects.set(key,bytes)},async get(key){const body=objects.get(key);return body?{body}:null}}}}}
 const req=(path,options={})=>new Request('https://example.test'+path,options);
 const call=(env,path,options)=>worker.fetch(req(path,options),env);

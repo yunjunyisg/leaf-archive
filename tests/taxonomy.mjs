@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import fs from 'node:fs';
 import {ranks,validPath,plantPath,buildTree,pathKey} from '../shared/taxonomy.js';
 import {taxonName,taxonColor} from '../shared/distribution.js';
-import worker from '../dist/server/index.js';
+import worker from '../dist/worker/index.js';
 const path=[{rank:'genus',name:'茅膏菜属'},{rank:'species',name:'Drosera burmannii'}];
 test('all ranks, optional ranks, species peers and qualifiers preserve their hierarchy',()=>{
  const full=ranks.filter(r=>!['unresolved','hybrid','aff','cf'].includes(r.key)).map(r=>({rank:r.key,name:r.label}));

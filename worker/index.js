@@ -2,7 +2,7 @@ import mapRelief from '../public/map-relief.webp';
 import {migrationDownloads} from './migration-downloads.js';
 import {migrationPhoto} from './migration-photos.js';
 import admin1Countries from 'leaf:admin1-countries';
-import {publicAsset} from './public-assets.js';
+import {publicAsset,publicBinary} from './public-assets.js';
 import admin1Json from '../data/boundaries/admin1.json.gz';
 import usCountiesJson from '../data/boundaries/US-counties.json.gz';
 import auCountiesJson from '../data/boundaries/AU-admin2.json.gz';
@@ -170,9 +170,9 @@ const downloadsResponse=await migrationDownloads(request,env);if(downloadsRespon
 if(u.pathname==='/manifest.webmanifest')return new Response(JSON.stringify(manifest),{headers:{'Content-Type':'application/manifest+json; charset=utf-8','Cache-Control':'no-cache'}});
 if(u.pathname==='/sw.js')return new Response(serviceWorker,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-cache','Service-Worker-Allowed':'/'}});
 if(u.pathname==='/offline.html')return new Response(offline,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'}});
-if(desktopAssets[u.pathname]){const [data,mime]=desktopAssets[u.pathname];const headers={'Content-Type':mime,'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'};if(mime==='application/zip')headers['Content-Disposition']='attachment; filename="leaf-archive-shortcuts.zip"';return new Response(Uint8Array.from(atob(data.split(',')[1]),c=>c.charCodeAt(0)),{headers})}
+if(desktopAssets[u.pathname]){const [data,mime]=desktopAssets[u.pathname];const headers={'Content-Type':mime,'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'};if(mime==='application/zip')headers['Content-Disposition']='attachment; filename="leaf-archive-shortcuts.zip"';return publicBinary(request,data,mime,headers)}
 if(u.pathname==='/origins'||u.pathname==='/origins/')return new Response(originMapHtml,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
-if(u.pathname.startsWith('/map-boundaries/')){const countryMatch=/^\/map-boundaries\/admin1\/([A-Z]{2})\.json$/.exec(u.pathname);const data=(countryMatch?admin1Countries[countryMatch[1]]:null)||{'/map-boundaries/admin1.json':admin1Json,'/map-boundaries/US-counties.json':usCountiesJson,'/map-boundaries/AU-admin2.json':auCountiesJson}[u.pathname];if(data){const decoded=atob(data.slice(data.indexOf(',')+1)),bytes=new Uint8Array(decoded.length);for(let i=0;i<decoded.length;i++)bytes[i]=decoded.charCodeAt(i);return new Response(bytes,{encodeBody:'manual',headers:{'Content-Type':'application/json; charset=utf-8','Content-Encoding':'gzip','Cache-Control':'public, max-age=3600, no-transform'}})};}
+if(u.pathname.startsWith('/map-boundaries/')){const countryMatch=/^\/map-boundaries\/admin1\/([A-Z]{2})\.json$/.exec(u.pathname);const data=(countryMatch?admin1Countries[countryMatch[1]]:null)||{'/map-boundaries/admin1.json':admin1Json,'/map-boundaries/US-counties.json':usCountiesJson,'/map-boundaries/AU-admin2.json':auCountiesJson}[u.pathname];if(data)return publicBinary(request,data,'application/json; charset=utf-8',{'Content-Encoding':'gzip','Cache-Control':'public, max-age=3600, no-transform'});}
 if(u.pathname==='/origin-map.js')return publicAsset(request,originMapJs,'text/javascript; charset=utf-8');
 if(u.pathname==='/origin-map.css')return publicAsset(request,originMapCss,'text/css; charset=utf-8');
 if(u.pathname==='/map-relief.webp')return publicAsset(request,mapRelief,'image/webp',true);

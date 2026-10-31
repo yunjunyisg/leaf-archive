@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {feature} from 'topojson-client';
 import {taxonName,taxonColor,taxonGroups,regionIndex,regionFor,regionGroups,automaticDistributionLevel} from '../shared/distribution.js';
-import worker from '../dist/server/index.js';
+import worker from '../dist/worker/index.js';
 const data=name=>JSON.parse(gunzipSync(fs.readFileSync('data/boundaries/'+name+'.json.gz')));
 const admin1=regionIndex(data('admin1').features),au=regionIndex(data('AU-admin2').features);
 const usData=data('US-counties'),us=regionIndex(feature(usData,usData.objects.counties).features.map(f=>({...f,properties:{...f.properties,code:'US',aliases:[f.properties.name,f.properties.name+' County']}})));

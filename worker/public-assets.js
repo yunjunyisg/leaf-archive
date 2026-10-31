@@ -17,3 +17,6 @@ export async function publicAsset(request,content,mime,binary=false){
  for(let i=0;i<decoded.length;i++)bytes[i]=decoded.charCodeAt(i);
  return new Response(bytes,{headers});
 }
+
+export function binaryBody(content){const decoded=atob(content.slice(content.indexOf(',')+1)),bytes=Uint8Array.from(decoded,c=>c.charCodeAt(0));return new Blob([bytes]).stream()}
+export function publicBinary(request,content,mime,headers={}){return new Response(request.method==='HEAD'?null:binaryBody(content),{...(headers['Content-Encoding']==='gzip'?{encodeBody:'manual'}:{}),headers:{'Content-Type':mime,...headers}})}

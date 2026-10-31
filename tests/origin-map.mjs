@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
 import {validOriginLocation,filterByArea,groupByLocation,distanceKm} from '../shared/geography.js';
-import worker from '../dist/server/index.js';
+import worker from '../dist/worker/index.js';
 
 function setup(){
  const sql=new DatabaseSync(':memory:');for(const file of fs.readdirSync('drizzle').filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync('drizzle/'+file,'utf8'));
