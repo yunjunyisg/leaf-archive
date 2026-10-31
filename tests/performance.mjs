@@ -36,7 +36,7 @@ test('welcome runs once per session and does not block maps or classification na
 });
 
 test('automatic zoom still colors Australia, Western Australia and Kimberley; hover restores only one region',async()=>{
- const {regionIndex,regionGroups,regionFor,taxonName,taxonColor,taxonGroups,automaticDistributionLevel}=await import('../shared/distribution.js');
+ const {regionIndex,regionGroups,regionFor,taxonName,taxonColor,taxonGroups,automaticDistributionLevel,pointInFeature}=await import('../shared/distribution.js');
  const {locatedPlants}=await import('../shared/geography.js');
  const nodes=new Map(),node=selector=>{if(!nodes.has(selector))nodes.set(selector,{dataset:{},value:'',innerHTML:'',textContent:'',setAttribute(){},before(){},prepend(){},remove(){},querySelectorAll(){return []}});return nodes.get(selector)};
  const root={querySelector:node},painted=[],handlers=new Map();let zoom=2,controller;
@@ -44,7 +44,8 @@ test('automatic zoom still colors Australia, Western Australia and Kimberley; ho
  const L={DomEvent:{stopPropagation(){}},geoJSON(data,options){const group={layers:data.features.map(feature=>({feature,options:{},handlers:{},styles:0,on(event,handler){this.handlers[event]=handler;return this},getElement(){return null},bindTooltip(){return this},setStyle(style){this.style={...this.style,...style};this.styles++}})),addTo(){painted.push(this);return this},eachLayer(fn){this.layers.forEach(fn)},remove(){this.removed=true}};group.layers.forEach(layer=>options.onEachFeature(layer.feature,layer));return group}};
  const plant={id:'kingston',genus:'Drosera',species:'indica',originLocation:{lat:-15.98111,lon:128.4178,countryCode:'AU',state:'Western Australia',county:'Wyndham-East Kimberley',precision:'locality'}};
  const countries={type:'FeatureCollection',features:[{type:'Feature',id:'AU',properties:{code:'AU',name:'Australia'},geometry:{type:'Polygon',coordinates:[[[110,-45],[155,-45],[155,-10],[110,-10],[110,-45]]]}}]};
- const context={document:{createElement:()=>node('created-'+nodes.size)},root,map,L,feature(){},locatedPlants,regionIndex,regionGroups,regionFor,taxonName,taxonColor,taxonGroups,automaticDistributionLevel,URL,WeakMap,Map,JSON,setTimeout,clearTimeout,fetch:async path=>{const name=path.startsWith('/map-boundaries/admin1/')?'admin1':'AU-admin2';const d=JSON.parse(gunzipSync(fs.readFileSync('data/boundaries/'+name+'.json.gz')));if(name==='admin1')d.features=d.features.filter(f=>f.properties.code==='AU');return {ok:true,json:async()=>d}}};
+ const boundaryCoverage=JSON.parse(fs.readFileSync('shared/boundary-coverage.json'));
+ const context={boundaryCoverage,pointInFeature,document:{createElement:()=>node('created-'+nodes.size)},root,map,L,feature(){},locatedPlants,regionIndex,regionGroups,regionFor,taxonName,taxonColor,taxonGroups,automaticDistributionLevel,URL,WeakMap,Map,JSON,setTimeout,clearTimeout,fetch:async path=>{const name=path.startsWith('/map-boundaries/admin1/')?'admin1':'AU-admin2';const d=JSON.parse(gunzipSync(fs.readFileSync('data/boundaries/'+name+'.json.gz')));if(name==='admin1')d.features=d.features.filter(f=>f.properties.code==='AU');return {ok:true,json:async()=>d}}};
  const source=fs.readFileSync('public/distribution-map.js','utf8').replace(/^import .*;\n/gm,'').replace('export function createDistributionMap','function createDistributionMap');
  vm.createContext(context);vm.runInContext(source,context);
  controller=context.createDistributionMap({root,map,countryFeatures:countries,getPlants:()=>[plant],getViewCountry:()=>'AU',onChange:()=>controller?.refresh(),onRegion(){}});

@@ -8,7 +8,7 @@ fi
 update_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 source_dir="$update_root/standalone"
 target_dir=/opt/leaf-archive/standalone
-for name in server.mjs taxonomy.mjs profile.mjs profile-page.html profile-client.js account-ui.mjs account-ui.js account-deletion.mjs filing.mjs storage.mjs local-auth.mjs access.mjs admin.mjs admin-account.mjs admin-page.html admin-client.js; do
+for name in server.mjs global-boundaries.mjs taxonomy.mjs profile.mjs profile-page.html profile-client.js account-ui.mjs account-ui.js account-deletion.mjs filing.mjs storage.mjs local-auth.mjs access.mjs admin.mjs admin-account.mjs admin-page.html admin-client.js; do
     test -f "$source_dir/$name" || { echo '更新文件不完整，尚未修改服务器。'; exit 1; }
 done
 core_source="$update_root/dist/server/index.js"
@@ -20,6 +20,7 @@ if [ -d "$update_root/dist" ]; then
     /usr/bin/node --check --input-type=module < "$core_source"
     has_core=1
 fi
+test -f "$source_dir/boundary-data/catalog.json" || { echo '缺少全球地图边界数据，请使用完整更新包。'; exit 1; }
 test -f "$target_dir/server.mjs"
 test -f /var/lib/leaf-archive/archive.sqlite
 id www >/dev/null
@@ -47,7 +48,11 @@ rollback() {
         systemctl stop leaf-archive || true
         for file in "$source_dir"/*; do
             name=$(basename -- "$file")
-            if [ ! -e "$backup_dir/$name" ]; then rm -f -- "$target_dir/$name"; fi
+            if [ -d "$file" ] && [ -d "$target_dir/$name" ]; then
+                find "$target_dir/$name" -depth -delete
+            elif [ ! -e "$backup_dir/$name" ]; then
+                rm -f -- "$target_dir/$name"
+            fi
         done
         cp -a "$backup_dir/." "$target_dir/"
         if [ "$has_core" -eq 1 ]; then cp -a "$core_backup" "$core_target"; fi

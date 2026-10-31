@@ -1,0 +1,27 @@
+{
+  "tag": "global-map-20261031-v1",
+  "files": [
+    {
+      "name": "leaf-archive-global-map-20261031-v1.tar.gz",
+      "sha256": "81219b719635654e81f78095d2e9048ff1530616a7c40227480eb9f7c83f1a47",
+      "parts": [
+        {
+          "url": "https://tmpfiles.org/wtAOT6tLcsQz/global-map-transfer-1.bin",
+          "sha256": "4bd5b4fff74434eb824cb2e74d9eb89fe4d1416c6f2f9a8355a159aa852547a4"
+        },
+        {
+          "url": "https://tmpfiles.org/wWA5TStPc5zc/global-map-transfer-2.bin",
+          "sha256": "9485ae32eaafb9aa09cdd8425e0be319416ee8f0c984092ceb8b3364c3d93883"
+        },
+        {
+          "url": "https://tmpfiles.org/wLAjT5tccUie/global-map-transfer-3.bin",
+          "sha256": "8680a990c0480f42df07ffb70a10d2ae7e63730cf5783fcd3349dd88bc8f4b8e"
+        },
+        {
+          "url": "https://tmpfiles.org/wcA6TOtMcIyT/global-map-transfer-4.bin",
+          "sha256": "0813f0b8102c49ef7362e3f69152ffad1547f8eb4091614262ce656b99dc5829"
+        }
+      ]
+    }
+  ]
+}

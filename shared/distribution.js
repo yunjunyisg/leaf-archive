@@ -21,21 +21,22 @@ export function regionIndex(features){return features.map(feature=>{const coordi
 export function regionFor(location,index,level){
  if(!location?.countryCode)return null;
  if(level==='country')return index.find(r=>r.feature.properties.code===location.countryCode)?.feature||null;
- if(location.precision==='country'||level==='county'&&location.precision==='region')return null;
- const pool=index.filter(r=>r.feature.properties.code===location.countryCode),name=level==='state'?location.state:location.county;
+ if(location.precision==='country'||['county','district'].includes(level)&&location.precision==='region')return null;
+ const pool=index.filter(r=>r.feature.properties.code===location.countryCode),name=level==='state'?location.state:level==='district'?(location.district||location.county):location.county;
  const names=new Set([name,level==='county'?name?.replace(/\s+(County|Parish|Borough|Municipality)$/i,''):''].filter(Boolean).map(foldRegion));
  const named=pool.filter(r=>(r.feature.properties.aliases||[r.feature.properties.name]).some(a=>names.has(foldRegion(a))));
  if(named.length===1)return named[0].feature;
  // A city/region representative must never be used to invent a more precise county.
- const exact=level==='state'?['region','county','city','locality','point']:['county','locality','point'];
+ const exact=level==='state'?['region','county','city','locality','point']:level==='district'?['locality','point']:['county','locality','point'];
  if(!exact.includes(location.precision||'point'))return null;
  const candidates=named.length?named:pool;
  return candidates.find(r=>{const [w,s,e,n]=r.bounds;return location.lon>=w&&location.lon<=e&&location.lat>=s&&location.lat<=n&&pointInFeature(location,r.feature)})?.feature||null;
 }
 export function regionGroups(plants,index,level){const groups=new Map();let unmatched=0;for(const p of plants){const f=regionFor(p.originLocation,index,level);if(!f){unmatched++;continue}const id=String(f.id);if(!groups.has(id))groups.set(id,{feature:f,plants:[]});groups.get(id).plants.push(p)}return {groups,unmatched}}
 // Leaflet zoom levels: continent/country overview, state overview, local detail.
-export function automaticDistributionLevel(zoom,countryCode=''){
+export function automaticDistributionLevel(zoom,countryCode='',coverage={US:{ADM2:{}},AU:{ADM2:{}}}){
  if(zoom<4)return 'country';
- if(zoom>=7&&['US','AU'].includes(countryCode))return 'county';
+ if(zoom>=10&&coverage[countryCode]?.ADM3)return 'district';
+ if(zoom>=7&&coverage[countryCode]?.ADM2)return 'county';
  return 'state';
 }

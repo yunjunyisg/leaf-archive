@@ -119,3 +119,11 @@ INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
 OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
 TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
+
+全球二级、三级行政区概览：geoBoundaries gbOpen。
+各国数据源、年份、单独许可、许可说明、上游固定版本和校验值：
+/map-boundaries/global/catalog.json
+https://www.geoboundaries.org/
+引用：Runfola et al. (2020), geoBoundaries: A global database of political administrative boundaries.
+PLoS ONE 15(4): e0231866. https://doi.org/10.1371/journal.pone.0231866
+各国行政级别并不等同；公开简化边界不作为法定边界或精确采集点依据。
