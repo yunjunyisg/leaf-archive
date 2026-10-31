@@ -1,0 +1,18 @@
+{
+  "name": "Natural Earth II relief overview",
+  "source": "https://naturalearth.s3.amazonaws.com/50m_raster/NE2_50M_SR_W.zip",
+  "license": "Public Domain",
+  "licenseUrl": "https://www.naturalearthdata.com/about/terms-of-use/",
+  "sourceSha256": "7e0e07089b699a3cccad98dd1b2446390d8e3f8c5006359d477a329cebcafaa9",
+  "sha256": "cf86cb2632ab13fb3675f654a9ac837e2ecfbc5428ea56769a5596726325663f",
+  "projection": "EPSG:3857",
+  "latitudeBounds": [
+    -85.0511287798066,
+    85.0511287798066
+  ],
+  "size": [
+    4096,
+    4096
+  ],
+  "usage": "Global terrain overview only; no street or satellite detail."
+}

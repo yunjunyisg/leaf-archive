@@ -1,3 +1,4 @@
+import mapRelief from '../public/map-relief.webp';
 import {migrationDownloads} from './migration-downloads.js';
 import {migrationPhoto} from './migration-photos.js';
 import admin1Countries from 'leaf:admin1-countries';
@@ -174,6 +175,7 @@ if(u.pathname==='/origins'||u.pathname==='/origins/')return new Response(originM
 if(u.pathname.startsWith('/map-boundaries/')){const countryMatch=/^\/map-boundaries\/admin1\/([A-Z]{2})\.json$/.exec(u.pathname);const data=(countryMatch?admin1Countries[countryMatch[1]]:null)||{'/map-boundaries/admin1.json':admin1Json,'/map-boundaries/US-counties.json':usCountiesJson,'/map-boundaries/AU-admin2.json':auCountiesJson}[u.pathname];if(data){const decoded=atob(data.slice(data.indexOf(',')+1)),bytes=new Uint8Array(decoded.length);for(let i=0;i<decoded.length;i++)bytes[i]=decoded.charCodeAt(i);return new Response(bytes,{encodeBody:'manual',headers:{'Content-Type':'application/json; charset=utf-8','Content-Encoding':'gzip','Cache-Control':'public, max-age=3600, no-transform'}})};}
 if(u.pathname==='/origin-map.js')return publicAsset(request,originMapJs,'text/javascript; charset=utf-8');
 if(u.pathname==='/origin-map.css')return publicAsset(request,originMapCss,'text/css; charset=utf-8');
+if(u.pathname==='/map-relief.webp')return publicAsset(request,mapRelief,'image/webp',true);
 if(u.pathname==='/map-licenses.txt')return new Response(mapLicenses,{headers:{'Content-Type':'text/plain; charset=utf-8'}});
 if(u.pathname==='/leaflet.css')return publicAsset(request,leafletCss,'text/css; charset=utf-8');
 if(u.pathname==='/geography.js')return publicAsset(request,geographyJs,'text/javascript; charset=utf-8');

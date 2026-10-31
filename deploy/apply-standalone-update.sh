@@ -20,7 +20,20 @@ if [ -d "$update_root/dist" ]; then
     /usr/bin/node --check --input-type=module < "$core_source"
     has_core=1
 fi
-test -f "$source_dir/boundary-data/catalog.json" || { echo '缺少全球地图边界数据，请使用完整更新包。'; exit 1; }
+if [ ! -f "$source_dir/boundary-data/catalog.json" ]; then
+    test -f "$update_root/required-boundaries.json" || { echo '缺少全球地图边界数据，请使用完整更新包。'; exit 1; }
+    /usr/bin/node --input-type=module - "$update_root/required-boundaries.json" "$target_dir/boundary-data" <<'JS'
+import {readFileSync} from 'node:fs';import {createHash} from 'node:crypto';import path from 'node:path';
+try{
+ const files=JSON.parse(readFileSync(process.argv[2],'utf8')).files;if(!files||!files['catalog.json']||Object.keys(files).length<2)throw Error();
+ for(const [name,hash] of Object.entries(files)){
+  if(!/^(catalog\.json|[A-Z]{2}-ADM[23]\.json\.gz)$/.test(name)||!/^[a-f0-9]{64}$/.test(hash))throw Error();
+  if(createHash('sha256').update(readFileSync(path.join(process.argv[3],name))).digest('hex')!==hash)throw Error();
+ }
+ console.log('现有全球地图边界校验通过，本次保留边界文件。');
+}catch{console.error('现有全球地图版本不符、文件缺失或校验失败，尚未修改程序。请先安装完整全球地图更新包。');process.exit(1)}
+JS
+fi
 test -f "$target_dir/server.mjs"
 test -f /var/lib/leaf-archive/archive.sqlite
 id www >/dev/null

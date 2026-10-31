@@ -127,3 +127,8 @@ https://www.geoboundaries.org/
 引用：Runfola et al. (2020), geoBoundaries: A global database of political administrative boundaries.
 PLoS ONE 15(4): e0231866. https://doi.org/10.1371/journal.pone.0231866
 各国行政级别并不等同；公开简化边界不作为法定边界或精确采集点依据。
+
+本地地形底纹：Natural Earth II, NE2_50M_SR_W，公有领域。
+https://naturalearth.s3.amazonaws.com/50m_raster/NE2_50M_SR_W.zip
+https://www.naturalearthdata.com/about/terms-of-use/
+按 EPSG:3857 重投影为本地全球概览，不含街道、实时影像或精确地形测量信息。
