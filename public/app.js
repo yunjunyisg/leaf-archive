@@ -1,3 +1,4 @@
+import {choicePanelLayout} from '/choice-layout.js';
 import {locationLabel,precisionLabels} from '/geography.js';
 import {ranks,rankInfo,childRanks,referenceRank,plantPath,pathKey,buildTree,taxonomySuggestions} from '/taxonomy.js';
 (()=>{
@@ -405,29 +406,35 @@ function closeTaxonomyChoices(){for(const control of taxonomyChoiceControls)cont
 function attachTaxonomyChoices(input,getRank){
  if(!input)return;const label=input.closest('label');if(!label)return;
  input.removeAttribute('list');label.classList.add('taxonomy-choice-field');
- const toggle=document.createElement('button'),panel=document.createElement('div'),list=document.createElement('div'),note=document.createElement('p'),more=document.createElement('button');
- toggle.type='button';toggle.className='taxonomy-choice-toggle';toggle.textContent='已用选项';panel.className='taxonomy-choice-panel';panel.id='taxonomy-choices-'+taxonomyChoiceControls.length;panel.hidden=true;list.setAttribute('role','listbox');list.id=panel.id+'-list';note.className='taxonomy-choice-note';more.type='button';more.className='taxonomy-choice-more';more.textContent='显示更多';panel.append(note,list,more);label.append(toggle,panel);
+ const toggle=document.createElement('button'),panel=document.createElement('div'),head=document.createElement('div'),dismiss=document.createElement('button'),list=document.createElement('div'),note=document.createElement('p'),more=document.createElement('button');
+ toggle.type='button';toggle.className='taxonomy-choice-toggle';toggle.textContent='已用选项';panel.className='taxonomy-choice-panel';panel.id='taxonomy-choices-'+taxonomyChoiceControls.length;panel.hidden=true;head.className='taxonomy-choice-head';dismiss.type='button';dismiss.className='taxonomy-choice-dismiss';dismiss.textContent='×';dismiss.setAttribute('aria-label','关闭分类选项');list.className='taxonomy-choice-list';list.setAttribute('role','listbox');list.id=panel.id+'-list';note.className='taxonomy-choice-note';more.type='button';more.className='taxonomy-choice-more';more.textContent='显示更多';head.append(note,dismiss);panel.append(head,list,more);label.append(toggle);input.closest('dialog').append(panel);
  input.setAttribute('role','combobox');input.setAttribute('aria-autocomplete','list');input.setAttribute('aria-controls',list.id);input.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls',list.id);toggle.setAttribute('aria-expanded','false');
  let items=[],active=-1,limit=40;
- function close(){panel.hidden=true;panel.dataset.open='false';input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');toggle.setAttribute('aria-expanded','false');items=[];active=-1;list.replaceChildren();note.textContent='';more.hidden=true}
+ function close(){panel.hidden=true;panel.dataset.open='false';input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');toggle.setAttribute('aria-expanded','false');items=[];active=-1;list.replaceChildren();list.scrollTop=0;note.textContent='';more.hidden=true}
  function choose(index){if(input.disabled){close();return}const value=items[index];if(value===undefined)return;input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));close()}
- function highlight(){const nodes=[...list.children];nodes.forEach((node,index)=>node.dataset.active=String(index===active));if(nodes[active]){input.setAttribute('aria-activedescendant',nodes[active].id);nodes[active].scrollIntoView({block:'nearest'})}else input.removeAttribute('aria-activedescendant')}
+ function highlight(){const nodes=[...list.children];nodes.forEach((node,index)=>node.dataset.active=String(index===active));if(nodes[active]){input.setAttribute('aria-activedescendant',nodes[active].id);const option=nodes[active].getBoundingClientRect(),view=list.getBoundingClientRect();if(option.top<view.top)list.scrollTop-=view.top-option.top;else if(option.bottom>view.bottom)list.scrollTop+=option.bottom-view.bottom}else input.removeAttribute('aria-activedescendant')}
  function positionPanel(){
-  panel.classList.remove('taxonomy-choice-above');const container=input.closest('.form-body')||input.closest('dialog');if(!container||panel.hidden)return;
-  const frame=container.getBoundingClientRect(),field=label.getBoundingClientRect(),height=panel.getBoundingClientRect().height,below=frame.bottom-field.bottom,above=field.top-frame.top;
-  if(below<height&&above>below)panel.classList.add('taxonomy-choice-above');
+  const dialog=input.closest('dialog'),container=input.closest('.form-body')||dialog;if(!container||panel.hidden)return;
+  const visible=window.visualViewport,viewport={left:visible?.offsetLeft||0,top:visible?.offsetTop||0,right:(visible?.offsetLeft||0)+(visible?.width||innerWidth),bottom:(visible?.offsetTop||0)+(visible?.height||innerHeight)},box=dialog.getBoundingClientRect(),body=container.getBoundingClientRect(),anchor=input.getBoundingClientRect(),button=toggle.getBoundingClientRect();
+  if(Math.max(anchor.bottom,button.bottom)<Math.max(body.top,viewport.top)||Math.min(anchor.top,button.top)>Math.min(body.bottom,viewport.bottom)){close();return}
+  const header=dialog.querySelector('.dialog-header')?.getBoundingClientRect(),footer=dialog.querySelector('.dialog-footer')?.getBoundingClientRect();
+  const frame={left:Math.max(box.left+8,viewport.left+8),right:Math.min(box.right-8,viewport.right-8),top:Math.max(box.top+8,header?.bottom||0,viewport.top+8),bottom:Math.min(box.bottom-8,footer?.top||viewport.bottom,viewport.bottom-8)};
+  if(frame.bottom-frame.top<160){frame.top=Math.max(box.top+6,viewport.top+6);frame.bottom=Math.min(box.bottom-6,viewport.bottom-6)}
+  const preferred=innerWidth<=600?240:280,layout=choicePanelLayout(anchor,frame,preferred,innerWidth<=600?260:300);
+  panel.dataset.placement=layout.placement;panel.style.width=layout.width+'px';panel.style.maxHeight=layout.maxHeight+'px';panel.style.left=layout.left+'px';panel.style.top=layout.top+'px';
+  const actual=panel.getBoundingClientRect().height;if(layout.placement==='above')panel.style.top=Math.max(frame.top,anchor.top-6-actual)+'px';
  }
  function draw(){
-  list.replaceChildren();for(const [index,name] of items.slice(0,limit).entries()){const option=document.createElement('button');option.type='button';option.className='taxonomy-choice-option';option.id=panel.id+'-option-'+index;option.setAttribute('role','option');option.tabIndex=-1;option.setAttribute('aria-selected',String(input.value.trim()===name));option.textContent=(input.value.trim()===name?'✓ ':'')+name;option.onclick=()=>choose(index);list.append(option)}
-  more.hidden=items.length<=limit;more.textContent='显示更多（还有 '+Math.max(0,items.length-limit)+' 项）';highlight();positionPanel();
+  const previousScroll=list.scrollTop;list.replaceChildren();for(const [index,name] of items.slice(0,limit).entries()){const option=document.createElement('button');option.type='button';option.className='taxonomy-choice-option';option.id=panel.id+'-option-'+index;option.setAttribute('role','option');option.tabIndex=-1;option.setAttribute('aria-selected',String(input.value.trim()===name));option.textContent=(input.value.trim()===name?'✓ ':'')+name;option.onclick=()=>choose(index);list.append(option)}
+  more.hidden=items.length<=limit;more.textContent='显示更多（还有 '+Math.max(0,items.length-limit)+' 项）';positionPanel();list.scrollTop=previousScroll;highlight();
  }
  function show(all=false){
   if(input.disabled||!authState?.user){close();return}for(const control of taxonomyChoiceControls)if(control.input!==input)control.close();
-  const rank=getRank(),name=rankInfo(rank)?.label||'分类';toggle.setAttribute('aria-label','选择已用'+name);input.setAttribute('aria-label',name);
-  items=taxonomySuggestions(records,taxa,rank,all?'':input.value);active=-1;limit=40;note.textContent=items.length?'本账号已保存的同层名称 · '+items.length+' 项':input.value&&!all?'没有匹配项，可以直接输入新名称。':'本层级暂无已保存选项，可以直接输入新名称。';panel.hidden=false;panel.dataset.open='true';input.setAttribute('aria-expanded','true');toggle.setAttribute('aria-expanded','true');draw();
+  const rank=getRank(),name=rankInfo(rank)?.label||'分类';toggle.setAttribute('aria-label','选择已用'+name);input.setAttribute('aria-label',name);list.setAttribute('aria-label',name+'已用名称');
+  items=taxonomySuggestions(records,taxa,rank,all?'':input.value);active=-1;limit=40;list.scrollTop=0;note.textContent=items.length?name+'已用名称 · '+items.length+' 项':input.value&&!all?'没有匹配项，可以直接输入新名称。':'本层级暂无已保存选项，可以直接输入新名称。';panel.hidden=false;panel.dataset.open='true';input.setAttribute('aria-expanded','true');toggle.setAttribute('aria-expanded','true');draw();
  }
  toggle.setAttribute('aria-label','选择已用'+(rankInfo(getRank())?.label||'分类'));toggle.onclick=event=>{event.preventDefault();if(panel.hidden)show(true);else close()};
- more.onclick=()=>{limit+=40;draw()};input.addEventListener('focus',()=>show());input.addEventListener('input',()=>show());
+ dismiss.onclick=close;more.onclick=()=>{active=-1;limit+=40;draw()};input.addEventListener('focus',()=>show());input.addEventListener('input',()=>show());
  input.addEventListener('keydown',event=>{
   if(event.isComposing)return;
   if(event.key==='Escape'&&!panel.hidden){event.preventDefault();event.stopPropagation();close();return}
@@ -435,10 +442,13 @@ function attachTaxonomyChoices(input,getRank){
   if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();if(panel.hidden)show(true);if(!items.length)return;const visible=Math.min(limit,items.length);active=event.key==='ArrowDown'?(active+1)%visible:(active<=0?visible-1:active-1);highlight()}
   if(event.key==='Enter'&&!panel.hidden&&items.length){event.preventDefault();choose(active<0?0:active)}
  });
- input.form?.addEventListener('submit',close);input.closest('dialog')?.addEventListener('close',close);taxonomyChoiceControls.push({input,panel,toggle,close});
+ input.form?.addEventListener('submit',close);input.closest('dialog')?.addEventListener('close',close);taxonomyChoiceControls.push({input,panel,list,toggle,close,reposition:positionPanel});
 }
 for(const field of ['kingdom','division','className','order','family','tribe','genus','section','series','species','variety','form','infraspecific'])attachTaxonomyChoices($('#plantForm').elements[field],()=>field==='species'?(['hybrid','unresolved'].includes($('#plantForm').elements.identification.value)?$('#plantForm').elements.identification.value:'species'):field==='infraspecific'?$('#plantForm').elements.identification.value:field);
 attachTaxonomyChoices($('#taxonName'),()=>$('#taxonRank')?.value);
+let taxonomyChoiceFrame=0;
+function repositionTaxonomyChoices(event){if(event&&event.target instanceof Node&&taxonomyChoiceControls.some(control=>control.panel.contains(event.target)))return;if(taxonomyChoiceFrame)return;taxonomyChoiceFrame=requestAnimationFrame(()=>{taxonomyChoiceFrame=0;for(const control of taxonomyChoiceControls)if(!control.panel.hidden)control.reposition()})}
+document.addEventListener('scroll',repositionTaxonomyChoices,true);window.addEventListener('resize',repositionTaxonomyChoices);window.visualViewport?.addEventListener('resize',repositionTaxonomyChoices);window.visualViewport?.addEventListener('scroll',repositionTaxonomyChoices);
 document.addEventListener('pointerdown',event=>{for(const control of taxonomyChoiceControls)if(event.target!==control.input&&!control.panel.contains(event.target)&&!control.toggle.contains(event.target))control.close()});
 document.addEventListener('focusin',event=>{for(const control of taxonomyChoiceControls)if(event.target!==control.input&&!control.panel.contains(event.target)&&event.target!==control.toggle)control.close()});
 
