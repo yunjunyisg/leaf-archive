@@ -72,3 +72,20 @@ export function applyClassificationPath(plant,path){
  }
  return next;
 }
+
+// Suggest only explicitly saved names. Do not turn plant nicknames or missing-rank placeholders into taxonomy.
+export function taxonomySuggestions(plants=[],taxa=[],rank,query=''){
+ if(!rankInfo(rank))return [];
+ const names=new Map(),add=value=>{if(typeof value!=='string')return;const name=value.trim();if(!name)return;const key=name.normalize('NFKC').toLocaleLowerCase();if(!names.has(key))names.set(key,name)};
+ for(const p of plants){
+  if(p.demo||p.taxonomyDetached)continue;
+  const kind=p.identification||'species';
+  if(['species','hybrid','unresolved'].includes(rank)){if(rank===(['hybrid','unresolved'].includes(kind)?kind:'species'))add(p.species)}
+  else if(['aff','cf'].includes(rank)){if(kind===rank)add(p.infraspecific)}
+  else if(['variety','form'].includes(rank)){if(kind==='species')add(p[rank])}
+  else add(p[rank]);
+ }
+ for(const taxon of taxa)for(const part of taxon.path||[])if(part.rank===rank)add(part.name);
+ const fold=value=>String(value||'').normalize('NFKD').replace(/\p{M}/gu,'').toLocaleLowerCase().trim(),q=fold(query);
+ return [...names.values()].filter(name=>!q||fold(name).includes(q)).sort((a,b)=>Number(fold(b).startsWith(q))-Number(fold(a).startsWith(q))||a.localeCompare(b,'zh-CN'));
+}

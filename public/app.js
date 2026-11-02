@@ -1,5 +1,5 @@
 import {locationLabel,precisionLabels} from '/geography.js';
-import {ranks,rankInfo,childRanks,referenceRank,plantPath,pathKey,buildTree} from '/taxonomy.js';
+import {ranks,rankInfo,childRanks,referenceRank,plantPath,pathKey,buildTree,taxonomySuggestions} from '/taxonomy.js';
 (()=>{
  const splash=document.querySelector('#welcomeSplash');if(!splash?.showModal)return;
  if(document.body.dataset.page==='origins'||document.body.dataset.page==='classification')return;
@@ -178,7 +178,7 @@ if(view==='grid'){$('#content').innerHTML='<div class="cards">'+d.map(p=>'<artic
 function bindCards(){for(const el of $$('[data-id]')){el.onclick=()=>openDetail(el.dataset.id);el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDetail(el.dataset.id)}}}}
 function render(){renderStats();renderTree();renderOptions();for(const n of $$('.nav'))n.classList.toggle('active',!classificationPage&&!originsPage&&n.dataset.section===section);$('[data-page-link=classification]').classList.toggle('active',classificationPage);$('[data-page-link=origins]').classList.toggle('active',originsPage);const title=originsPage?'产地地图':classificationPage?'分类树':{all:'植物收藏',care:'养护记录',sources:'购入来源'}[section];$('#pageTitle').innerHTML=title+'<span class="title-dot">.</span>';$('#crumb').textContent=title;$('#pageSubtitle').textContent=originsPage?'从世界到城市与区县，查看植物的原生地。':classificationPage?'从界到种及种下分类，整理参考图与植物档案。':{all:'从第一片新叶开始，记录与你一起生长的植物。',care:'记下浇水、换盆与新叶，照顾每一个生长阶段。',sources:'把植物的来处，留在它的档案里。'}[section];renderContent()}
 function clearPrivateView(){
- records=[];taxa=[];selected=null;editing=null;photoDraft=[];logDraft=[];photoDateDraft={};originDraft=null;originsController?.reset();
+ closeTaxonomyChoices();records=[];taxa=[];selected=null;editing=null;photoDraft=[];logDraft=[];photoDateDraft={};originDraft=null;originsController?.reset();
  for(const id of ['editor','detail','confirm','taxonEditor','originPicker'])if($('#'+id)?.open)close(id);
  $('#demo').checked=true;render();
 }
@@ -199,7 +199,7 @@ function showAccount(state){
 async function load(){
  try{
   const state=await api('/api/auth');showAccount(state);$('#error').hidden=true;
-  if(state.user){const loaded=await Promise.all([api('/api/plants'),classificationPage?api('/api/taxa'):Promise.resolve(null)]);records=loaded[0];if(loaded[1])taxa=loaded[1];autoDemo=false;$('#demo').checked=false;syncStatus('云端已同步');}
+  if(state.user){const loaded=await Promise.all([api('/api/plants'),classificationPage?api('/api/taxa'):api('/api/taxa').catch(()=>null)]);records=loaded[0];if(loaded[1])taxa=loaded[1];autoDemo=false;$('#demo').checked=false;syncStatus('云端已同步');}
   else{clearPrivateView();autoDemo=false;syncStatus('登录后同步个人档案');}
  }catch(e){syncStatus('未连接云端');$('#error').hidden=false;$('#error').textContent=e.message;$('#demo').checked=true;}
  if(originsPage&&new URL(location.href).searchParams.get('demo')==='1')$('#demo').checked=true;loading=false;render();
@@ -329,6 +329,7 @@ function drawWrappedText(ctx,text,x,y,width,lineHeight,maxLines){let line='',lin
 $('#detail').addEventListener('cancel',e=>{if(growthBusy)e.preventDefault()});
 
 function updateIdentification(){
+ closeTaxonomyChoices();
  const kind=$('#plantForm').elements.identification.value;
  $('#plantForm').elements.species.required=['aff','cf','hybrid'].includes(kind);
  $('#speciesLabel').textContent=kind==='hybrid'?'杂交种名 / 亲本组合':'种（基础种名）';
@@ -346,6 +347,7 @@ function updateTaxonRanks(){
  updateReferenceBox();
 }
 function updateReferenceBox(){
+ closeTaxonomyChoices();
  const rank=$('#taxonRank').value;
  $('#taxonReferenceBox').hidden=!referenceRank(rank);
  $('#taxonPath').textContent=taxonEditing?taxonEditing.path.map(p=>rankInfo(p.rank).label+'：'+p.name).join(' / ')+'；关联 '+taxonEditing.plantCount+' 份植物档案，改名或移动时一并更新分类。':'';
@@ -397,6 +399,49 @@ if(classificationPage){
  $('#taxonEditor').addEventListener('cancel',e=>{if(taxonUploading)e.preventDefault()});
 }
 
+// Custom choice panels work in browsers and WebViews that do not expose native datalist menus.
+const taxonomyChoiceControls=[];
+function closeTaxonomyChoices(){for(const control of taxonomyChoiceControls)control.close()}
+function attachTaxonomyChoices(input,getRank){
+ if(!input)return;const label=input.closest('label');if(!label)return;
+ input.removeAttribute('list');label.classList.add('taxonomy-choice-field');
+ const toggle=document.createElement('button'),panel=document.createElement('div'),list=document.createElement('div'),note=document.createElement('p'),more=document.createElement('button');
+ toggle.type='button';toggle.className='taxonomy-choice-toggle';toggle.textContent='已用选项';panel.className='taxonomy-choice-panel';panel.id='taxonomy-choices-'+taxonomyChoiceControls.length;panel.hidden=true;list.setAttribute('role','listbox');list.id=panel.id+'-list';note.className='taxonomy-choice-note';more.type='button';more.className='taxonomy-choice-more';more.textContent='显示更多';panel.append(note,list,more);label.append(toggle,panel);
+ input.setAttribute('role','combobox');input.setAttribute('aria-autocomplete','list');input.setAttribute('aria-controls',list.id);input.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls',list.id);toggle.setAttribute('aria-expanded','false');
+ let items=[],active=-1,limit=40;
+ function close(){panel.hidden=true;panel.dataset.open='false';input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');toggle.setAttribute('aria-expanded','false');items=[];active=-1;list.replaceChildren();note.textContent='';more.hidden=true}
+ function choose(index){if(input.disabled){close();return}const value=items[index];if(value===undefined)return;input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));close()}
+ function highlight(){const nodes=[...list.children];nodes.forEach((node,index)=>node.dataset.active=String(index===active));if(nodes[active]){input.setAttribute('aria-activedescendant',nodes[active].id);nodes[active].scrollIntoView({block:'nearest'})}else input.removeAttribute('aria-activedescendant')}
+ function positionPanel(){
+  panel.classList.remove('taxonomy-choice-above');const container=input.closest('.form-body')||input.closest('dialog');if(!container||panel.hidden)return;
+  const frame=container.getBoundingClientRect(),field=label.getBoundingClientRect(),height=panel.getBoundingClientRect().height,below=frame.bottom-field.bottom,above=field.top-frame.top;
+  if(below<height&&above>below)panel.classList.add('taxonomy-choice-above');
+ }
+ function draw(){
+  list.replaceChildren();for(const [index,name] of items.slice(0,limit).entries()){const option=document.createElement('button');option.type='button';option.className='taxonomy-choice-option';option.id=panel.id+'-option-'+index;option.setAttribute('role','option');option.tabIndex=-1;option.setAttribute('aria-selected',String(input.value.trim()===name));option.textContent=(input.value.trim()===name?'✓ ':'')+name;option.onclick=()=>choose(index);list.append(option)}
+  more.hidden=items.length<=limit;more.textContent='显示更多（还有 '+Math.max(0,items.length-limit)+' 项）';highlight();positionPanel();
+ }
+ function show(all=false){
+  if(input.disabled||!authState?.user){close();return}for(const control of taxonomyChoiceControls)if(control.input!==input)control.close();
+  const rank=getRank(),name=rankInfo(rank)?.label||'分类';toggle.setAttribute('aria-label','选择已用'+name);input.setAttribute('aria-label',name);
+  items=taxonomySuggestions(records,taxa,rank,all?'':input.value);active=-1;limit=40;note.textContent=items.length?'本账号已保存的同层名称 · '+items.length+' 项':input.value&&!all?'没有匹配项，可以直接输入新名称。':'本层级暂无已保存选项，可以直接输入新名称。';panel.hidden=false;panel.dataset.open='true';input.setAttribute('aria-expanded','true');toggle.setAttribute('aria-expanded','true');draw();
+ }
+ toggle.setAttribute('aria-label','选择已用'+(rankInfo(getRank())?.label||'分类'));toggle.onclick=event=>{event.preventDefault();if(panel.hidden)show(true);else close()};
+ more.onclick=()=>{limit+=40;draw()};input.addEventListener('focus',()=>show());input.addEventListener('input',()=>show());
+ input.addEventListener('keydown',event=>{
+  if(event.isComposing)return;
+  if(event.key==='Escape'&&!panel.hidden){event.preventDefault();event.stopPropagation();close();return}
+  if(event.key==='Tab'){close();return}
+  if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();if(panel.hidden)show(true);if(!items.length)return;const visible=Math.min(limit,items.length);active=event.key==='ArrowDown'?(active+1)%visible:(active<=0?visible-1:active-1);highlight()}
+  if(event.key==='Enter'&&!panel.hidden&&items.length){event.preventDefault();choose(active<0?0:active)}
+ });
+ input.form?.addEventListener('submit',close);input.closest('dialog')?.addEventListener('close',close);taxonomyChoiceControls.push({input,panel,toggle,close});
+}
+for(const field of ['kingdom','division','className','order','family','tribe','genus','section','series','species','variety','form','infraspecific'])attachTaxonomyChoices($('#plantForm').elements[field],()=>field==='species'?(['hybrid','unresolved'].includes($('#plantForm').elements.identification.value)?$('#plantForm').elements.identification.value:'species'):field==='infraspecific'?$('#plantForm').elements.identification.value:field);
+attachTaxonomyChoices($('#taxonName'),()=>$('#taxonRank')?.value);
+document.addEventListener('pointerdown',event=>{for(const control of taxonomyChoiceControls)if(event.target!==control.input&&!control.panel.contains(event.target)&&!control.toggle.contains(event.target))control.close()});
+document.addEventListener('focusin',event=>{for(const control of taxonomyChoiceControls)if(event.target!==control.input&&!control.panel.contains(event.target)&&event.target!==control.toggle)control.close()});
+
 load();
 
 // Desktop installation uses the existing signed-in website and cloud records.
@@ -429,7 +474,7 @@ async function refreshCloud(){
   if(!state.user){showAccount(state);return;}
   const latest=await api('/api/plants');
   if(epoch!==syncEpoch)return;
-  const latestTaxa=typeof classificationPage!=='undefined'&&classificationPage?await api('/api/taxa'):null;
+  const latestTaxa=classificationPage?await api('/api/taxa'):await api('/api/taxa').catch(()=>null);
   if(epoch!==syncEpoch)return;
   const changed=JSON.stringify(latest)!==JSON.stringify(records)||(latestTaxa&&JSON.stringify(latestTaxa)!==JSON.stringify(taxa));
   if(latestTaxa)taxa=latestTaxa;

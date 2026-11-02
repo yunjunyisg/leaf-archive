@@ -41,12 +41,12 @@ test('conditional database update rejects a write that races after the initial r
 const refreshSource=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8').split('async function refreshCloud(){')[1].split('setInterval(refreshCloud,15000);')[0];
 function client(){
  const elements={'#error':{hidden:false},'#demo':{checked:false},'#detail':{open:false},'#editor':{open:false},'#confirm':{open:false},'#logText':{value:''},'#growthPhotoPreview':{children:[]}};
- const ctx={authState:{user:{id:'same-account'}},loading:false,syncRunning:false,syncWrites:0,syncEpoch:0,autoDemo:false,records:[],document:{hidden:false},navigator:{onLine:true},selected:null,growthBusy:false,$:id=>elements[id],render(){ctx.renders++},syncStatus(text){ctx.status=text},renders:0,async api(url){return url==='/api/auth'?{user:{id:'same-account'}}:[{id:'new',name:'手机新记录'}]}};
+ const ctx={classificationPage:false,taxa:[],authState:{user:{id:'same-account'}},loading:false,syncRunning:false,syncWrites:0,syncEpoch:0,autoDemo:false,records:[],document:{hidden:false},navigator:{onLine:true},selected:null,growthBusy:false,$:id=>elements[id],render(){ctx.renders++},syncStatus(text){ctx.status=text},renders:0,async api(url){return url==='/api/auth'?{user:{id:'same-account'}}:url==='/api/taxa'?[{path:[{rank:'genus',name:'Heliamphora'}]}]:[{id:'new',name:'手机新记录'}]}};
  vm.createContext(ctx);vm.runInContext('async function refreshCloud(){'+refreshSource,ctx);return {ctx,elements};
 }
 test('background refresh receives another device record while preserving open editor',async()=>{
  const {ctx,elements}=client();elements['#editor'].open=true;ctx.autoDemo=true;elements['#demo'].checked=true;
- await ctx.refreshCloud();assert.equal(ctx.records[0].name,'手机新记录');assert.equal(elements['#editor'].open,true);assert.equal(elements['#demo'].checked,false);assert.equal(ctx.renders,1);
+ await ctx.refreshCloud();assert.equal(ctx.records[0].name,'手机新记录');assert.equal(elements['#editor'].open,true);assert.equal(elements['#demo'].checked,false);assert.equal(ctx.renders,1);assert.equal(ctx.taxa[0].path[0].name,'Heliamphora');
 });
 test('a response started before a local save cannot replace newer local state',async()=>{
  const {ctx}=client();let finish;ctx.api=()=>new Promise(resolve=>finish=resolve);const pending=ctx.refreshCloud();ctx.syncEpoch++;ctx.records=[{id:'local',name:'刚保存'}];finish([{id:'stale'}]);await pending;assert.equal(ctx.records[0].id,'local');assert.equal(ctx.renders,0);
