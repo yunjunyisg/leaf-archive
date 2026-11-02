@@ -22,3 +22,15 @@ export function locatedPlants(plants){return plants.filter(p=>{try{return Boolea
 export function filterByArea(plants,area={}){return plants.filter(p=>{const l=p.originLocation;return l&&['countryCode','state','county','city','district'].every(k=>!area[k]||l[k]===area[k]);});}
 export function groupByLocation(plants){const groups=new Map();for(const p of locatedPlants(plants)){const l=p.originLocation,key=l.lat.toFixed(5)+','+l.lon.toFixed(5);if(!groups.has(key))groups.set(key,{key,location:l,plants:[]});groups.get(key).plants.push(p)}return [...groups.values()];}
 export function distanceKm(a,b){const rad=x=>x*Math.PI/180,dlat=rad(b.lat-a.lat),dlon=rad(b.lon-a.lon),v=Math.sin(dlat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dlon/2)**2;return 6371*2*Math.atan2(Math.sqrt(v),Math.sqrt(Math.max(0,1-v)));}
+
+// Country is metadata: changing it must never substitute a representative coordinate.
+export function withOriginCountry(location,countryCode,country=''){
+ if(!location)return null;
+ const code=String(countryCode||'').toUpperCase(),previous=String(location.countryCode||'').toUpperCase(),next={...location,countryCode:code,country};
+ if(previous&&previous!==code){
+  for(const key of ['state','county','city','district','locality'])next[key]='';
+  for(const key of ['featureType','sourceId','sourceUrl'])delete next[key];
+  next.source='manual';
+ }
+ next.label=locationPath(next).join(' / ');return next;
+}
