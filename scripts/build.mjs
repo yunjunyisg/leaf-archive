@@ -1,5 +1,8 @@
 import fs from 'node:fs/promises';import path from 'node:path';import {createHash} from 'node:crypto';import {build,transform} from 'esbuild';import {gunzipSync,gzipSync} from 'node:zlib';
 await fs.mkdir('dist/server',{recursive:true});await fs.mkdir('dist/worker',{recursive:true});await fs.mkdir('dist/.openai',{recursive:true});await fs.mkdir('dist/drizzle',{recursive:true});
+// These pages share one editor contract; fail the build if a page falls behind.
+const editorTemplates=await Promise.all(['index','classification','origins'].map(async page=>{const html=await fs.readFile('public/'+page+'.html','utf8');const editor=html.match(/<dialog id="editor"[\s\S]*?<\/dialog>/)?.[0];if(!editor)throw Error('页面缺少植物编辑表单：'+page);return editor}));
+if(editorTemplates.some(editor=>editor!==editorTemplates[0]))throw Error('植物编辑表单不一致，请同步收藏、分类树和产地地图的编辑表单。');
 await fs.copyFile('.openai/hosting.json','dist/.openai/hosting.json');await fs.cp('drizzle','dist/drizzle',{recursive:true});
 await fs.rm('dist/server/assets',{recursive:true,force:true});await fs.mkdir('dist/server/assets');
 const assets={};
