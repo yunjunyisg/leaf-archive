@@ -1,3 +1,4 @@
+import photoDateJs from '../shared/photo-date.js?raw';
 import choiceLayoutJs from '../shared/choice-layout.js?raw';
 import mapRelief from '../public/map-relief.webp';
 import {migrationDownloads} from './migration-downloads.js';
@@ -184,6 +185,7 @@ if(u.pathname==='/classification'||u.pathname==='/classification/')return new Re
 if(u.pathname==='/')return new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
 if(welcomeIcons[u.pathname])return publicAsset(request,welcomeIcons[u.pathname],'image/webp',true);
 if(u.pathname==='/style.css')return publicAsset(request,css,'text/css; charset=utf-8');
+if(u.pathname==='/photo-date.js')return publicAsset(request,photoDateJs,'text/javascript; charset=utf-8');
 if(u.pathname==='/choice-layout.js')return publicAsset(request,choiceLayoutJs,'text/javascript; charset=utf-8');
 if(u.pathname==='/taxonomy.js')return publicAsset(request,taxonomyJs,'text/javascript; charset=utf-8');
 if(u.pathname==='/app.js')return publicAsset(request,js,'text/javascript; charset=utf-8');
