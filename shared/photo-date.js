@@ -51,5 +51,5 @@ export function parsePhotoDate(bytes){
  return '';
 }
 export async function readPhotoDate(file){
- try{if(file.size>8*1024*1024)return '';return parsePhotoDate(await file.arrayBuffer())}catch{return ''}
+ try{if(file.size>20*1024*1024)return '';return parsePhotoDate(await file.arrayBuffer())}catch{return ''}
 }

@@ -54,8 +54,8 @@ export function httpServer(app){
  return createServer(async(req,res)=>{
   try{
    const url=new URL(req.url,app.origin);if(url.origin!==app.origin){res.writeHead(400);res.end();return}
-   const chunks=[];let size=0;
-   if(!['GET','HEAD'].includes(req.method))for await(const chunk of req){size+=chunk.length;if(size>10*1024*1024){res.writeHead(413);res.end('Request too large');return}chunks.push(chunk)}
+   const chunks=[];let size=0;const bodyLimit=url.pathname==='/api/images'?22*1024*1024:10*1024*1024;
+   if(!['GET','HEAD'].includes(req.method))for await(const chunk of req){size+=chunk.length;if(size>bodyLimit){res.writeHead(413);res.end('Request too large');return}chunks.push(chunk)}
    const headers=new Headers();for(const [key,value] of Object.entries(req.headers))if(value!==undefined)headers.set(key,Array.isArray(value)?value.join(', '):value);
    const request=new Request(url,{method:req.method,headers,...(chunks.length?{body:Buffer.concat(chunks)}:{})});
    // The application listens only on loopback; Nginx must overwrite X-Real-IP.

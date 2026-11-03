@@ -23,7 +23,7 @@ export async function importSnapshot({sql,bucket,directory,sourceProjectId='appg
  const uploads=[];
  for(const row of images){
   const key=row.owner+'/'+row.id,entry=manifest.get(key);
-  if(!entry||!/^[a-f0-9]{64}$/.test(entry.sha256)||!Number.isSafeInteger(entry.size)||entry.size<1||entry.size>8*1024*1024)throw Error('图片对象未完整导出');
+  if(!entry||!/^[a-f0-9]{64}$/.test(entry.sha256)||!Number.isSafeInteger(entry.size)||entry.size<1||entry.size>20*1024*1024)throw Error('图片对象未完整导出');
   const bytes=await fs.readFile(path.join(directory,'objects',digest(key)));
   if(bytes.length!==entry.size||digest(bytes)!==entry.sha256)throw Error('图片大小或 SHA256 校验失败');
   uploads.push({key,file:path.join(directory,'objects',digest(key)),sha256:entry.sha256});
