@@ -138,6 +138,27 @@ async function api(url,options={}){
 }
 function modal(id){$('#'+id).showModal()}
 function close(id){$('#'+id).close()}
+
+let uploadPhotoViewer=null;
+function uploadPhotoMarkup(url,alt){return '<img class="upload-preview-image" role="button" tabindex="0" src="'+escape(url)+'" alt="'+escape(alt)+'" aria-label="放大预览：'+escape(alt)+'" loading="lazy" decoding="async">'}
+function previewUploadedPhoto(thumbnail){
+ if(!uploadPhotoViewer){
+  uploadPhotoViewer=document.createElement('dialog');uploadPhotoViewer.id='uploadPhotoViewer';uploadPhotoViewer.className='upload-photo-viewer';uploadPhotoViewer.setAttribute('aria-labelledby','uploadPhotoViewerTitle');
+  uploadPhotoViewer.innerHTML='<div class="upload-photo-heading"><h2 id="uploadPhotoViewerTitle">照片预览</h2><button type="button" class="secondary" autofocus data-close-upload-preview>关闭预览</button></div><div class="upload-photo-stage"><img alt="放大的照片预览" decoding="async"></div><p class="upload-photo-caption"></p><p class="upload-photo-status" role="status"></p>';
+  document.body.append(uploadPhotoViewer);
+  uploadPhotoViewer.querySelector('[data-close-upload-preview]').onclick=()=>uploadPhotoViewer.close();
+  uploadPhotoViewer.addEventListener('click',event=>{if(event.target===uploadPhotoViewer)uploadPhotoViewer.close()});
+  uploadPhotoViewer.addEventListener('close',()=>{uploadPhotoViewer.querySelector('img').removeAttribute('src');uploadPhotoViewer.querySelector('.upload-photo-caption').textContent='';uploadPhotoViewer.querySelector('.upload-photo-status').textContent=''});
+ }
+ const image=uploadPhotoViewer.querySelector('img'),status=uploadPhotoViewer.querySelector('.upload-photo-status');
+ status.textContent='正在加载原图…';image.onload=()=>{status.textContent=''};image.onerror=()=>{status.textContent='图片暂时无法加载，请关闭后重试。'};
+ image.alt=thumbnail.alt;image.src=thumbnail.getAttribute('src');
+ uploadPhotoViewer.querySelector('.upload-photo-caption').textContent=thumbnail.parentElement.querySelector('.photo-capture-date')?.textContent||'';
+ if(!uploadPhotoViewer.open)uploadPhotoViewer.showModal();
+}
+document.addEventListener('click',event=>{const image=event.target instanceof Element?event.target.closest('.upload-preview-image'):null;if(image){event.preventDefault();previewUploadedPhoto(image)}});
+document.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&event.target instanceof Element&&event.target.matches('.upload-preview-image')){event.preventDefault();previewUploadedPhoto(event.target)}});
+
 function renderStats(){const d=data();$('#statTotal').innerHTML=d.length+'<small>株</small>';$('#statFamilies').innerHTML=new Set(d.map(x=>x.family).filter(Boolean)).size+'<small>科</small>';$('#statPrice').innerHTML='¥ '+money(d.reduce((s,p)=>s+Number(p.price||0),0))+'<small>CNY</small>';$('#statCare').innerHTML=d.filter(p=>isDue(p)||p.status==='需关注').length+'<small>株</small>';$('#navcount').textContent=records.length;$('#allCount').textContent=d.length;$('#demoLabel').hidden=!$('#demo').checked}
 function renderTree(){
  $('#filterLabel').textContent='';
@@ -181,7 +202,7 @@ function bindCards(){for(const el of $$('[data-id]')){el.onclick=()=>openDetail(
 function render(){renderStats();renderTree();renderOptions();for(const n of $$('.nav'))n.classList.toggle('active',!classificationPage&&!originsPage&&n.dataset.section===section);$('[data-page-link=classification]').classList.toggle('active',classificationPage);$('[data-page-link=origins]').classList.toggle('active',originsPage);const title=originsPage?'产地地图':classificationPage?'分类树':{all:'植物收藏',care:'养护记录',sources:'购入来源'}[section];$('#pageTitle').innerHTML=title+'<span class="title-dot">.</span>';$('#crumb').textContent=title;$('#pageSubtitle').textContent=originsPage?'从世界到城市与区县，查看植物的原生地。':classificationPage?'从界到种及种下分类，整理参考图与植物档案。':{all:'从第一片新叶开始，记录与你一起生长的植物。',care:'记下浇水、换盆与新叶，照顾每一个生长阶段。',sources:'把植物的来处，留在它的档案里。'}[section];renderContent()}
 function clearPrivateView(){
  closeTaxonomyChoices();records=[];taxa=[];selected=null;editing=null;photoDraft=[];logDraft=[];photoDateDraft={};photoCaptureDraft={};originDraft=null;originsController?.reset();
- for(const id of ['editor','detail','confirm','taxonEditor','originPicker'])if($('#'+id)?.open)close(id);
+ for(const id of ['uploadPhotoViewer','editor','detail','confirm','taxonEditor','originPicker'])if($('#'+id)?.open)close(id);
  $('#demo').checked=true;render();
 }
 function showAccount(state){
@@ -220,7 +241,7 @@ $('#logout').onclick=async()=>{
  try{await api('/api/auth/logout',{method:'POST'});syncEpoch++;clearPrivateView();syncChannel?.postMessage({type:'auth-changed'});await load();}catch(error){toast(error.message);}
 };
 function renderPhotos(){
- $('#photoPreview').innerHTML=photoDraft.map((url,i)=>'<div><img src="'+escape(url)+'" alt="已导入的植物照片" loading="lazy" decoding="async"><button type="button" data-remove-photo="'+i+'" aria-label="移除第'+(i+1)+'张照片">×</button><small class="photo-capture-date">'+escape(photoCaptureDraft[url]|| (photoDateDraft[url]?'已保存照片日期：'+photoDateDraft[url]:'未读取到拍摄日期，可手动填写'))+'</small><label>照片日期<input type="date" data-photo-date="'+i+'" value="'+escape(photoDateDraft[url]||'')+'" aria-label="第'+(i+1)+'张照片的拍摄日期"></label></div>').join('');
+ $('#photoPreview').innerHTML=photoDraft.map((url,i)=>'<div>'+uploadPhotoMarkup(url,'已导入的植物照片')+'<button type="button" data-remove-photo="'+i+'" aria-label="移除第'+(i+1)+'张照片">×</button><small class="photo-capture-date">'+escape(photoCaptureDraft[url]|| (photoDateDraft[url]?'已保存照片日期：'+photoDateDraft[url]:'未读取到拍摄日期，可手动填写'))+'</small><label>照片日期<input type="date" data-photo-date="'+i+'" value="'+escape(photoDateDraft[url]||'')+'" aria-label="第'+(i+1)+'张照片的拍摄日期"></label></div>').join('');
  for(const b of $$('[data-remove-photo]'))b.onclick=()=>{if(uploading)return;delete photoCaptureDraft[photoDraft[Number(b.dataset.removePhoto)]];delete photoDateDraft[photoDraft[Number(b.dataset.removePhoto)]];photoDraft.splice(Number(b.dataset.removePhoto),1);renderPhotos()};
  for(const input of $$('[data-photo-date]'))input.onchange=()=>{photoDateDraft[photoDraft[Number(input.dataset.photoDate)]]=input.value};
 }
@@ -230,7 +251,7 @@ $('#plantForm').onsubmit=async e=>{e.preventDefault();if(uploading)return;const 
 function openDetail(id){
  const p=[...records,...examples].find(x=>x.id===id);if(!p)return;selected=p;
  const pairs=[['收藏编号',p.number],['来源编号',p.sourceNumber],['购入价格',p.price===''?'未填写':'¥ '+money(p.price)],['科',p.family],['属',p.genus],...ranks.filter(r=>!['family','genus','aff','cf','unresolved','hybrid'].includes(r.key)).map(r=>[r.label,p[r.key]]),['种级类别 / 鉴定',rankInfo(p.identification||'species')?.label],['aff. / cf. 名称',p.infraspecific],['购入日期',p.date],['购入来源',p.source],['产地',p.origin],...(p.originLocation?[['地图位置',locationLabel(p.originLocation)],...(p.originLocation.locality?[['小地名',p.originLocation.locality]]:[]),...(p.originLocation.featureType?[['地物类别',p.originLocation.featureType]]:[]),['位置精度',precisionLabels[p.originLocation.precision||'point']]]:[]),['摆放位置',p.location],['生长状态',p.status],['光照需求',p.light],['浇水建议',p.water],['栽培介质',p.substrate],['上次浇水',p.lastWater],['下次养护',p.nextWater]];
- $('#detailContent').innerHTML='<div class="detail-top">'+(p.photos?.length?'<img class="detail-image" id="bigPhoto" src="'+escape(p.photos[0])+'" alt="'+escape(p.name)+'">':'')+'<button class="icon-button detail-close" id="closeDetail" aria-label="关闭">×</button></div><div class="detail-body"><div class="detail-heading"><div><div class="eyebrow">'+(p.demo?'EXAMPLE PROFILE':'PLANT PROFILE')+'</div><h2>'+escape(p.name)+'</h2><div class="latin">'+escape(p.latin)+'</div></div><button class="primary" id="editDetail">'+(p.demo?'用此示例新建':'编辑档案')+'</button></div>'+(p.photos?.length>1?'<div class="gallery">'+p.photos.map(url=>'<button data-photo="'+escape(url)+'" aria-label="查看植物照片"><img src="'+escape(url)+'" alt="'+escape(p.name)+'" loading="lazy" decoding="async"></button>').join('')+'</div>':'')+'<p class="detail-description">'+escape(p.description||'尚未填写简介。')+'</p><dl class="detail-fields">'+pairs.map(([k,v])=>'<div><dt>'+k+'</dt><dd>'+escape(v||'未填写')+'</dd></div>').join('')+'</dl>'+(p.originLocation?'<a class="origin-detail-link" href="/origins?plant='+encodeURIComponent(p.id)+(p.demo?'&demo=1':'')+'">在产地地图中查看</a>':'')+'<h3>个体信息</h3><p class="detail-description individual-info">'+escape(p.individualInfo||'尚未填写个体信息。')+'</p>'+(p.notes?'<h3>备注</h3><p class="detail-description">'+escape(p.notes)+'</p>':'')+statusMarkup(p)+growthMarkup(p)+(!p.demo?'<div class="detail-actions"><button class="secondary" id="waterToday">记录今天浇水</button><button class="danger-text" id="deletePlant">删除档案</button></div>':'<p class="detail-description">这是示例档案。点击“用此示例新建”可保存到自己的收藏中。</p>')+'</div>';
+ $('#detailContent').innerHTML='<div class="detail-top">'+(p.photos?.length?'<img class="detail-image upload-preview-image" role="button" tabindex="0" aria-label="放大预览植物照片" id="bigPhoto" src="'+escape(p.photos[0])+'" alt="'+escape(p.name)+'">':'')+'<button class="icon-button detail-close" id="closeDetail" aria-label="关闭">×</button></div><div class="detail-body"><div class="detail-heading"><div><div class="eyebrow">'+(p.demo?'EXAMPLE PROFILE':'PLANT PROFILE')+'</div><h2>'+escape(p.name)+'</h2><div class="latin">'+escape(p.latin)+'</div></div><button class="primary" id="editDetail">'+(p.demo?'用此示例新建':'编辑档案')+'</button></div>'+(p.photos?.length>1?'<div class="gallery">'+p.photos.map(url=>'<button data-photo="'+escape(url)+'" aria-label="查看植物照片"><img src="'+escape(url)+'" alt="'+escape(p.name)+'" loading="lazy" decoding="async"></button>').join('')+'</div>':'')+'<p class="detail-description">'+escape(p.description||'尚未填写简介。')+'</p><dl class="detail-fields">'+pairs.map(([k,v])=>'<div><dt>'+k+'</dt><dd>'+escape(v||'未填写')+'</dd></div>').join('')+'</dl>'+(p.originLocation?'<a class="origin-detail-link" href="/origins?plant='+encodeURIComponent(p.id)+(p.demo?'&demo=1':'')+'">在产地地图中查看</a>':'')+'<h3>个体信息</h3><p class="detail-description individual-info">'+escape(p.individualInfo||'尚未填写个体信息。')+'</p>'+(p.notes?'<h3>备注</h3><p class="detail-description">'+escape(p.notes)+'</p>':'')+statusMarkup(p)+growthMarkup(p)+(!p.demo?'<div class="detail-actions"><button class="secondary" id="waterToday">记录今天浇水</button><button class="danger-text" id="deletePlant">删除档案</button></div>':'<p class="detail-description">这是示例档案。点击“用此示例新建”可保存到自己的收藏中。</p>')+'</div>';
  if(!$('#detail').open)modal('detail');$('#closeDetail').onclick=()=>{if(growthBusy){toast('请等待生长记录保存完成');return}close('detail')};$('#editDetail').onclick=()=>openEditor(records.find(x=>x.id===p.id)||p);$$('[data-photo]').forEach(b=>b.onclick=()=>$('#bigPhoto').src=b.dataset.photo);
  bindGrowth(p);bindStatus(p);if(p.demo)return;
  $('#waterToday').onclick=async()=>{if(hasStatusDraft(p)){toast('请先保存正在填写的状态变更');return;}setGrowthBusy(true);try{await saveDetail({...p,lastWater:today(),nextWater:p.nextWater&&p.nextWater<=today()?'':p.nextWater,logs:[...(p.logs||[]),{id:crypto.randomUUID(),date:today(),type:'浇水',text:'完成浇水。',photos:[]}]});toast('已记录今天浇水，可设置下次养护日期')}catch(err){toast(err.message)}finally{setGrowthBusy(false)}};
@@ -287,7 +308,7 @@ function setGrowthBusy(value){growthBusy=value;for(const selector of ['#growthPh
 function bindGrowth(p){
  renderTimeline(p);$('#timelineSort').onchange=()=>renderTimeline(p);bindComparison(p);
  if(p.demo)return;let draft=[],captureDates={};
- function preview(){$('#growthPhotoPreview').innerHTML=draft.map((url,i)=>'<div><img src="'+escape(url)+'" alt="待保存的生长照片"><small class="photo-capture-date">'+escape(captureDates[url]?'拍摄日期：'+captureDates[url]:'未读取到拍摄日期')+'</small><button type="button" data-growth-remove="'+i+'" aria-label="移除第'+(i+1)+'张生长照片">×</button></div>').join('');$$('[data-growth-remove]').forEach(b=>b.onclick=()=>{if(growthBusy)return;draft.splice(Number(b.dataset.growthRemove),1);preview()})}
+ function preview(){$('#growthPhotoPreview').innerHTML=draft.map((url,i)=>'<div>'+uploadPhotoMarkup(url,'待保存的生长照片')+'<small class="photo-capture-date">'+escape(captureDates[url]?'拍摄日期：'+captureDates[url]:'未读取到拍摄日期')+'</small><button type="button" data-growth-remove="'+i+'" aria-label="移除第'+(i+1)+'张生长照片">×</button></div>').join('');$$('[data-growth-remove]').forEach(b=>b.onclick=()=>{if(growthBusy)return;draft.splice(Number(b.dataset.growthRemove),1);preview()})}
  $('#growthPhotoFiles').onchange=async e=>{
   const files=[...e.target.files];e.target.value='';if(draft.length+files.length>6){$('#growthUploadStatus').textContent='每条记录最多 6 张照片。';return}setGrowthBusy(true);let failed=false;
   try{for(let i=0;i<files.length;i++){const file=files[i];if(file.size>20*1024*1024)throw new Error('图片超过 20 MB：'+file.name);$('#growthUploadStatus').textContent='正在导入 '+(i+1)+' / '+files.length+' 张照片…';const captureDate=await readPhotoDate(file);const form=new FormData();form.append('file',file);const result=await api('/api/images',{method:'POST',body:form});draft.push(result.url);captureDates[result.url]=captureDate;preview()}}
@@ -340,7 +361,7 @@ function updateIdentification(){
 }
 $('#plantForm').elements.identification.onchange=updateIdentification;
 function renderReferences(){
- $('#referencePreview').innerHTML=taxonReferences.map((url,i)=>'<div><img src="'+escape(url)+'" alt="参考图 '+(i+1)+'">'+(Object.hasOwn(referenceCaptureDates,url)?'<small class="photo-capture-date">'+escape(referenceCaptureDates[url]?'拍摄日期：'+referenceCaptureDates[url]:'未读取到拍摄日期')+'</small>':'')+'<button type="button" data-remove-reference="'+i+'" aria-label="移除参考图 '+(i+1)+'">×</button></div>').join('');
+ $('#referencePreview').innerHTML=taxonReferences.map((url,i)=>'<div>'+uploadPhotoMarkup(url,'参考图 '+(i+1))+(Object.hasOwn(referenceCaptureDates,url)?'<small class="photo-capture-date">'+escape(referenceCaptureDates[url]?'拍摄日期：'+referenceCaptureDates[url]:'未读取到拍摄日期')+'</small>':'')+'<button type="button" data-remove-reference="'+i+'" aria-label="移除参考图 '+(i+1)+'">×</button></div>').join('');
  $$('[data-remove-reference]').forEach(b=>{b.disabled=taxonUploading;b.onclick=()=>{taxonReferences.splice(Number(b.dataset.removeReference),1);renderReferences()}});
 }
 function updateTaxonRanks(){
