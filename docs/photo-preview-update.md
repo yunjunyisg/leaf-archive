@@ -37,3 +37,5 @@ bash "$UPDATE_DIR/deploy/apply-standalone-update.sh"
 ## 验证
 
 111 项自动测试通过。本地原生 Node 程序通过 HTTPS 在 Chromium 中验证桌面和手机尺寸：三页新增档案的上传、点击放大、键盘打开、Esc 与按钮关闭、关闭保留编辑内容、修改日期、移除照片及保存后通过 API 再读取；另检查档案主图、生长照片和分类参考图预览、原图正常解码，以及关闭后清除大图来源。真实设备和线上安装尚需验收。
+
+管理员后台使用独立页面，后台图片预览请安装[管理员图片预览更新](admin-photo-preview-update.md)。

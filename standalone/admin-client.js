@@ -7,10 +7,29 @@ const bytes=value=>value<1024?value+' 字节':value<1024*1024?(value/1024).toFix
 function cell(row,text){const td=document.createElement('td');td.textContent=text;row.append(td);return td}
 function button(parent,text,handler){const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=handler;parent.append(b);return b}
 async function api(url,options={}){
- const response=await fetch(url,{cache:'no-store',...options});if(response.status===401){location.href='/auth/local';throw Error('登录已过期，请重新登录')}
+ const response=await fetch(url,{cache:'no-store',...options});if(response.status===401){closeImagePreview();location.href='/auth/local';throw Error('登录已过期，请重新登录')}
  const data=await response.json();if(!response.ok)throw Error(data.error||'后台暂时不可用');return data;
 }
 const showError=error=>{$('message').textContent=error.message||'数据读取失败，请稍后刷新。'};
+
+function clearImagePreview(){
+ $('imagePreviewPhoto').removeAttribute('src');$('imagePreviewCaption').textContent='';$('imagePreviewStatus').textContent='';$('imagePreviewDownload').removeAttribute('href');$('imagePreviewDownload').hidden=true;
+}
+function closeImagePreview(){if($('adminImagePreview').open)$('adminImagePreview').close();clearImagePreview()}
+function previewable(image,caption){image.classList.add('admin-preview-thumbnail');image.setAttribute('role','button');image.tabIndex=0;image.setAttribute('aria-label','放大预览：'+image.alt);image.dataset.previewCaption=caption}
+function showImagePreview(image){
+ const photo=$('imagePreviewPhoto'),status=$('imagePreviewStatus'),download=$('imagePreviewDownload');status.textContent='正在加载原图…';
+ photo.onload=()=>{status.textContent=''};photo.onerror=()=>{status.textContent='图片暂时无法加载，请关闭后重试。'};photo.alt=image.alt;photo.src=image.getAttribute('src');
+ $('imagePreviewCaption').textContent=image.dataset.previewCaption||'';
+ const href=image.closest('figure')?.querySelector('a[download]')?.getAttribute('href');download.hidden=!href;if(href)download.href=href;else download.removeAttribute('href');
+ if(!$('adminImagePreview').open)$('adminImagePreview').showModal();
+}
+$('closeImagePreview').onclick=closeImagePreview;
+$('adminImagePreview').addEventListener('click',event=>{if(event.target===$('adminImagePreview'))closeImagePreview()});
+$('adminImagePreview').addEventListener('close',()=>{if(!$('adminImagePreview').open)clearImagePreview()});
+document.addEventListener('click',event=>{const image=event.target instanceof Element?event.target.closest('.admin-preview-thumbnail'):null;if(image){event.preventDefault();showImagePreview(image)}});
+document.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&event.target instanceof Element&&event.target.matches('.admin-preview-thumbnail')){event.preventDefault();showImagePreview(event.target)}});
+
 function pager(kind,data){$(kind+'Page').textContent='第 '+data.page+' 页';$(kind+'Prev').disabled=data.page<=1;$(kind+'Next').disabled=data.page*data.pageSize>=data.total}
 async function stats(){
  const attempt=++epoch,data=await api('/api/admin/stats');if(attempt!==epoch)return;
@@ -42,13 +61,13 @@ async function detail(id){
  const attempt=++detailEpoch,p=await api('/api/admin/plants/'+encodeURIComponent(id));if(attempt!==detailEpoch)return;
  $('detailTitle').textContent=p.name||'植物档案';const pairs=[['收藏编号',p.number],['学名',p.latin],['科',p.family],['属',p.genus],['状态',p.status],['产地',p.origin],['位置',p.location],['简介',p.description],['个体信息',p.individualInfo],['备注',p.notes]];
  $('detailText').textContent=pairs.filter(([,v])=>v).map(([k,v])=>k+'：'+v).join('\n');$('detailPhotos').replaceChildren();const photos=[...new Set([...(p.photos||[]),...(p.logs||[]).flatMap(log=>log.photos||[])])];
- for(const url of photos){const personal=/^\/images\/[a-f0-9-]{36}$/.test(url),example=/^\/assets\/[A-Za-z0-9_]+\.jpg$/.test(url);if(!personal&&!example)continue;const image=document.createElement('img');image.src=personal?'/api/admin'+url:url;image.alt=p.name||'植物照片';image.loading='lazy';image.decoding='async';const figure=document.createElement('figure');figure.append(image);if(personal){const link=document.createElement('a');link.href='/api/admin'+url+'?download=1';link.download='';link.textContent='下载原图';figure.append(link)}$('detailPhotos').append(figure)}
+ for(const url of photos){const personal=/^\/images\/[a-f0-9-]{36}$/.test(url),example=/^\/assets\/[A-Za-z0-9_]+\.jpg$/.test(url);if(!personal&&!example)continue;const image=document.createElement('img');image.src=personal?'/api/admin'+url:url;image.alt=p.name||'植物照片';image.loading='lazy';image.decoding='async';previewable(image,p.name||'植物照片');const figure=document.createElement('figure');figure.append(image);if(personal){const link=document.createElement('a');link.href='/api/admin'+url+'?download=1';link.download='';link.textContent='下载原图';figure.append(link)}$('detailPhotos').append(figure)}
  if(!$('detail').open)$('detail').showModal();
 }
 async function images(){
  const attempt=++imagesEpoch,data=await api('/api/admin/images?page='+imagePage+(owner?'&owner='+encodeURIComponent(owner):''));if(attempt!==imagesEpoch)return;
  $('imagesTitle').textContent=owner?'用户 '+ownerName+' 的上传图片':'用户上传图片';$('imageCount').textContent='共 '+data.total+' 张图片';$('uploadedImages').replaceChildren();
- for(const item of data.images){const figure=document.createElement('figure'),img=document.createElement('img'),caption=document.createElement('figcaption'),link=document.createElement('a');img.src='/api/admin/images/'+item.id;img.alt='用户上传图片';img.loading='lazy';img.decoding='async';caption.textContent=item.username+' · '+item.id;link.href=img.src+'?download=1';link.download='';link.textContent='下载原图';figure.append(img,caption,link);$('uploadedImages').append(figure)}pager('images',data);
+ for(const item of data.images){const figure=document.createElement('figure'),img=document.createElement('img'),caption=document.createElement('figcaption'),link=document.createElement('a');img.src='/api/admin/images/'+item.id;img.alt='用户上传图片';img.loading='lazy';img.decoding='async';caption.textContent=item.username+' · '+item.id;previewable(img,caption.textContent);link.href=img.src+'?download=1';link.download='';link.textContent='下载原图';figure.append(img,caption,link);$('uploadedImages').append(figure)}pager('images',data);
 }
 function setView(view,reload=false){
  currentView=view;for(const node of document.querySelectorAll('[data-view]'))node.hidden=node.dataset.view!==view;
@@ -81,5 +100,5 @@ $('refresh').onclick=refresh;$('userSearch').onsubmit=event=>{event.preventDefau
 for(const [id,change,fn] of [['usersPrev',()=>userPage--,users],['usersNext',()=>userPage++,users],['plantsPrev',()=>plantPage--,plants],['plantsNext',()=>plantPage++,plants],['imagesPrev',()=>imagePage--,images],['imagesNext',()=>imagePage++,images]])$(id).onclick=()=>{change();fn().catch(showError)};
 $('clearOwner').onclick=()=>{owner='';ownerName='';plantPage=1;imagePage=1;Promise.all([plants(),images()]).catch(showError)};
 $('closeDetail').onclick=()=>{detailEpoch++;$('detail').close();$('detailPhotos').replaceChildren()};
-$('logout').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST'});location.href='/auth/local'}catch(e){showError(e)}};
+$('logout').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST'});closeImagePreview();location.href='/auth/local'}catch(e){showError(e)}};
 refresh();
