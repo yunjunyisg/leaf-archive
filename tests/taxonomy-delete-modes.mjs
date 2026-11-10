@@ -30,9 +30,8 @@ test('removing a root promotes children to roots and detaches plants attached di
 test('deleting a childless manual node does not accidentally remove its implicit ancestors or image files',async()=>{
  const f=await fixture();try{f.app.database.sql.prepare('DELETE FROM plants WHERE owner=?').run('delete-user');f.app.database.sql.prepare('DELETE FROM taxa WHERE owner=?').run('delete-user');f.seedTaxon('only-leaf',path,undefined,[f.picture]);const snap=await f.inspect(path),r=await f.remove(path,'node',snap.revision);assert.equal(r.status,200);const data=await r.json();assert.equal(data.taxa.length,1);assert.deepEqual(data.taxa[0].path,path.slice(0,-1));assert.deepEqual(data.taxa[0].references,[]);assert.equal(buildTree([],data.taxa).nodes.size,3);assert.ok(await f.app.BUCKET.get('delete-user/'+f.picture.split('/').pop()))}finally{await f.close()}
 });
-test('promotion collisions and missing qualifier parents fail atomically; the user may then choose branch deletion',async()=>{
- const f=await fixture();try{f.seedTaxon('collision',[path[0],path[2]]);let before=f.dump(),snap=await f.inspect(),r=await f.remove(path.slice(0,2),'node',snap.revision);assert.equal(r.status,409);assert.deepEqual(f.dump(),before);
- f.app.database.sql.prepare('DELETE FROM taxa WHERE id=?').run('collision');const qualified=validPath([...path,{rank:'aff',name:'Examplea aff. sample'}]);f.seedTaxon('qualifier',qualified);f.seedPlant('qualifier-plant',qualified);before=f.dump();snap=await f.inspect(path);r=await f.remove(path,'node',snap.revision);assert.equal(r.status,400);assert.match((await r.json()).error,/必要的上级/);assert.deepEqual(f.dump(),before);assert.equal((await f.remove(path,'branch',snap.revision)).status,200);
+test('missing qualifier parents fail atomically; the user may then choose branch deletion',async()=>{
+ const f=await fixture();try{let before,snap,r;const qualified=validPath([...path,{rank:'aff',name:'Examplea aff. sample'}]);f.seedTaxon('qualifier',qualified);f.seedPlant('qualifier-plant',qualified);before=f.dump();snap=await f.inspect(path);r=await f.remove(path,'node',snap.revision);assert.equal(r.status,400);assert.match((await r.json()).error,/必要的上级/);assert.deepEqual(f.dump(),before);assert.equal((await f.remove(path,'branch',snap.revision)).status,200);
  }finally{await f.close()}
 });
 test('a mid-update failure restores deleted nodes, descendant paths, revisions and references',async()=>{
@@ -43,4 +42,34 @@ test('deletion modes preserve version, origin and owner guards; unknown modes do
  f.app.database.sql.prepare("UPDATE plants SET data=json_set(data,'$.notes','other device') WHERE id='delete-user-direct'").run();const changed=f.dump();assert.equal((await f.remove(path.slice(0,2),'node',snap.revision)).status,409);assert.deepEqual(f.dump(),changed);
  const foreign=await f.inspect(path.slice(0,2),'delete-other');assert.equal((await f.remove(path.slice(0,2),'node',foreign.revision,{owner:'delete-user'},'delete-other')).status,200);assert.deepEqual(f.dump(),changed);
  }finally{await f.close()}
+});
+
+for(const system of ['apg4','itis'])test(system+': legacy duplicate names at different parents never block node-only deletion',async()=>{
+ const f=await fixture(system);try{
+  // Same family exists as a root and below a class: reproduces the screenshot.
+  const duplicate=validPath([{rank:'className',nameZh:'木兰纲',nameEn:'Magnoliopsida'},...path.slice(1)],system);
+  f.seedTaxon('legacy-duplicate',duplicate,undefined,[f.picture]);f.seedPlant('legacy-duplicate-plant',duplicate);
+  const before=JSON.parse(f.dump().plants.find(p=>p.id==='legacy-duplicate-plant').data),foreign=f.dump('delete-other');
+  const snap=await f.inspect(path.slice(0,1)),r=await f.remove(path.slice(0,1),'node',snap.revision);assert.equal(r.status,200,JSON.stringify(await r.clone().json()));
+  const data=await r.json();assert.deepEqual(plantPath(data.plants.find(p=>p.id==='delete-user-descendant'),system),path.slice(1));
+  assert.deepEqual(data.plants.find(p=>p.id==='legacy-duplicate-plant'),{id:'legacy-duplicate-plant',...before});
+  assert.ok(data.taxa.find(t=>t.id==='legacy-duplicate'));assert.deepEqual(f.dump('delete-other'),foreign);
+  assert.equal((await f.remove(path.slice(1,2),'branch',(await f.inspect(path.slice(1,2))).revision)).status,200);
+  assert.deepEqual(JSON.parse(f.dump().plants.find(p=>p.id==='legacy-duplicate-plant').data),before);
+ }finally{await f.close()}
+});
+test('promotion into identical full paths combines manual records and retains reference images and all plants',async()=>{
+ const f=await fixture();try{
+  const otherPicture='/images/'+crypto.randomUUID();f.app.database.sql.prepare('INSERT INTO images VALUES (?,?,?)').run(otherPicture.split('/').pop(),'delete-user','image/jpeg');await f.app.BUCKET.put('delete-user/'+otherPicture.split('/').pop(),new Uint8Array([255,216,255,217]));
+  const promoted=[path[0],path[2],path[3]];f.seedTaxon('destination',promoted,undefined,[otherPicture]);f.seedPlant('existing-plant',promoted);
+  const snap=await f.inspect(),r=await f.remove(path.slice(0,2),'node',snap.revision);assert.equal(r.status,200,JSON.stringify(await r.clone().json()));const data=await r.json();
+  const rows=data.taxa.filter(t=>pathKey(t.path)===pathKey(promoted));assert.equal(rows.length,1);assert.equal(rows[0].id,'destination');assert.deepEqual(new Set(rows[0].references),new Set([f.picture,otherPicture]));
+  assert.ok(!data.taxa.find(t=>t.id==='delete-user-leaf'));for(const id of ['delete-user-descendant','existing-plant']){const p=data.plants.find(p=>p.id===id);assert.deepEqual(plantPath(p),promoted);assert.equal(plantPath(p,'itis').length,1);assert.deepEqual(p.photos,[f.picture])}
+  for(const picture of [f.picture,otherPicture])assert.ok(await f.app.BUCKET.get('delete-user/'+picture.split('/').pop()));
+  // A later deletion of this shared node is also possible without duplicate rows.
+  assert.equal((await f.remove(promoted,'node',(await f.inspect(promoted)).revision)).status,200);
+ }finally{await f.close()}
+});
+test('legacy duplicate cleanup rolls back combined references, deleted rows and promoted plants on failure',async()=>{
+ const f=await fixture();try{f.seedTaxon('destination',[path[0],path[2],path[3]],undefined,[f.picture]);const before=f.dump(),snap=await f.inspect();f.app.database.sql.exec("CREATE TRIGGER reject_legacy_cleanup BEFORE UPDATE ON plants WHEN OLD.id='delete-user-descendant' BEGIN SELECT RAISE(ABORT,'simulated cleanup failure'); END;");assert.equal((await f.remove(path.slice(0,2),'node',snap.revision)).status,500);assert.deepEqual(f.dump(),before)}finally{await f.close()}
 });

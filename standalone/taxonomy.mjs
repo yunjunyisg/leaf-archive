@@ -1,5 +1,5 @@
 import {createHash,randomUUID} from 'node:crypto';
-import {validPath,pathKey,plantPath,buildTree,detachClassification,applyClassificationPath,taxonomySystem,storagePathKey,canonicalPath,sameTaxon,partLabel,referenceRank} from '../dist/server/index.js';
+import {validPath,pathKey,plantPath,buildTree,detachClassification,applyClassificationPath,taxonomySystem,storagePathKey,canonicalPath,referenceRank} from '../dist/server/index.js';
 import {sessionAccount,isAdmin} from './access.mjs';
 const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
 const json=(data,status=200)=>Response.json(data,{status,headers});
@@ -55,19 +55,28 @@ export async function taxonomyRoutes(request,{sql,session}){
     for(const row of found.taxa)sql.prepare('DELETE FROM taxa WHERE id=? AND owner=?').run(row.id,session.owner);
     for(const row of found.plants){const next={...detachClassification(row.value,system),_revision:randomUUID()};sql.prepare('UPDATE plants SET data=? WHERE id=? AND owner=?').run(JSON.stringify(next),row.id,session.owner)}
    }else{
-    const outside={nodes:new Map([...tree.nodes].filter(([,node])=>!prefix(node.path,oldPath)))},promoted=[];
     const removeNode=path=>{const next=[...path.slice(0,oldPath.length-1),...path.slice(oldPath.length)];if(!next.length)return [];try{return validPath(next,system)}catch{throw fail('只删除此节点后，下级分类将失去必要的上级（例如 aff. / cf. 需要基础种）；请先调整下级或选择同时删除所有子节点')}};
-    // Check every logical descendant, including implicit nodes with no own row.
-    for(const node of tree.nodes.values())if(prefix(node.path,oldPath)&&node.path.length>oldPath.length){
-     const path=removeNode(node.path);canonicalPath(path,outside);
-     const duplicate=[...outside.nodes.values(),...promoted].find(other=>sameTaxon(other,path.at(-1)));
-     if(duplicate)throw fail('保留子节点时，“'+partLabel(path.at(-1))+'”将与已有同层级分类重复；请先处理重复节点',409);
-     promoted.push({...path.at(-1),path});
-    }
+    // Deletion is scoped by full path. Legacy same-name nodes elsewhere must
+    // not veto cleanup; only structural validity matters when promoting children.
+    for(const node of tree.nodes.values())if(prefix(node.path,oldPath)&&node.path.length>oldPath.length)removeNode(node.path);
     const taxonPlans=found.taxa.filter(row=>pathKey(row.value.path)!==oldKey).map(row=>({row,path:removeNode(row.value.path)}));
     const plantPlans=found.plants.map(row=>({row,path:removeNode(plantPath(row.value,system))}));
     for(const row of found.taxa.filter(row=>pathKey(row.value.path)===oldKey))sql.prepare('DELETE FROM taxa WHERE id=? AND owner=?').run(row.id,session.owner);
-    for(const {row,path}of taxonPlans){const next={...row.value,path,system,_revision:randomUUID()};sql.prepare('UPDATE taxa SET path_key=?,data=? WHERE id=? AND owner=?').run(storagePathKey(path,system),JSON.stringify(next),row.id,session.owner)}
+    // If promotion lands on an identical full path, keep one manual record
+    // and all reference images. Same names under different parents stay separate.
+    const destinations=new Map(),touched=new Map();
+    for(const row of state.taxa)if(taxonomySystem(row.value.system)===system&&!prefix(row.value.path,oldPath)){
+     const key=pathKey(row.value.path),existing=destinations.get(key);if(existing){existing.duplicates.push(row);existing.references=[...new Set([...existing.references,...(row.value.references||[])])]}else destinations.set(key,{row,path:structuredClone(row.value.path),references:[...(row.value.references||[])],duplicates:[]});
+    }
+    for(const {row,path}of taxonPlans){
+     const key=pathKey(path),existing=destinations.get(key);
+     if(existing){
+      for(const [i,part]of path.entries())for(const language of ['nameZh','nameEn'])if(!existing.path[i][language]&&part[language])existing.path[i][language]=part[language];
+      existing.references=[...new Set([...existing.references,...(row.value.references||[])])];
+      sql.prepare('DELETE FROM taxa WHERE id=? AND owner=?').run(row.id,session.owner);touched.set(key,existing);
+     }else{const target={row,path,references:[...(row.value.references||[])],duplicates:[]};destinations.set(key,target);touched.set(key,target)}
+    }
+    for(const {row,path,references,duplicates}of touched.values()){for(const duplicate of duplicates)sql.prepare('DELETE FROM taxa WHERE id=? AND owner=?').run(duplicate.id,session.owner);const next={...row.value,path,system,references,_revision:randomUUID()};sql.prepare('UPDATE taxa SET path_key=?,data=? WHERE id=? AND owner=?').run(storagePathKey(path,system),JSON.stringify(next),row.id,session.owner)}
     for(const {row,path}of plantPlans){const next={...(path.length?applyClassificationPath(row.value,path,system):detachClassification(row.value,system)),_revision:randomUUID()};sql.prepare('UPDATE plants SET data=? WHERE id=? AND owner=?').run(JSON.stringify(next),row.id,session.owner)}
    }
   }else{
