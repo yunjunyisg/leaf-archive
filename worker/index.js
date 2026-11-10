@@ -154,7 +154,7 @@ function valid(p){
 }
 async function reconcilePlantTaxonomy(p,env,who,exceptId){
  if(!p.taxonomyPaths)return p;
- const plants=(await db(env).prepare('SELECT id,data FROM plants WHERE owner=?').bind(who).all()).results.filter(r=>r.id!==exceptId).map(r=>JSON.parse(r.data));
+ const plants=(await db(env).prepare('SELECT id,data FROM plants WHERE owner=?').bind(who).all()).results.map(r=>JSON.parse(r.data));
  const taxa=(await db(env).prepare('SELECT data FROM taxa WHERE owner=?').bind(who).all()).results.map(r=>JSON.parse(r.data));
  for(const {key} of taxonomySystems)p.taxonomyPaths[key]=canonicalPath(p.taxonomyPaths[key],buildTree(plants,taxa,key));
  return syncFlatClassification(p);

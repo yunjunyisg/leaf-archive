@@ -444,7 +444,7 @@ if(classificationPage){
  };
  $('#taxonForm').onsubmit=async e=>{
   e.preventDefault();if(taxonUploading)return;
-  let path;try{path=validPath([...selectedParentPath(),{rank:$('#taxonRank').value,nameZh:$('#taxonName').value.trim(),nameEn:$('#taxonNameEn').value.trim()}],selectedTaxonomySystem)}catch(error){$('#taxonError').textContent=error.message;return}
+  let path;try{path=validPath([...selectedParentPath(),{rank:$('#taxonRank').value,name:taxonEditing?.path.at(-1)?.name,nameZh:$('#taxonName').value.trim(),nameEn:$('#taxonNameEn').value.trim()}],selectedTaxonomySystem)}catch(error){$('#taxonError').textContent=error.message;return}
   const references=referenceRank(path.at(-1).rank)?taxonReferences:[];
   const existing=taxonEditing;
   if(existing&&JSON.stringify(path)!==JSON.stringify(existing.path)&&!confirm('将修改此分类及其下级，并更新 '+existing.plantCount+' 份植物档案的分类。是否继续？'))return;

@@ -1,3 +1,4 @@
+import {classificationWriteDatabase} from './taxonomy-labels.mjs';
 import {globalBoundaryRoutes} from './global-boundaries.mjs';
 import {taxonomyRoutes} from './taxonomy.mjs';
 import {profileRoutes} from './profile.mjs';
@@ -45,7 +46,8 @@ export function createApp({dataDirectory,origin,env={}}){
   }
   const administrative=await adminRoutes(request,{sql:database.sql,bucket:BUCKET,dataDirectory,session});if(administrative)return withFilingFooter(administrative);
   const boundaries=await globalBoundaryRoutes(request);if(boundaries)return boundaries;
-  const response=await worker.fetch(request,bindings);
+  const write=session&&['POST','PUT'].includes(request.method)&&/^\/api\/(plants|taxa)(\/|$)/.test(url.pathname);
+  const response=await worker.fetch(request,write?{...bindings,DB:classificationWriteDatabase(database,session.owner)}:bindings);
   if(url.pathname==='/api/auth'&&response.ok){const state=await response.json();if(state.user&&session){const local=database.sql.prepare('SELECT nickname FROM local_accounts WHERE owner=?').get(session.owner);if(local)state.user.nickname=local.nickname}return Response.json({...state,passwordLogin:true,legacyLogin:false,isAdmin:Boolean(session&&isAdmin(database.sql,session.owner))},{headers:{'Cache-Control':'no-store'}})}
   return withFilingFooter(await withAccountUi(response));
  },close:()=>database.close()};

@@ -26,7 +26,8 @@ export function validPath(path,system){
  for(const part of path){
   const bilingual=Object.hasOwn(part||{},'nameZh')||Object.hasOwn(part||{},'nameEn');
   const nameZh=String(part?.nameZh??'').trim(),nameEn=String(part?.nameEn??'').trim();
-  const name=bilingual?(nameEn||nameZh):(typeof part?.name==='string'?part.name.trim():'');
+  const previous=typeof part?.name==='string'?part.name.trim():'';
+  const name=bilingual?([nameZh,nameEn].some(value=>value&&nameKey(value)===nameKey(previous))?previous:nameEn||nameZh):previous;
   if(!name||Math.max(name.length,nameZh.length,nameEn.length)>200||!childRanks(out,system).some(r=>r.key===part.rank))throw Error('分类层级无效，且每层中文或英文至少填写一项（最多 200 字）');
   out.push({rank:part.rank,name,...(bilingual?{nameZh,nameEn}:{})});
  }return out;
@@ -62,11 +63,12 @@ export function canonicalPath(path,tree){
  const out=[];
  for(const part of path){
   const matches=[...tree.nodes.values()].filter(n=>sameTaxon(n,part));
+  if(matches.length>1)throw Object.assign(Error(rankInfo(part.rank).label+'的中英文名称对应已有的不同分类节点：'+matches.slice(0,2).map(n=>partLabel(n)+'（上级：'+(n.path.length>1?partLabel(n.path.at(-2)):'根级')+'）').join('；')+'。请在分类树核对后再保存'),{status:409});
   const match=matches.find(n=>pathKey(n.path.slice(0,-1))===pathKey(out));
-  if(matches.length&&!match)throw Object.assign(Error('相同层级与名称已存在于其他上级下，请复用或编辑已有分类：'+partLabel(matches[0])),{status:409});
+  if(matches.length&&!match)throw Object.assign(Error(rankInfo(part.rank).label+'“'+partLabel(matches[0])+'”已位于“'+(matches[0].path.length>1?partLabel(matches[0].path.at(-2)):'根级')+'”下，当前填写的上级为“'+(out.length?partLabel(out.at(-1)):'根级')+'”；请在分类树中移动已有节点，避免重复创建'),{status:409});
   if(match){
-   const known=bilingualNames(match);for(const key of ['nameZh','nameEn'])if(part[key]&&nameKey(part[key])!==nameKey(known[key]))throw Object.assign(Error('分类名称已存在，请在分类树中编辑中英文名称'),{status:409});
-   out.push({rank:match.rank,name:match.name,...(match.nameZh!==undefined||match.nameEn!==undefined?{nameZh:match.nameZh||'',nameEn:match.nameEn||''}:{})});
+   const known=bilingualNames(match);for(const key of ['nameZh','nameEn'])if(part[key]&&known[key]&&nameKey(part[key])!==nameKey(known[key]))throw Object.assign(Error(rankInfo(part.rank).label+'“'+partLabel(match)+'”已有'+(key==='nameZh'?'中文':'英文 / 拉丁')+'名称“'+known[key]+'”，与当前输入不同；请复用已有名称或在分类树中修改'),{status:409});
+   out.push({rank:match.rank,name:match.name,...(part.nameZh!==undefined||part.nameEn!==undefined||match.nameZh!==undefined||match.nameEn!==undefined?{nameZh:known.nameZh||part.nameZh||'',nameEn:known.nameEn||part.nameEn||''}:{})});
   }else out.push(part);
  }return out;
 }
@@ -75,12 +77,12 @@ export function buildTree(plants,taxa=[],system='apg4'){
  const roots=[],nodes=new Map();
  function add(path){let children=roots;let node;
   path.forEach((part,i)=>{const prefix=path.slice(0,i+1),key=pathKey(prefix);
-   node=nodes.get(key);if(!node){node={...part,key,path:prefix,children:[],plants:[],references:[],record:null};nodes.set(key,node);children.push(node)}children=node.children;
+   node=nodes.get(key);if(!node){node={...part,key,path:prefix,children:[],plants:[],references:[],record:null};nodes.set(key,node);children.push(node)}else{for(const language of ['nameZh','nameEn'])if(!node[language]&&part[language])node[language]=part[language]}children=node.children;
   });return node;
  }
  for(const t of taxa){if(taxonomySystem(t.system)!==system)continue;const n=add(t.path);n.references=t.references||[];n.record=t;}
  for(const p of plants){const path=plantPath(p,system);if(path.length)add(path).plants.push(p);}
- function sort(children){children.sort((a,b)=>rankInfo(a.rank).level-rankInfo(b.rank).level||a.name.localeCompare(b.name,'zh'));children.forEach(n=>sort(n.children));}
+ function sort(children,parent=[]){children.sort((a,b)=>rankInfo(a.rank).level-rankInfo(b.rank).level||a.name.localeCompare(b.name,'zh'));for(const n of children){const part={rank:n.rank,name:n.name,...(n.nameZh!==undefined||n.nameEn!==undefined?{nameZh:n.nameZh||'',nameEn:n.nameEn||''}:{})};n.path=[...parent,part];sort(n.children,n.path)}}
  sort(roots);return {roots,nodes};
 }
 

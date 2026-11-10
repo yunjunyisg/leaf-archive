@@ -1,7 +1,7 @@
-import {taxonomySystems,systemRanks,plantPath,bilingualNames,validPath,partLabel} from '/taxonomy.js';
+import {taxonomySystems,systemRanks,plantPath,bilingualNames,validPath,partLabel,buildTree,pathKey} from '/taxonomy.js';
 export function createTaxonomyEditor({form,getPlants,getTaxa,bindChoices,initialSystem='apg4'}){
  const root=document.createElement('div');root.id='dualTaxonomyEditor';root.className='dual-taxonomy-editor';
- root.innerHTML='<label>分类路径<select id="plantTaxonomySystem">'+taxonomySystems.map(s=>'<option value="'+s.key+'">'+s.label+'</option>').join('')+'</select></label><p class="taxonomy-help">两套路径分别保存。层级可跳过；填写的每层至少有中文或英文一项。已有名称可直接选择复用；补充译名、改名或移动已有分类，请在分类树编辑节点。</p><p id="legacyTaxonomyNotice" class="taxonomy-help" hidden>旧分类保留在 APG IV 路径下，未经自动校对；ITIS 路径独立填写。英文栏也可填写拉丁学名。</p><label class="taxonomy-all-ranks"><input type="checkbox" id="showAllTaxonomyRanks"> 显示所有可选层级</label>';
+ root.innerHTML='<label>分类路径<select id="plantTaxonomySystem">'+taxonomySystems.map(s=>'<option value="'+s.key+'">'+s.label+'</option>').join('')+'</select></label><p class="taxonomy-help">两套路径分别保存。层级可跳过；填写的每层至少有中文或英文一项。中英文是同一节点的两个名称，可直接复用并补充缺少的一项；修改已有名称或移动分类，请在分类树编辑节点。</p><p id="legacyTaxonomyNotice" class="taxonomy-help" hidden>旧分类保留在 APG IV 路径下，未经自动校对；ITIS 路径独立填写。英文栏也可填写拉丁学名。</p><label class="taxonomy-all-ranks"><input type="checkbox" id="showAllTaxonomyRanks"> 显示所有可选层级</label>';
  const oldHeading=[...form.querySelectorAll('h3')].find(n=>n.textContent==='植物分类');oldHeading.after(root);
  for(const label of form.querySelectorAll('.form-grid>label')){const input=label.querySelector('input,select');if(input&&['kingdom','division','className','order','tribe','section','series','species','identification','variety','form','infraspecific','family','genus'].includes(input.name))label.classList.add('legacy-taxonomy-field')}
  for(let node=root.nextElementSibling;node&&node.tagName!=='H3';node=node.nextElementSibling)node.classList.add('legacy-taxonomy-field');
@@ -22,7 +22,7 @@ export function createTaxonomyEditor({form,getPlants,getTaxa,bindChoices,initial
  selector.onchange=()=>{form.dispatchEvent(new CustomEvent('taxonomy-system-change'));update()};all.onchange=update;
  return {root,get system(){return selector.value},open(plant,system=initialSystem){
   selector.value=system;all.checked=false;for(const input of inputs.values())input.value='';
-  for(const s of taxonomySystems)for(const part of plant?plantPath(plant,s.key):[]){const names=bilingualNames(part);for(const language of ['nameZh','nameEn']){const input=inputs.get(s.key+':'+part.rank+':'+language);if(input)input.value=names[language]||''}}
+  for(const s of taxonomySystems){const path=plant?plantPath(plant,s.key):[],tree=buildTree(getPlants(),getTaxa(),s.key);for(const [index,part]of path.entries()){const names=bilingualNames(part),node=tree.nodes.get(pathKey(path.slice(0,index+1))),known=node?bilingualNames(node):{};for(const language of ['nameZh','nameEn'])if(!names[language]&&known[language])names[language]=known[language];for(const language of ['nameZh','nameEn']){const input=inputs.get(s.key+':'+part.rank+':'+language);if(input)input.value=names[language]||''}}}
   root.querySelector('#legacyTaxonomyNotice').hidden=!plant||Boolean(plant.taxonomyPaths);update();
  },getPaths(){return Object.fromEntries(taxonomySystems.map(system=>{const path=[];for(const rank of systemRanks(system.key)){const nameZh=inputs.get(system.key+':'+rank.key+':nameZh').value.trim(),nameEn=inputs.get(system.key+':'+rank.key+':nameEn').value.trim();if(nameZh||nameEn)path.push({rank:rank.key,nameZh,nameEn})}return [system.key,path.length?validPath(path,system.key):[]]}))}};
 }
