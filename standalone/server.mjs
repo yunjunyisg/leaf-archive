@@ -20,7 +20,7 @@ export function createApp({dataDirectory,origin,env={}}){
  const database=openDatabase(dataDirectory),BUCKET=diskBucket(path.join(dataDirectory,'objects'),{sql:database.sql}),login=createLocalAuth(database.sql);
  // Ignore caller-supplied identity and runtime TRUST_SITES_IDENTITY, including forwarded headers.
  const bindings={...env,DB:database.DB,BUCKET,TRUST_SITES_IDENTITY:'false'};
- return {database,BUCKET,origin:site.origin,async fetch(request,ip){
+ const app={database,BUCKET,origin:site.origin,async fetch(request,ip){
   const headers=new Headers(request.headers);headers.delete('oai-authenticated-user-id');headers.delete('oai-authenticated-user-email');
   const url=new URL(request.url);if(url.origin!==site.origin)return new Response('Invalid site origin',{status:400});
   request=new Request(request,{headers});
@@ -49,6 +49,14 @@ export function createApp({dataDirectory,origin,env={}}){
   if(url.pathname==='/api/auth'&&response.ok){const state=await response.json();if(state.user&&session){const local=database.sql.prepare('SELECT nickname FROM local_accounts WHERE owner=?').get(session.owner);if(local)state.user.nickname=local.nickname}return Response.json({...state,passwordLogin:true,legacyLogin:false,isAdmin:Boolean(session&&isAdmin(database.sql,session.owner))},{headers:{'Cache-Control':'no-store'}})}
   return withFilingFooter(await withAccountUi(response));
  },close:()=>database.close()};
+ const pending=new Map(),handle=app.fetch.bind(app);
+ app.fetch=async(request,ip)=>{
+  const url=new URL(request.url),session=sessionAccount(database.sql,request);
+  if(!session||!['POST','PUT','DELETE'].includes(request.method)||!/^\/api\/(plants|taxa|taxonomy\/branch)(\/|$)/.test(url.pathname))return handle(request,ip);
+  const previous=pending.get(session.owner)||Promise.resolve();let finish;const next=new Promise(resolve=>finish=resolve);pending.set(session.owner,next);
+  await previous;try{return await handle(request,ip)}finally{finish();if(pending.get(session.owner)===next)pending.delete(session.owner)}
+ };
+ return app;
 }
 export function httpServer(app){
  return createServer(async(req,res)=>{

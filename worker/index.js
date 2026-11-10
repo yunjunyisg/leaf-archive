@@ -1,3 +1,4 @@
+import taxonomyEditorJs from '../public/taxonomy-editor.js?raw';
 import photoDateJs from '../shared/photo-date.js?raw';
 import choiceLayoutJs from '../shared/choice-layout.js?raw';
 import mapRelief from '../public/map-relief.webp';
@@ -16,8 +17,8 @@ import originMapHtml from '../public/origins.html';
 import originMapJs from '../public/origin-map.js';
 import originMapCss from '../public/origin-map.css';
 import leafletCss from '../node_modules/leaflet/dist/leaflet.css';
-import {plantPath,buildTree,detachClassification,applyClassificationPath,validPath,referenceRank,pathKey} from '../shared/taxonomy.js';
-export {validPath,pathKey,plantPath,buildTree,detachClassification,applyClassificationPath};
+import {plantPath,buildTree,detachClassification,applyClassificationPath,validPath,referenceRank,pathKey,taxonomySystem,taxonomySystems,storagePathKey,validTaxonomyPaths,syncFlatClassification,canonicalPath,sameTaxon} from '../shared/taxonomy.js';
+export * from '../shared/taxonomy.js';
 import taxonomyJs from '../shared/taxonomy.js?raw';
 import {authRoutes, identity} from './auth.js';
 import html from '../public/index.html';
@@ -129,6 +130,7 @@ function valid(p){
  if(!p||typeof p!=='object')throw new Error('无效的档案');const out={};
  const fields=['name','latin','number','sourceNumber','source','family','genus','kingdom','division','className','order','tribe','section','series','species','identification','variety','form','infraspecific','description','origin','individualInfo','price','date','location','status','light','water','substrate','notes','lastWater','nextWater'];
  for(const f of fields){out[f]=String(p[f]??'').trim();if(out[f].length>10000)throw new Error('内容过长')}
+ if(Object.hasOwn(p,'taxonomyPaths')){out.taxonomyPaths=validTaxonomyPaths(p.taxonomyPaths);Object.assign(out,syncFlatClassification(out))}
  if(Object.hasOwn(p,'originLocation'))out.originLocation=validOriginLocation(p.originLocation);
  if(out.status&&!plantStatuses.includes(out.status))throw new Error('植物状态无效');
  if(!out.name||!out.number)throw new Error('请填写中文名和收藏编号');
@@ -149,6 +151,13 @@ function valid(p){
   const photos=Array.isArray(x.photos)?x.photos.filter(photoPath).slice(0,6):[];
   return {id:typeof x.id==='string'?x.id.slice(0,80):crypto.randomUUID(),date:x.date,type:String(x.type||'观察').slice(0,20),text:x.text.slice(0,3000),photos};
  });return out;
+}
+async function reconcilePlantTaxonomy(p,env,who,exceptId){
+ if(!p.taxonomyPaths)return p;
+ const plants=(await db(env).prepare('SELECT id,data FROM plants WHERE owner=?').bind(who).all()).results.filter(r=>r.id!==exceptId).map(r=>JSON.parse(r.data));
+ const taxa=(await db(env).prepare('SELECT data FROM taxa WHERE owner=?').bind(who).all()).results.map(r=>JSON.parse(r.data));
+ for(const {key} of taxonomySystems)p.taxonomyPaths[key]=canonicalPath(p.taxonomyPaths[key],buildTree(plants,taxa,key));
+ return syncFlatClassification(p);
 }
 // Generate status history atomically with the archive write, including editor saves.
 function recordStatusChange(p,current,change={}){
@@ -187,6 +196,7 @@ if(welcomeIcons[u.pathname])return publicAsset(request,welcomeIcons[u.pathname],
 if(u.pathname==='/style.css')return publicAsset(request,css,'text/css; charset=utf-8');
 if(u.pathname==='/photo-date.js')return publicAsset(request,photoDateJs,'text/javascript; charset=utf-8');
 if(u.pathname==='/choice-layout.js')return publicAsset(request,choiceLayoutJs,'text/javascript; charset=utf-8');
+if(u.pathname==='/taxonomy-editor.js')return publicAsset(request,taxonomyEditorJs,'text/javascript; charset=utf-8');
 if(u.pathname==='/taxonomy.js')return publicAsset(request,taxonomyJs,'text/javascript; charset=utf-8');
 if(u.pathname==='/app.js')return publicAsset(request,js,'text/javascript; charset=utf-8');
 if(assets[u.pathname])return publicAsset(request,assets[u.pathname],'image/jpeg',true);
@@ -198,28 +208,30 @@ if(u.pathname==='/api/taxa'&&request.method==='GET'){
  const r=await db(env).prepare('SELECT id, data FROM taxa WHERE owner = ? ORDER BY created').bind(who).all();return json(r.results.map(x=>({id:x.id,...JSON.parse(x.data)})));
 }
 if((u.pathname==='/api/taxa'&&request.method==='POST')||(u.pathname.startsWith('/api/taxa/')&&request.method==='PUT')){
- const input=await request.json();const path=validPath(input.path);
+ const input=await request.json();const system=taxonomySystem(input.system),path=validPath(input.path,input.system);
  if(!Array.isArray(input.references)||!input.references.every(photoPath))return json({error:'参考图无效'},400);
  if(input.references.length&&!referenceRank(path.at(-1).rank))return json({error:'仅种级及以下分类可导入参考图'},400);
  for(const url of input.references.filter(x=>x.startsWith('/images/'))){
   if(!await db(env).prepare('SELECT id FROM images WHERE id = ? AND owner = ?').bind(url.split('/').pop(),who).first())return json({error:'参考图不存在或不属于当前账号'},400);
  }
- const p={path,references:[...new Set(input.references)],_revision:crypto.randomUUID()};
+ const p={path,system,references:[...new Set(input.references)],_revision:crypto.randomUUID()};
  if(request.method==='POST'){
-  const id=crypto.randomUUID();await db(env).prepare('INSERT INTO taxa (id,owner,path_key,data,created) VALUES (?,?,?,?,?)').bind(id,who,pathKey(path),JSON.stringify(p),new Date().toISOString()).run();return json({id,...p},201);
+  const savedTaxa=(await db(env).prepare('SELECT data FROM taxa WHERE owner=?').bind(who).all()).results.map(r=>JSON.parse(r.data)),savedPlants=(await db(env).prepare('SELECT data FROM plants WHERE owner=?').bind(who).all()).results.map(r=>JSON.parse(r.data)),tree=buildTree(savedPlants,savedTaxa,system);
+  path.splice(0,path.length-1,...canonicalPath(path.slice(0,-1),tree));if([...tree.nodes.values()].some(n=>sameTaxon(n,path.at(-1))))return json({error:'相同层级和名称已存在，请编辑或复用已有分类'},409);
+  const id=crypto.randomUUID();await db(env).prepare('INSERT INTO taxa (id,owner,path_key,data,created) VALUES (?,?,?,?,?)').bind(id,who,storagePathKey(path,system),JSON.stringify(p),new Date().toISOString()).run();return json({id,...p},201);
  }
  const id=u.pathname.split('/').pop();const row=await db(env).prepare('SELECT id, data FROM taxa WHERE id = ? AND owner = ?').bind(id,who).first();
  if(!row)return json({error:'分类不存在'},404);
  const current=JSON.parse(row.data);
  if(!request.headers.get('If-Match'))return json({error:'请重新打开分类后保存'},428);
  if(request.headers.get('If-Match')!=='"'+current._revision+'"')return json({error:'分类已在其他设备修改，请关闭后重新打开'},409);
- if(pathKey(current.path)!==pathKey(path))return json({error:'参考图管理不能修改分类路径'},400);
+ if(taxonomySystem(current.system)!==system||pathKey(current.path)!==pathKey(path))return json({error:'参考图管理不能修改分类路径'},400);
  const r=await db(env).prepare('UPDATE taxa SET data = ? WHERE id = ? AND owner = ? AND data = ?').bind(JSON.stringify(p),id,who,row.data).run();
  if(!r.meta?.changes)return json({error:'分类刚刚在其他设备更新，请重新打开'},409);
  return json({id,...p});
 }
 if(u.pathname==='/api/plants'&&request.method==='GET'){const r=await db(env).prepare('SELECT id, data FROM plants WHERE owner = ? ORDER BY created DESC').bind(who).all();return json(r.results.map(x=>{const p=JSON.parse(x.data);return {id:x.id,...p,_revision:p._revision||'legacy'}}))}
-if(u.pathname==='/api/plants'&&request.method==='POST'){const p={...valid(await request.json()),_revision:crypto.randomUUID()};p.logs=p.logs.filter(l=>l.type!=='状态变更');const id=crypto.randomUUID();await db(env).prepare('INSERT INTO plants (id,owner,number,data,created) VALUES (?,?,?,?,?)').bind(id,who,p.number,JSON.stringify(p),new Date().toISOString()).run();return json({id,...p},201)}
+if(u.pathname==='/api/plants'&&request.method==='POST'){const p={...await reconcilePlantTaxonomy(valid(await request.json()),env,who),_revision:crypto.randomUUID()};p.logs=p.logs.filter(l=>l.type!=='状态变更');const id=crypto.randomUUID();await db(env).prepare('INSERT INTO plants (id,owner,number,data,created) VALUES (?,?,?,?,?)').bind(id,who,p.number,JSON.stringify(p),new Date().toISOString()).run();return json({id,...p},201)}
 if(u.pathname.startsWith('/api/plants/')&&['PUT','DELETE'].includes(request.method)){
  const id=u.pathname.split('/').pop();const row=await db(env).prepare('SELECT id, data FROM plants WHERE id = ? AND owner = ?').bind(id,who).first();
  if(!row)return json({error:'档案不存在，可能已在其他窗口删除。'},404);
@@ -232,7 +244,7 @@ if(u.pathname.startsWith('/api/plants/')&&['PUT','DELETE'].includes(request.meth
   if(!result.meta?.changes)return json({error:'档案刚刚在其他窗口更新，请重新打开后再操作。'},409);
   return json({ok:true});
  }
- const input=await request.json();const p={...valid(input),_revision:crypto.randomUUID()};
+ const input=await request.json();if(!Object.hasOwn(input,'taxonomyPaths')&&current.taxonomyPaths)input.taxonomyPaths=current.taxonomyPaths;const p={...await reconcilePlantTaxonomy(valid(input),env,who,id),_revision:crypto.randomUUID()};
  if(!Object.hasOwn(input,'originLocation')&&current.originLocation)p.originLocation=current.originLocation;
  recordStatusChange(p,current,input.statusChange);
  const result=await db(env).prepare('UPDATE plants SET number = ?, data = ? WHERE id = ? AND owner = ? AND data = ?').bind(p.number,JSON.stringify(p),id,who,row.data).run();
@@ -242,4 +254,4 @@ if(u.pathname.startsWith('/api/plants/')&&['PUT','DELETE'].includes(request.meth
 if(u.pathname==='/api/images'&&request.method==='POST'){const f=await request.formData();const file=f.get('file');if(!file||!['image/jpeg','image/png','image/webp'].includes(file.type))return json({error:'请选择 JPG、PNG 或 WebP 图片'},400);if(file.size>20*1024*1024)return json({error:'每张图片不得超过 20 MB'},400);if(!env.BUCKET)throw new Error('图片存储暂时不可用');const bytes=await file.arrayBuffer();const b=new Uint8Array(bytes);const magic=(file.type==='image/jpeg'&&b[0]===255&&b[1]===216)||(file.type==='image/png'&&b[0]===137&&b[1]===80&&b[2]===78&&b[3]===71)||(file.type==='image/webp'&&new TextDecoder().decode(b.slice(0,4))==='RIFF'&&new TextDecoder().decode(b.slice(8,12))==='WEBP');if(!magic)return json({error:'图片格式不匹配'},400);const id=crypto.randomUUID();await env.BUCKET.put(who+'/'+id,bytes,{httpMetadata:{contentType:file.type}});await db(env).prepare('INSERT INTO images (id,owner,mime) VALUES (?,?,?)').bind(id,who,file.type).run();return json({url:'/images/'+id})}
 if(u.pathname.startsWith('/images/')&&request.method==='GET'){const id=u.pathname.split('/').pop();const row=await db(env).prepare('SELECT mime FROM images WHERE id = ? AND owner = ?').bind(id,who).first();if(!row)return new Response('Not found',{status:404});const object=await env.BUCKET.get(who+'/'+id);if(!object)return new Response('Not found',{status:404});return new Response(object.body,{headers:{'Content-Type':row.mime,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}})}
 return json({error:'未找到此操作'},404);
-}catch(e){console.error(e);if(['产地来源链接无效','产地位置无效','产地经纬度无效','产地位置内容过长','产地国家代码无效','产地位置精度无效','植物状态无效','状态变更日期无效','状态变更备注最多 3000 字','aff. 和 cf. 请填写基础种名','分类路径无效','分类层级或名称无效','鉴定类别无效','杂交种请填写名称或亲本组合','杂交种暂不支持种下分类','未定种不能添加种下分类','aff. 和 cf. 不能同时填写变种或变型','分类名称最多 200 字','照片日期无效','生长记录日期无效','每株植物最多保存 300 条生长记录'].includes(e.message))return json({error:e.message},400);const duplicate=String(e).includes('UNIQUE');return json({error:duplicate?(u.pathname.startsWith('/api/taxa')?'该分类已存在，请在分类树中管理参考图。':'收藏编号已存在，请使用其他编号。'):e.message==='档案存储暂时不可用'||e.message==='图片存储暂时不可用'?e.message:'操作未完成，请检查填写内容后重试。'},duplicate?409:500)}}};
+}catch(e){console.error(e);if(e.status===409)return json({error:e.message},409);if(['分类体系无效','分类路径数据无效','分类层级无效，且每层中文或英文至少填写一项（最多 200 字）','产地来源链接无效','产地位置无效','产地经纬度无效','产地位置内容过长','产地国家代码无效','产地位置精度无效','植物状态无效','状态变更日期无效','状态变更备注最多 3000 字','aff. 和 cf. 请填写基础种名','分类路径无效','分类层级或名称无效','鉴定类别无效','杂交种请填写名称或亲本组合','杂交种暂不支持种下分类','未定种不能添加种下分类','aff. 和 cf. 不能同时填写变种或变型','分类名称最多 200 字','照片日期无效','生长记录日期无效','每株植物最多保存 300 条生长记录'].includes(e.message))return json({error:e.message},400);const duplicate=String(e).includes('UNIQUE');return json({error:duplicate?(u.pathname.startsWith('/api/taxa')?'该分类已存在，请在分类树中管理参考图。':'收藏编号已存在，请使用其他编号。'):e.message==='档案存储暂时不可用'||e.message==='图片存储暂时不可用'?e.message:'操作未完成，请检查填写内容后重试。'},duplicate?409:500)}}};

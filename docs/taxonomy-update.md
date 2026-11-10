@@ -34,3 +34,5 @@ node scripts/package-runtime-update.mjs /absolute/path/leaf-archive-taxonomy-upd
 ```
 
 包内包括 `dist/server/index.js`、`standalone/`、更新脚本及文件校验清单；不包含数据库、个人照片或签名私钥。未改动既有数据库迁移文件。
+
+APG IV / ITIS 双路径、中英文名称、收藏选图与圆角分支画布见[双体系分类树更新](taxonomy-systems-update.md)。
