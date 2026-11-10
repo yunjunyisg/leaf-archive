@@ -54,7 +54,7 @@ export function createApp({dataDirectory,origin,env={}}){
  const pending=new Map(),handle=app.fetch.bind(app);
  app.fetch=async(request,ip)=>{
   const url=new URL(request.url),session=sessionAccount(database.sql,request);
-  if(!session||!['POST','PUT','DELETE'].includes(request.method)||!/^\/api\/(plants|taxa|taxonomy\/branch)(\/|$)/.test(url.pathname))return handle(request,ip);
+  if(!session||!['POST','PUT','DELETE'].includes(request.method)||!/^\/api\/(plants|taxa|taxonomy\/(branch|assign))(\/|$)/.test(url.pathname))return handle(request,ip);
   const previous=pending.get(session.owner)||Promise.resolve();let finish;const next=new Promise(resolve=>finish=resolve);pending.set(session.owner,next);
   await previous;try{return await handle(request,ip)}finally{finish();if(pending.get(session.owner)===next)pending.delete(session.owner)}
  };

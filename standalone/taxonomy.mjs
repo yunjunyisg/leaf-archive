@@ -12,30 +12,66 @@ function snapshot(sql,owner){
 function branch(state,path,system){return {plants:state.plants.filter(r=>prefix(plantPath(r.value,system),path)),taxa:state.taxa.filter(r=>taxonomySystem(r.value.system)===system&&prefix(r.value.path,path))}}
 const fail=(message,status=400)=>Object.assign(Error(message),{status});
 export async function taxonomyRoutes(request,{sql,session}){
- const url=new URL(request.url);let system;try{system=taxonomySystem(url.searchParams.get('system')??undefined)}catch{return json({error:'分类体系无效'},400)}if(url.pathname!=='/api/taxonomy/branch')return null;
+ const url=new URL(request.url);let system;try{system=taxonomySystem(url.searchParams.get('system')??undefined)}catch{return json({error:'分类体系无效'},400)}if(!['/api/taxonomy/branch','/api/taxonomy/assign'].includes(url.pathname))return null;
  if(!session)return json({error:'请先登录'},401);if(isAdmin(sql,session.owner))return json({error:'管理员不提供个人分类编辑'},403);
+ if(url.pathname==='/api/taxonomy/assign'){
+  if(request.method!=='POST')return json({error:'此操作需要提交归类选择'},405);
+  if(request.headers.get('Origin')!==url.origin)return json({error:'请求来源无效'},403);
+  const text=await request.text();if(text.length>1024*1024)return json({error:'分类内容过长'},413);
+  let input,path;try{input=JSON.parse(text);system=taxonomySystem(input.system);path=validPath(input.path,input.system);if(typeof input.plantId!=='string'||!input.plantId||input.plantId.length>200)throw Error()}catch{return json({error:'请选择植物和有效的目标分支'},400)}
+  if(!request.headers.get('If-Match')||typeof input.plantRevision!=='string'||!input.plantRevision)return json({error:'请刷新植物与分类后重新选择'},428);
+  sql.exec('BEGIN IMMEDIATE');try{
+   if(sessionAccount(sql,request)?.owner!==session.owner)throw fail('登录已失效',401);
+   const state=snapshot(sql,session.owner),row=state.plants.find(r=>r.id===input.plantId);
+   if(!row)throw fail('植物不存在或不属于当前账号',404);
+   if(request.headers.get('If-Match')!=='"'+state.revision+'"'||input.plantRevision!==(row.value._revision||'legacy'))throw fail('植物或分类已在其他设备更新，请刷新后重新选择',409);
+   const tree=buildTree(state.plants.map(r=>r.value),state.taxa.map(r=>r.value),system),target=tree.nodes.get(pathKey(path));if(!target)throw fail('目标分支已变更，请刷新后重新选择',409);
+   const next={...applyClassificationPath(row.value,target.path,system),_revision:randomUUID()};sql.prepare('UPDATE plants SET data=? WHERE id=? AND owner=?').run(JSON.stringify(next),row.id,session.owner);
+   const latest=snapshot(sql,session.owner),response=json({plants:latest.plants.map(r=>({id:r.id,...r.value})),taxa:latest.taxa.map(r=>({id:r.id,...r.value})),assignedPlantId:row.id});sql.exec('COMMIT');return response;
+  }catch(error){sql.exec('ROLLBACK');return json({error:error.status?error.message:'重新归类失败，未更改任何数据'},error.status||500)}
+ }
  if(request.method==='GET'){
   let path;try{path=validPath(JSON.parse(url.searchParams.get('path')||'null'),url.searchParams.has('system')?system:undefined)}catch{return json({error:'分类路径无效'},400)}
   const state=snapshot(sql,session.owner),found=branch(state,path,system),tree=buildTree(state.plants.map(r=>r.value),state.taxa.map(r=>r.value),system);
   if(!tree.nodes.has(pathKey(path)))return json({error:'分类不存在，请刷新分类树'},404);
   const selected=found.taxa.find(r=>pathKey(r.value.path)===pathKey(path));
-  return json({revision:state.revision,plantCount:found.plants.length,taxonCount:found.taxa.length,nodeCount:[...tree.nodes.values()].filter(n=>prefix(n.path,path)).length,references:selected?.value.references||[]});
+  return json({revision:state.revision,directPlantCount:found.plants.filter(r=>plantPath(r.value,system).length===path.length).length,plantCount:found.plants.length,taxonCount:found.taxa.length,nodeCount:[...tree.nodes.values()].filter(n=>prefix(n.path,path)).length,references:selected?.value.references||[],path:tree.nodes.get(pathKey(path)).path,system});
  }
  if(!['PUT','DELETE'].includes(request.method))return json({error:'不支持此操作'},405);
  if(request.headers.get('Origin')!==url.origin)return json({error:'请求来源无效'},403);
  const text=await request.text();if(text.length>1024*1024)return json({error:'分类内容过长'},413);
  let input,oldPath,newPath;try{input=JSON.parse(text);system=taxonomySystem(input.system);oldPath=validPath(input.path,input.system);if(request.method==='PUT')newPath=validPath(input.newPath,input.system)}catch{return json({error:'分类路径无效'},400)}
  if(!request.headers.get('If-Match'))return json({error:'请重新打开分类后操作'},428);
- if(request.method==='DELETE'&&input.confirmation!=='删除分类')return json({error:'请明确确认删除分类及其下级'},400);
+ const deleteMode=Object.hasOwn(input,'deleteMode')?input.deleteMode:'branch';
+ if(request.method==='DELETE'&&!['node','branch'].includes(deleteMode))return json({error:'请选择只删除当前节点或同时删除所有子节点'},400);
+ if(request.method==='DELETE'&&input.confirmation!=='删除分类')return json({error:'请明确确认所选删除方式'},400);
  sql.exec('BEGIN IMMEDIATE');try{
   if(sessionAccount(sql,request)?.owner!==session.owner)throw fail('登录已失效',401);
   const state=snapshot(sql,session.owner),tree=buildTree(state.plants.map(r=>r.value),state.taxa.map(r=>r.value),system),oldKey=pathKey(oldPath),found=branch(state,oldPath,system);
   if(request.headers.get('If-Match')!=='"'+state.revision+'"')throw fail('分类或档案已在其他设备更新，请刷新后重新编辑',409);
   if(!tree.nodes.has(oldKey))throw fail('分类不存在，请刷新分类树',404);
   if(request.method==='DELETE'){
-   for(const row of found.taxa)sql.prepare('DELETE FROM taxa WHERE id=? AND owner=?').run(row.id,session.owner);
-   for(const row of found.plants){const next={...detachClassification(row.value,system),_revision:randomUUID()};sql.prepare('UPDATE plants SET data=? WHERE id=? AND owner=?').run(JSON.stringify(next),row.id,session.owner)}
+   if(deleteMode==='branch'){
+    for(const row of found.taxa)sql.prepare('DELETE FROM taxa WHERE id=? AND owner=?').run(row.id,session.owner);
+    for(const row of found.plants){const next={...detachClassification(row.value,system),_revision:randomUUID()};sql.prepare('UPDATE plants SET data=? WHERE id=? AND owner=?').run(JSON.stringify(next),row.id,session.owner)}
+   }else{
+    const outside={nodes:new Map([...tree.nodes].filter(([,node])=>!prefix(node.path,oldPath)))},promoted=[];
+    const removeNode=path=>{const next=[...path.slice(0,oldPath.length-1),...path.slice(oldPath.length)];if(!next.length)return [];try{return validPath(next,system)}catch{throw fail('只删除此节点后，下级分类将失去必要的上级（例如 aff. / cf. 需要基础种）；请先调整下级或选择同时删除所有子节点')}};
+    // Check every logical descendant, including implicit nodes with no own row.
+    for(const node of tree.nodes.values())if(prefix(node.path,oldPath)&&node.path.length>oldPath.length){
+     const path=removeNode(node.path);canonicalPath(path,outside);
+     const duplicate=[...outside.nodes.values(),...promoted].find(other=>sameTaxon(other,path.at(-1)));
+     if(duplicate)throw fail('保留子节点时，“'+partLabel(path.at(-1))+'”将与已有同层级分类重复；请先处理重复节点',409);
+     promoted.push({...path.at(-1),path});
+    }
+    const taxonPlans=found.taxa.filter(row=>pathKey(row.value.path)!==oldKey).map(row=>({row,path:removeNode(row.value.path)}));
+    const plantPlans=found.plants.map(row=>({row,path:removeNode(plantPath(row.value,system))}));
+    for(const row of found.taxa.filter(row=>pathKey(row.value.path)===oldKey))sql.prepare('DELETE FROM taxa WHERE id=? AND owner=?').run(row.id,session.owner);
+    for(const {row,path}of taxonPlans){const next={...row.value,path,system,_revision:randomUUID()};sql.prepare('UPDATE taxa SET path_key=?,data=? WHERE id=? AND owner=?').run(storagePathKey(path,system),JSON.stringify(next),row.id,session.owner)}
+    for(const {row,path}of plantPlans){const next={...(path.length?applyClassificationPath(row.value,path,system):detachClassification(row.value,system)),_revision:randomUUID()};sql.prepare('UPDATE plants SET data=? WHERE id=? AND owner=?').run(JSON.stringify(next),row.id,session.owner)}
+   }
   }else{
+   const parent=newPath.slice(0,-1);if(input.requireExistingParent===true&&parent.length&&!tree.nodes.has(pathKey(parent)))throw fail('目标分支已变更，请刷新后重新拖动',409);
    const outside={nodes:new Map([...tree.nodes].filter(([,n])=>!prefix(n.path,oldPath)))};
    newPath=canonicalPath(newPath,outside);
    const newKey=pathKey(newPath),changed=JSON.stringify(newPath)!==JSON.stringify(oldPath);
@@ -60,7 +96,9 @@ export async function taxonomyRoutes(request,{sql,session}){
    }
    for(const {row,next} of plantPlans)sql.prepare('UPDATE plants SET data=? WHERE id=? AND owner=?').run(JSON.stringify(next),row.id,session.owner);
   }
-  const latest=snapshot(sql,session.owner);
+  let latest=snapshot(sql,session.owner);
+  // Deleting or moving the last child must not remove its implicit ancestors.
+  const parent=oldPath.slice(0,-1);if(parent.length){const remaining=buildTree(latest.plants.map(r=>r.value),latest.taxa.map(r=>r.value),system);if(!remaining.nodes.has(pathKey(parent))){const path=tree.nodes.get(pathKey(parent)).path,id=randomUUID(),value={path,system,references:[],_revision:randomUUID()};sql.prepare('INSERT INTO taxa VALUES (?,?,?,?,?)').run(id,session.owner,storagePathKey(path,system),JSON.stringify(value),new Date().toISOString());latest=snapshot(sql,session.owner)}}
   const response=json({plants:latest.plants.map(r=>({id:r.id,...r.value})),taxa:latest.taxa.map(r=>({id:r.id,...r.value})),plantCount:found.plants.length,taxonCount:found.taxa.length});sql.exec('COMMIT');return response;
  }catch(error){sql.exec('ROLLBACK');return json({error:error.status?error.message:'分类修改失败，未更改任何数据'},error.status||500)}
 }

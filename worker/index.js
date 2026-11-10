@@ -1,3 +1,4 @@
+import taxonomyGesturesJs from '../public/taxonomy-gestures.js?raw';
 import taxonomyEditorJs from '../public/taxonomy-editor.js?raw';
 import photoDateJs from '../shared/photo-date.js?raw';
 import choiceLayoutJs from '../shared/choice-layout.js?raw';
@@ -196,6 +197,7 @@ if(welcomeIcons[u.pathname])return publicAsset(request,welcomeIcons[u.pathname],
 if(u.pathname==='/style.css')return publicAsset(request,css,'text/css; charset=utf-8');
 if(u.pathname==='/photo-date.js')return publicAsset(request,photoDateJs,'text/javascript; charset=utf-8');
 if(u.pathname==='/choice-layout.js')return publicAsset(request,choiceLayoutJs,'text/javascript; charset=utf-8');
+if(u.pathname==='/taxonomy-gestures.js')return publicAsset(request,taxonomyGesturesJs,'text/javascript; charset=utf-8');
 if(u.pathname==='/taxonomy-editor.js')return publicAsset(request,taxonomyEditorJs,'text/javascript; charset=utf-8');
 if(u.pathname==='/taxonomy.js')return publicAsset(request,taxonomyJs,'text/javascript; charset=utf-8');
 if(u.pathname==='/app.js')return publicAsset(request,js,'text/javascript; charset=utf-8');

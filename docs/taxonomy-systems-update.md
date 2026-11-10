@@ -62,3 +62,5 @@ bash "$UPDATE_DIR/deploy/apply-standalone-update.sh"
 本地原生 Node HTTPS 程序在桌面和手机尺寸 Chromium 检查收藏、分类树和产地地图三页的双路径编辑与保存、视图切换及刷新、收藏选图不触发上传、图片嵌套预览及重复提示。另检查圆角连线、折叠、缩放/重置、鼠标拖动与真实触摸事件滑动。没有实际设备或线上安装验收。
 
 旧档案补充中英文名称被误判重复的修复包及说明见[分类名称补全修复](taxonomy-label-completion-fix.md)。
+
+最新：[分类整理：删除范围、加入分支与拖动改上级](taxonomy-organize-update.md)。
