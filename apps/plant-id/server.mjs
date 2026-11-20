@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {randomBytes,randomUUID,createHash,scrypt as scryptCallback,timingSafeEqual} from 'node:crypto';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
-import {identify,modelConfiguration} from './model.mjs';
+import {identify,recognizeText,modelConfiguration} from './model.mjs';
 const scrypt=promisify(scryptCallback),hash=value=>createHash('sha256').update(value).digest('hex'),base='/plant-id/';
 const fail=(message,status=400)=>Object.assign(Error(message),{status});
 const positive=(value,fallback)=>{const n=Number(value??fallback);if(!Number.isInteger(n)||n<1||n>100000)throw Error('识别限额配置无效');return n};
@@ -30,7 +30,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
  const day=()=>new Date(now()+8*3600000).toISOString().slice(0,10),used=owner=>sql.prepare('SELECT count FROM usage WHERE day=? AND owner=?').get(day(),owner)?.count||0;
  function account(request){const raw=request.headers.get('Cookie')?.split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1);if(!raw||!/^[a-f0-9]{64}$/.test(raw))return null;return sql.prepare('SELECT users.id,users.username FROM sessions JOIN users ON users.id=sessions.owner WHERE sessions.token=? AND sessions.expires>?').get(hash(raw),now())||null}
  const json=(value,status=200,extra={})=>Response.json(value,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',...extra}});
- const files=new Map([['', ['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']],['icon.svg',['icon.svg','image/svg+xml']],['apps',['apps.html','text/html; charset=utf-8']]]);
+ const files=new Map([['', ['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']],['icon.svg',['icon.svg','image/svg+xml']],['apps',['apps.html','text/html; charset=utf-8']],['ocr',['ocr.html','text/html; charset=utf-8']],['ocr.js',['ocr.js','text/javascript; charset=utf-8']]]);
  async function route(request,{ip='local'}={}){
   const url=new URL(request.url);if(url.origin!==origin)return json({error:'请求来源无效'},403);
   if(url.pathname==='/plant-id')return new Response(null,{status:308,headers:{Location:base}});
@@ -62,19 +62,26 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
   if(path==='api/threads'&&request.method==='GET'){return json({threads:sql.prepare('SELECT id,title,created,updated FROM threads WHERE owner=? ORDER BY updated DESC,id LIMIT 50').all(user.id)})}
   const match=/^api\/threads\/([a-f0-9-]{36})$/.exec(path);
   if(match){const thread=sql.prepare('SELECT * FROM threads WHERE id=? AND owner=?').get(match[1],user.id);if(!thread)throw fail('记录不存在',404);if(request.method==='DELETE'){sql.prepare('DELETE FROM threads WHERE id=? AND owner=?').run(thread.id,user.id);return json({ok:true})}if(request.method==='GET')return json({thread,turns:sql.prepare('SELECT id,description,answer,created FROM turns WHERE thread=? AND owner=? ORDER BY created,rowid').all(thread.id,user.id).map(t=>({...t,answer:JSON.parse(t.answer)}))})}
-  if(path==='api/identify'&&request.method==='POST'){
+  if((path==='api/identify'||path==='api/ocr')&&request.method==='POST'){
+   const ocr=path==='api/ocr';
    if(!config.key)throw fail('识别服务尚未配置，请联系网站管理员开通视觉模型',503);
    if(active.has(user.id)||active.size>=concurrency)throw fail('识别服务忙，请等待当前识别完成',429);
    active.add(user.id);try{
-    const raw=await body(request,11*1024*1024);let form;try{form=await new Response(raw,{headers:{'Content-Type':request.headers.get('Content-Type')||''}}).formData()}catch{throw fail('照片提交格式无效')}
+    const raw=await body(request,(ocr?6:11)*1024*1024);let form;try{form=await new Response(raw,{headers:{'Content-Type':request.headers.get('Content-Type')||''}}).formData()}catch{throw fail('照片提交格式无效')}
     const text=form.get('text')||'',threadId=form.get('threadId')||'';if(typeof text!=='string'||text.length>6000||typeof threadId!=='string'||threadId&&!/^[a-f0-9-]{36}$/.test(threadId))throw fail('文字或记录格式无效');
     if(form.get('consent')!=='yes')throw fail('请先同意将本轮照片和描述发送给视觉模型');
-    const images=[];let total=0;for(const file of form.getAll('images')){if(typeof file==='string'||file.size>5*1024*1024||!file.size)throw fail('识别副本单张不能超过 5 MiB');const bytes=Buffer.from(await file.arrayBuffer()),mime=imageMime(bytes);if(!mime||mime!==file.type||config.provider==='bigmodel'&&mime==='image/webp')throw fail('请选择有效的 JPG、PNG 或 WebP 图片');total+=bytes.length;images.push({bytes,mime})}
+    const images=[];let total=0;for(const file of form.getAll('images')){if(typeof file==='string'||file.size>5*1024*1024||!file.size)throw fail('识别副本单张不能超过 5 MiB');const bytes=Buffer.from(await file.arrayBuffer()),mime=imageMime(bytes);if(!mime||mime!==file.type||(ocr||config.provider==='bigmodel')&&mime==='image/webp')throw fail(ocr?'请选择有效的 JPG 或 PNG 图片':'请选择有效的 JPG、PNG 或 WebP 图片');total+=bytes.length;images.push({bytes,mime})}
+    if(ocr&&(images.length!==1||text||threadId))throw fail('文字识别每次需要一张照片');
     if(images.length>3||total>10*1024*1024)throw fail('每轮最多三张识别副本，合计不超过 10 MiB');if(!images.length&&!text.trim())throw fail('请上传照片或填写植物特征');
     const thread=threadId?sql.prepare('SELECT * FROM threads WHERE id=? AND owner=?').get(threadId,user.id):null;if(threadId&&!thread)throw fail('记录不存在',404);
     if(thread&&sql.prepare('SELECT count(*) AS n FROM turns WHERE thread=? AND owner=?').get(threadId,user.id).n>=30)throw fail('本次记录已满三十轮，请新建识别');
     const previous=thread?JSON.parse(sql.prepare('SELECT answer FROM turns WHERE thread=? AND owner=? ORDER BY created DESC,rowid DESC LIMIT 1').get(threadId,user.id)?.answer||'null'):null;
     limit('identify:'+user.id,6,60000);sql.exec('BEGIN IMMEDIATE');try{if(used(user.id)>=daily||(sql.prepare('SELECT SUM(count) AS n FROM usage WHERE day=?').get(day()).n||0)>=globalDaily)throw fail('今日识别额度已用完，请明天再试',429);sql.prepare('INSERT INTO usage VALUES (?,?,1) ON CONFLICT(day,owner) DO UPDATE SET count=count+1').run(day(),user.id);sql.exec('COMMIT')}catch(error){sql.exec('ROLLBACK');throw error}
+    if(ocr){
+     const result=await recognizeText({config,image:images[0],signal:request.signal,fetchImpl});
+     if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
+     return json({...result,remaining:Math.max(0,daily-used(user.id))});
+    }
     const answer=await identify({config,images,text,previous,signal:request.signal,fetchImpl});if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
     const id=thread?.id||randomUUID(),created=now();sql.exec('BEGIN IMMEDIATE');try{if(thread){if(!sql.prepare('SELECT id FROM threads WHERE id=? AND owner=?').get(id,user.id))throw fail('记录已删除，未恢复记录',409)}else sql.prepare('INSERT INTO threads VALUES (?,?,?,?,?)').run(id,user.id,text.trim().slice(0,40)||'照片识别',created,created);sql.prepare('INSERT INTO turns VALUES (?,?,?,?,?,?)').run(randomUUID(),id,user.id,text,JSON.stringify(answer),created);sql.prepare('UPDATE threads SET updated=? WHERE id=? AND owner=?').run(created,id,user.id);sql.exec('COMMIT')}catch(error){sql.exec('ROLLBACK');throw error}
     return json({threadId:id,answer,remaining:Math.max(0,daily-used(user.id))});

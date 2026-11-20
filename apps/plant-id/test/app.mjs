@@ -13,3 +13,29 @@ test('model configuration cannot send secrets to overseas, arbitrary or mismatch
 test('native HTTP serves a CSP-protected independent page, registration and real multipart transport',async()=>{const f=await fixture(),server=listen(f.app,{origin,port:0});try{await new Promise(resolve=>server.once('listening',resolve));const url='http://127.0.0.1:'+server.address().port;const page=await fetch(url+'/plant-id/');assert.equal(page.status,200);assert.match(page.headers.get('Content-Security-Policy'),/script-src 'self'/);assert.match(await page.text(),/识植助手/);const r=await fetch(url+'/plant-id/api/register',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({username:'http_user',password:'test-password-123'})});assert.equal(r.status,200);const cookie=r.headers.get('Set-Cookie').split(';')[0],result=await fetch(url+'/plant-id/api/identify',{method:'POST',headers:{Origin:origin,Cookie:cookie},body:f.form()});assert.equal(result.status,200);assert.equal((await result.json()).answer.otherProbability,35)}finally{await new Promise(resolve=>server.close(resolve));await f.close()}});
 test('sessions, history and usage survive reopening the independent database; passwords are not stored in plaintext',async()=>{const f=await fixture({env:{PLANT_ID_DAILY_LIMIT:'1'}});let reopened;try{const a=await f.register();assert.equal((await f.request('api/identify',{method:'POST',cookie:a.cookie,body:f.form()})).status,200);const row=f.app.sql.prepare('SELECT password FROM users').get();assert.ok(!row.password.includes('test-password-123'));f.app.close();reopened=createPlantId({dataDirectory:f.directory,origin,env:{PLANT_ID_API_KEY:'test-only-not-a-real-key',PLANT_ID_DAILY_LIMIT:'1'}});const session=await reopened.fetch(new Request(origin+'/plant-id/api/session',{headers:{Cookie:a.cookie}}));const data=await session.json();assert.equal(data.user.username,'first_user');assert.equal(data.remaining,0);assert.equal((await(await reopened.fetch(new Request(origin+'/plant-id/api/threads',{headers:{Cookie:a.cookie}}))).json()).threads.length,1);assert.equal((await reopened.fetch(new Request(origin+'/plant-id/api/identify',{method:'POST',headers:{Cookie:a.cookie,Origin:origin},body:f.form()}))).status,429)}finally{if(reopened)reopened.close();await rm(f.directory,{recursive:true,force:true})}});
 test('login checks passwords, registration can be disabled, and oversized bodies cannot invoke vision',async()=>{const f=await fixture();try{const a=await f.register();const wrong=await f.request('api/login',{method:'POST',body:JSON.stringify({username:'first_user',password:'wrong-password'})});assert.equal(wrong.status,401);const login=await f.request('api/login',{method:'POST',body:JSON.stringify({username:'first_user',password:'test-password-123'})});assert.equal(login.status,200);const large=new Uint8Array(11*1024*1024+1);assert.equal((await f.request('api/identify',{method:'POST',cookie:a.cookie,body:large,headers:{'Content-Type':'multipart/form-data; boundary=test'}})).status,413);assert.equal(f.calls.length,0)}finally{await f.close()}const disabled=await fixture({env:{PLANT_ID_REGISTRATION:'false'}});try{assert.equal((await disabled.request('api/register',{method:'POST',body:JSON.stringify({username:'blocked_user',password:'test-password-123'})})).status,403)}finally{await disabled.close()}});
+
+test('OCR returns plain transcription, shares the recognition quota and creates no plant history', async () => {
+ const original = '捕蝇草 A-17\nDionaea muscipula';
+ const calls = [];
+ const f = await fixture({env:{PLANT_ID_DAILY_LIMIT:'1'},fetchImpl:async (url,options) => {
+  calls.push({url,body:JSON.parse(options.body)});
+  return Response.json({choices:[{finish_reason:'stop',message:{content:original}}]});
+ }});
+ try{
+  const {cookie} = await f.register();
+  const body = () => f.form({text:''});
+  assert.equal((await f.request('ocr')).status,200);
+  assert.equal((await f.request('ocr.js')).status,200);
+  assert.equal((await f.request('api/ocr',{method:'POST',body:body()})).status,401);
+  assert.equal((await f.request('api/ocr',{method:'POST',cookie,body:f.form({text:'',consent:'no'})})).status,400);
+  assert.equal((await f.request('api/ocr',{method:'POST',cookie,body:f.form({text:'',images:[image,image]})})).status,400);
+  const response = await f.request('api/ocr',{method:'POST',cookie,body:body()});
+  assert.equal(response.status,200);
+  assert.deepEqual(await response.json(),{text:original,truncated:false,remaining:0});
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].body.model,'glm-4.6v-flash');
+  assert.equal(calls[0].body.messages[0].content[1].image_url.url,'data:image/png;base64,'+image.toString('base64'));
+  assert.deepEqual((await (await f.request('api/threads',{cookie})).json()).threads,[]);
+  assert.equal((await f.request('api/identify',{method:'POST',cookie,body:f.form()})).status,429);
+ }finally{await f.close()}
+});

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>图片文字识别 · 识植助手</title>
+<link rel="icon" href="/plant-id/icon.svg">
+<link rel="stylesheet" href="/plant-id/style.css">
+<script type="module" src="/plant-id/ocr.js"></script>
+</head>
+<body>
+<header class="topbar">
+<a class="brand" href="/plant-id/"><img src="/plant-id/icon.svg" alt="" width="38" height="38">识植助手</a>
+<nav><a href="/plant-id/">返回植物识别</a></nav>
+</header>
+<main>
+<section class="intro">
+<h1>图片文字识别</h1>
+<p>提取植物标签、包装或截图里的文字，保留原文和换行。</p>
+</section>
+<section class="workspace">
+<p id="ocr-session" class="muted" role="status">正在检查登录状态…</p>
+<a id="ocr-login" class="button" href="/plant-id/" hidden>前往登录</a>
+<form id="ocr-form">
+<label class="field">选择一张图片（JPG 或 PNG，最大 5 MiB）
+<input type="file" id="ocr-file" accept="image/jpeg,image/png" required>
+</label>
+<label class="consent"><input id="ocr-consent" type="checkbox" required><span>同意把图片发送给已配置的视觉服务。本站不保存本次图片或识别文字。</span></label>
+<button class="button" id="ocr-start" disabled>提取文字</button>
+</form>
+<p id="ocr-notice" class="notice" role="status"></p>
+<div id="ocr-result" hidden>
+<label class="field">识别原文<textarea id="ocr-text" rows="10" readonly></textarea></label>
+<button id="ocr-copy" type="button" class="subtle">复制文字</button>
+<p id="ocr-copy-status" role="status"></p>
+</div>
+</section>
+</main>
+<footer><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">蜀ICP备2026066760号</a></footer>
+</body>
+</html>
