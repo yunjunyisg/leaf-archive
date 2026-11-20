@@ -14,16 +14,16 @@
 
 如果安装 1.0.0 时本机 3110 连接失败并回滚，直接安装当前版本。旧版启动入口比较了两种不同的路径，服务可能直接退出。新版支持通过安装程序使用的 current 符号链接启动。
 
-下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.2/plant-id-web-v1.0.2.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
+下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.3/plant-id-web-v1.0.3.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
 
 ```bash
 (
 set -e
 cd /root/leaf-migration
-echo "ea3261d500704916c4e575ef29e6a8d4e6c2c2e7099cf38a6a353d0da444d4bd  plant-id-web-v1.0.2.tar.gz" | sha256sum -c -
-gzip -t plant-id-web-v1.0.2.tar.gz
+echo "d9b3496e0a55ae8fa042745afea996d318a0aece22e36dd2356f0144b56ce175  plant-id-web-v1.0.3.tar.gz" | sha256sum -c -
+gzip -t plant-id-web-v1.0.3.tar.gz
 PLANT_ID_INSTALL_DIR=$(mktemp -d /root/leaf-migration/plant-id-verified.XXXXXX)
-tar -xzf plant-id-web-v1.0.2.tar.gz -C "$PLANT_ID_INSTALL_DIR"
+tar -xzf plant-id-web-v1.0.3.tar.gz -C "$PLANT_ID_INSTALL_DIR"
 (cd "$PLANT_ID_INSTALL_DIR" && sha256sum -c SHA256SUMS)
 bash "$PLANT_ID_INSTALL_DIR/deploy/install.sh"
 )
@@ -102,8 +102,12 @@ systemctl show plant-id -p MemoryCurrent -p MemoryPeak
 
 在识植助手顶部点击「文字识别」，或打开 `/plant-id/ocr`。登录后可上传一张不超过 5 MiB 的 JPG 或 PNG，提取并复制标签、包装或截图中的原文。OCR 与植物识别共用当前视觉服务及每日额度。本站不保存 OCR 图片和结果。已有密钥和代理配置可继续使用。
 
+## 识别结果格式提示
+
+1.0.3 统一植物识别的输出要求，支持从常见的代码块或附带说明中读取结构化结果，并接受整数百分数字符串。若输出被截断，界面会建议使用最清楚的一张照片或缩短描述。已有智谱模型、密钥和每日额度可继续使用。每次提交只调用一次模型。
+
 ## 本次验证范围
 
-13 项自动测试通过，包括从与生产相同的 current 符号链接启动进程并访问健康检查。其他测试覆盖真实本地 HTTP 与图片内容传输、独立账号与会话、历史归属、补充识别、密钥未配置时不伪造结果、授权与连接失败不泄露密钥、非法图像与来源检查、请求大小、限额、并发及退出后不写入迟到结果、数据库重开后的历史与额度保留。脚本语法和安装包内文件摘要已检查。
+15 项自动测试通过，包括从与生产相同的 current 符号链接启动进程并访问健康检查。其他测试覆盖真实本地 HTTP 与图片内容传输、独立账号与会话、历史归属、补充识别、密钥未配置时不伪造结果、授权与连接失败不泄露密钥、非法图像与来源检查、请求大小、限额、并发及退出后不写入迟到结果、数据库重开后的历史与额度保留。脚本语法和安装包内文件摘要已检查。
 
 模型调用测试使用模拟响应核对请求协议和图像字节，没有使用聊天中暴露的真实密钥发起推理。当前环境缺少可用的网页预览工具，未完成浏览器交互或手机实机验收；也没有目标服务器执行连接。因此需安装后用重新生成的密钥完成实际识别与设备验收。

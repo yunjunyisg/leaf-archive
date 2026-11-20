@@ -39,3 +39,47 @@ test('OCR returns plain transcription, shares the recognition quota and creates 
   assert.equal((await f.request('api/identify',{method:'POST',cookie,body:f.form()})).status,429);
  }finally{await f.close()}
 });
+
+test('recognition accepts wrapped JSON, integer percent strings and omitted optional notes', async () => {
+ const payload={
+  summary:answer.summary,
+  candidates:[{name:'蒲公英属',probability:'６５％',evidence:'黄色花序'}],
+  otherProbability:'35%',
+ };
+ const f=await fixture({fetchImpl:async (_url,options)=>{
+  const request=JSON.parse(options.body);
+  assert.match(request.messages[0].content,/只输出一个简短的 JSON/);
+  assert.doesNotMatch(request.messages[0].content,/\| 排名 \|/);
+  return Response.json({choices:[{finish_reason:'stop',message:{content:'识别如下：\n```json\n'+JSON.stringify(payload)+'\n```'}}]});
+ }});
+ try{
+  const {cookie}=await f.register();
+  const response=await f.request('api/identify',{method:'POST',cookie,body:f.form()});
+  assert.equal(response.status,200);
+  const result=(await response.json()).answer;
+  assert.equal(result.candidates[0].probability,65);
+  assert.deepEqual(result.candidates[0].evidence,['黄色花序']);
+  assert.deepEqual(result.followUp,[]);
+  assert.equal(result.otherProbability,35);
+ }finally{await f.close()}
+});
+
+test('truncated and filtered responses get distinct messages without retries or history writes', async () => {
+ const cases=[
+  [{finish_reason:'length',message:{content:'{"summary":'}},/被截断/],
+  [{finish_reason:'sensitive'},/未能处理本次内容/],
+  [{finish_reason:'stop',message:{content:JSON.stringify({...answer,otherProbability:90})}},/格式不完整/],
+ ];
+ let calls=0;
+ const f=await fixture({fetchImpl:async ()=>Response.json({choices:[cases[calls++][0]]})});
+ try{
+  const {cookie}=await f.register();
+  for(const [,expected] of cases){
+   const response=await f.request('api/identify',{method:'POST',cookie,body:f.form()});
+   assert.equal(response.status,502);
+   assert.match((await response.json()).error,expected);
+  }
+  assert.equal(calls,cases.length);
+  assert.equal(f.app.sql.prepare('SELECT count(*) n FROM threads').get().n,0);
+ }finally{await f.close()}
+});
