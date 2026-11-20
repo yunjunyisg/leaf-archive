@@ -12,16 +12,18 @@
 
 ## 一、下载并安装独立服务
 
-下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.0/plant-id-web-v1.0.0.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
+如果安装 1.0.0 时本机 3110 连接失败并回滚，直接安装 1.0.1。旧版启动入口比较了两种不同的路径，服务可能直接退出。新版支持通过安装程序使用的 current 符号链接启动。
+
+下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.1/plant-id-web-v1.0.1.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
 
 ```bash
 (
 set -e
 cd /root/leaf-migration
-echo "c78177451debe7aa3b56038b166a14e6c626528fe4bf6374c6e45c43beed2d2a  plant-id-web-v1.0.0.tar.gz" | sha256sum -c -
-gzip -t plant-id-web-v1.0.0.tar.gz
+echo "293c7e9db782dd7a5cded115514e63dba350c2aae98abb60b661b4a52de385dd  plant-id-web-v1.0.1.tar.gz" | sha256sum -c -
+gzip -t plant-id-web-v1.0.1.tar.gz
 PLANT_ID_INSTALL_DIR=$(mktemp -d /root/leaf-migration/plant-id-verified.XXXXXX)
-tar -xzf plant-id-web-v1.0.0.tar.gz -C "$PLANT_ID_INSTALL_DIR"
+tar -xzf plant-id-web-v1.0.1.tar.gz -C "$PLANT_ID_INSTALL_DIR"
 (cd "$PLANT_ID_INSTALL_DIR" && sha256sum -c SHA256SUMS)
 bash "$PLANT_ID_INSTALL_DIR/deploy/install.sh"
 )
@@ -97,6 +99,6 @@ systemctl show plant-id -p MemoryCurrent -p MemoryPeak
 
 ## 本次验证范围
 
-11 项自动测试通过，覆盖真实本地 HTTP 与图片内容传输、独立账号与会话、历史归属、补充识别、密钥未配置时不伪造结果、授权与连接失败不泄露密钥、非法图像与来源检查、请求大小、限额、并发及退出后不写入迟到结果、数据库重开后的历史与额度保留。脚本语法和安装包内文件摘要已检查。
+12 项自动测试通过，包括从与生产相同的 current 符号链接启动进程并访问健康检查。其他测试覆盖真实本地 HTTP 与图片内容传输、独立账号与会话、历史归属、补充识别、密钥未配置时不伪造结果、授权与连接失败不泄露密钥、非法图像与来源检查、请求大小、限额、并发及退出后不写入迟到结果、数据库重开后的历史与额度保留。脚本语法和安装包内文件摘要已检查。
 
 模型调用测试使用模拟响应核对请求协议和图像字节，没有使用聊天中暴露的真实密钥发起推理。当前环境缺少可用的网页预览工具，未完成浏览器交互或手机实机验收；也没有目标服务器执行连接。因此需安装后用重新生成的密钥完成实际识别与设备验收。

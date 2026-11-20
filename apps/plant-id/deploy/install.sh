@@ -19,18 +19,31 @@ PLANT_ID_OLD=$(readlink -f /opt/plant-id/current || true)
 PLANT_ID_UNIT_BACKUP=$(mktemp /opt/plant-id/old-unit.XXXXXX)
 if [ -f /etc/systemd/system/plant-id.service ]; then cp -a /etc/systemd/system/plant-id.service "$PLANT_ID_UNIT_BACKUP"; else rm -f "$PLANT_ID_UNIT_BACKUP"; fi
 rollback(){
- echo '独立服务启动失败，正在恢复上一程序版本。'
+ trap - ERR
+ systemctl show plant-id -p ActiveState -p Result -p ExecMainStatus >&2 || true
+ echo '独立服务启动失败，正在恢复安装前的服务配置。'
  if [ -n "$PLANT_ID_OLD" ] && [ -d "$PLANT_ID_OLD" ]; then ln -sfn "$PLANT_ID_OLD" /opt/plant-id/current; else rm -f /opt/plant-id/current; fi
- if [ -f "$PLANT_ID_UNIT_BACKUP" ]; then cp -a "$PLANT_ID_UNIT_BACKUP" /etc/systemd/system/plant-id.service; systemctl daemon-reload; systemctl restart plant-id || true; else systemctl stop plant-id || true; rm -f /etc/systemd/system/plant-id.service; systemctl daemon-reload; fi
- echo '未更改植藏程序及数据。请查看 journalctl -u plant-id。'
+ if [ -f "$PLANT_ID_UNIT_BACKUP" ]; then cp -a "$PLANT_ID_UNIT_BACKUP" /etc/systemd/system/plant-id.service; systemctl daemon-reload; systemctl restart plant-id || true; else systemctl disable --now plant-id || true; rm -f /etc/systemd/system/plant-id.service; systemctl daemon-reload; fi
+ echo '请执行 journalctl -u plant-id -n 40 --no-pager 查看启动日志。'
+ exit 1
 }
 trap rollback ERR
 ln -sfn "$PLANT_ID_RELEASE" /opt/plant-id/current
 install -m 644 "$PLANT_ID_SOURCE/deploy/plant-id.service" /etc/systemd/system/plant-id.service
 systemctl daemon-reload
-systemctl enable plant-id
 systemctl restart plant-id
-curl --fail --silent --show-error --retry 8 --retry-connrefused --retry-delay 1 http://127.0.0.1:3110/plant-id/healthz
+PLANT_ID_READY=false
+for ((attempt=0; attempt<15; attempt++)); do
+ if systemctl is-active --quiet plant-id && \
+    curl --noproxy '*' --fail --silent --max-time 2 http://127.0.0.1:3110/plant-id/healthz; then
+  PLANT_ID_READY=true
+  break
+ fi
+ sleep 1
+done
+[ "$PLANT_ID_READY" = true ]
+systemctl enable plant-id
+rm -f "$PLANT_ID_UNIT_BACKUP"
 trap - ERR
 echo
 echo '识植助手独立服务已启动。植藏服务和数据库未改动。'

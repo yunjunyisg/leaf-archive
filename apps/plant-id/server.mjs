@@ -1,8 +1,8 @@
 import http from 'node:http';
 import {Readable} from 'node:stream';
 import {DatabaseSync} from 'node:sqlite';
-import {mkdirSync,readFileSync,chmodSync} from 'node:fs';
-import {join,resolve} from 'node:path';
+import {mkdirSync,readFileSync,chmodSync,realpathSync} from 'node:fs';
+import {join} from 'node:path';
 import {randomBytes,randomUUID,createHash,scrypt as scryptCallback,timingSafeEqual} from 'node:crypto';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
@@ -87,4 +87,20 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
 export function listen(app,{origin,port=3110,host='127.0.0.1'}={}){
  const server=http.createServer(async(req,res)=>{const abort=new AbortController();res.on('close',()=>{if(!res.writableEnded)abort.abort()});try{const request=new Request(new URL(req.url,origin),{method:req.method,headers:req.headers,...(!['GET','HEAD'].includes(req.method)?{body:Readable.toWeb(req),duplex:'half'}:{}),signal:abort.signal});const local=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress);const response=await app.fetch(request,{ip:local?(req.headers['x-real-ip']||req.socket.remoteAddress):req.socket.remoteAddress});res.writeHead(response.status,Object.fromEntries(response.headers));if(response.body)Readable.fromWeb(response.body).pipe(res);else res.end()}catch{res.writeHead(500);res.end('请求失败')}});server.requestTimeout=120000;server.headersTimeout=15000;server.listen(port,host);return server;
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){const origin=process.env.PLANT_ID_ORIGIN||'https://gloriouscarnivorousplants.top',app=createPlantId({origin,dataDirectory:process.env.PLANT_ID_DATA_DIR||'/var/lib/plant-id'}),server=listen(app,{origin,port:Number(process.env.PLANT_ID_PORT||3110)});server.on('listening',()=>console.log('识植助手已在本机端口 '+server.address().port+' 启动'));for(const name of ['SIGTERM','SIGINT'])process.on(name,()=>server.close(()=>{app.close();process.exit(0)}))}
+// Node resolves the release symlink in import.meta.url, but retains it in argv.
+function isEntryPoint(){
+ const entry=process.argv[1];
+ if(!entry)return false;
+ try{return realpathSync(entry)===fileURLToPath(import.meta.url)}
+ catch(error){if(error.code==='ENOENT')return false;throw error}
+}
+
+if(isEntryPoint()){
+ const origin=process.env.PLANT_ID_ORIGIN||'https://gloriouscarnivorousplants.top';
+ const app=createPlantId({origin,dataDirectory:process.env.PLANT_ID_DATA_DIR||'/var/lib/plant-id'});
+ const server=listen(app,{origin,port:Number(process.env.PLANT_ID_PORT||3110)});
+ server.on('listening',()=>console.log('识植助手已在本机端口 '+server.address().port+' 启动'));
+ for(const name of ['SIGTERM','SIGINT']){
+  process.on(name,()=>server.close(()=>{app.close();process.exit(0)}));
+ }
+}
