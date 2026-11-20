@@ -82,7 +82,9 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
      if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
      return json({...result,remaining:Math.max(0,daily-used(user.id))});
     }
-    const answer=await identify({config,images,text,previous,signal:request.signal,fetchImpl});if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
+    const answer=await identify({config,images,text,previous,signal:request.signal,fetchImpl});
+    if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
+    if(answer.fallback)return json({fallback:answer.fallback,remaining:Math.max(0,daily-used(user.id))});
     const id=thread?.id||randomUUID(),created=now();sql.exec('BEGIN IMMEDIATE');try{if(thread){if(!sql.prepare('SELECT id FROM threads WHERE id=? AND owner=?').get(id,user.id))throw fail('记录已删除，未恢复记录',409)}else sql.prepare('INSERT INTO threads VALUES (?,?,?,?,?)').run(id,user.id,text.trim().slice(0,40)||'照片识别',created,created);sql.prepare('INSERT INTO turns VALUES (?,?,?,?,?,?)').run(randomUUID(),id,user.id,text,JSON.stringify(answer),created);sql.prepare('UPDATE threads SET updated=? WHERE id=? AND owner=?').run(created,id,user.id);sql.exec('COMMIT')}catch(error){sql.exec('ROLLBACK');throw error}
     return json({threadId:id,answer,remaining:Math.max(0,daily-used(user.id))});
    }finally{active.delete(user.id)}

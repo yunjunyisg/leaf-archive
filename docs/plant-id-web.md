@@ -14,16 +14,16 @@
 
 如果安装 1.0.0 时本机 3110 连接失败并回滚，直接安装当前版本。旧版启动入口比较了两种不同的路径，服务可能直接退出。新版支持通过安装程序使用的 current 符号链接启动。
 
-下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.3/plant-id-web-v1.0.3.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
+下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.4/plant-id-web-v1.0.4.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
 
 ```bash
 (
 set -e
 cd /root/leaf-migration
-echo "d9b3496e0a55ae8fa042745afea996d318a0aece22e36dd2356f0144b56ce175  plant-id-web-v1.0.3.tar.gz" | sha256sum -c -
-gzip -t plant-id-web-v1.0.3.tar.gz
+echo "ef58cceb19fd4981a975358d650bfb8ae47d18cb447dd3a0556562694a2f21d7  plant-id-web-v1.0.4.tar.gz" | sha256sum -c -
+gzip -t plant-id-web-v1.0.4.tar.gz
 PLANT_ID_INSTALL_DIR=$(mktemp -d /root/leaf-migration/plant-id-verified.XXXXXX)
-tar -xzf plant-id-web-v1.0.3.tar.gz -C "$PLANT_ID_INSTALL_DIR"
+tar -xzf plant-id-web-v1.0.4.tar.gz -C "$PLANT_ID_INSTALL_DIR"
 (cd "$PLANT_ID_INSTALL_DIR" && sha256sum -c SHA256SUMS)
 bash "$PLANT_ID_INSTALL_DIR/deploy/install.sh"
 )
@@ -104,7 +104,7 @@ systemctl show plant-id -p MemoryCurrent -p MemoryPeak
 
 ## 识别结果格式提示
 
-1.0.3 统一植物识别的输出要求，支持从常见的代码块或附带说明中读取结构化结果，并接受整数百分数字符串。若输出被截断，界面会建议使用最清楚的一张照片或缩短描述。已有智谱模型、密钥和每日额度可继续使用。每次提交只调用一次模型。
+植物识别支持多种结构化返回格式，可从常见的代码块或附带说明中读取结构化结果，并接受整数百分数字符串。1.0.4 会将无法整理为候选卡片的可读回复作为纯文本展示。截断的回复会标明只显示部分内容。原文只显示在当前页，不写入历史。已有智谱模型、密钥和每日额度可继续使用。每次提交只调用一次模型。
 
 ## 本次验证范围
 

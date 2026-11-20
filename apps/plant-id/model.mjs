@@ -91,10 +91,11 @@ export async function identify({config,images,text,previous,signal,fetchImpl=fet
   if(!images.length)answer.observations.visible=[];
   return answer;
  }catch{
-  const message=result.truncated
-   ?'识别结果被截断。请保留最清楚的一张照片，或缩短描述后再试'
-   :'视觉模型返回的格式不完整。请聚焦一株植物，稍后再试';
-  throw Object.assign(Error(message),{status:502});
+  const original=result.content.trim();
+  if(!original){
+   throw Object.assign(Error('视觉模型未返回可读内容，请稍后重试'),{status:502});
+  }
+  return {fallback:{text:original.slice(0,12000),truncated:result.truncated||original.length>12000}};
  }
 }
 
