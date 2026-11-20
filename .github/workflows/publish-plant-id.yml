@@ -1,0 +1,24 @@
+name: 发布识植助手独立应用
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/publish-plant-id.yml]
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: 验证识植助手接口与隔离
+        run: npm test --prefix apps/plant-id
+      - name: 核对文件并发布独立安装包
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 apps/distribution/publish.py 1.8.0

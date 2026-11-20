@@ -1,0 +1,18 @@
+{
+  "name": "@local/dsh-plant-id-preset",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "识植助手 agent preset for DeepSeek Harness: photo-based plant identification with ranked candidates, probabilities and verifiable distinctions.",
+  "keywords": [
+    "dsh",
+    "dsh-bundle",
+    "agent-preset",
+    "plant-identification"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

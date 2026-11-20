@@ -1,0 +1,27 @@
+[Unit]
+Description=Independent Plant Identification Assistant
+After=network.target
+[Service]
+Type=simple
+User=plant-id
+Group=plant-id
+WorkingDirectory=/opt/plant-id/current
+Environment=NODE_ENV=production
+Environment=PLANT_ID_ORIGIN=https://gloriouscarnivorousplants.top
+Environment=PLANT_ID_DATA_DIR=/var/lib/plant-id
+Environment=PLANT_ID_PORT=3110
+EnvironmentFile=-/etc/plant-id.env
+ExecStart=/usr/bin/node --max-old-space-size=160 /opt/plant-id/current/server.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=110
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/plant-id
+MemoryHigh=224M
+MemoryMax=320M
+[Install]
+WantedBy=multi-user.target
