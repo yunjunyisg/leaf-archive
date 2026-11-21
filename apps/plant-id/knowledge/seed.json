@@ -1,0 +1,10 @@
+{
+  "genera": ["Aldrovanda", "Brocchinia", "Byblis", "Cephalotus", "Darlingtonia", "Dionaea", "Drosera", "Drosophyllum", "Genlisea", "Heliamphora", "Nepenthes", "Pinguicula", "Roridula", "Sarracenia", "Triphyophyllum", "Utricularia"],
+  "communityExamples": ["Aldrovanda vesiculosa", "Byblis liniflora", "Cephalotus follicularis", "Darlingtonia californica", "Dionaea muscipula", "Drosera adelae", "Drosera aliciae", "Drosera binata", "Drosera capensis", "Drosera filiformis", "Drosera rotundifolia", "Drosophyllum lusitanicum", "Heliamphora nutans", "Nepenthes alata", "Nepenthes ampullaria", "Nepenthes bicalcarata", "Nepenthes gracilis", "Nepenthes mirabilis", "Nepenthes rafflesiana", "Nepenthes ventricosa", "Pinguicula gigantea", "Pinguicula grandiflora", "Pinguicula moranensis", "Pinguicula vulgaris", "Sarracenia flava", "Sarracenia leucophylla", "Sarracenia purpurea", "Utricularia sandersonii", "Utricularia vulgaris"],
+  "diagnostics": [
+    {"name":"Dionaea", "zh":"捕蝇草", "traits":"叶端有一对可闭合的捕虫叶瓣，核对叶瓣内侧触毛及边缘齿状突起。", "sourceName":"北卡罗来纳州立大学推广植物资料库", "source":"https://plants.ces.ncsu.edu/plants/dionaea-muscipula/"},
+    {"name":"Nepenthes", "zh":"猪笼草", "traits":"捕虫笼由叶端延伸的卷须连接。核对笼口唇缘、笼盖以及上位笼和下位笼的差异。", "sourceName":"北卡罗来纳州立大学推广植物资料库", "source":"https://plants.ces.ncsu.edu/plants/nepenthes/"},
+    {"name":"Sarracenia", "zh":"瓶子草", "traits":"捕虫叶本身形成瓶状或管状陷阱。核对瓶口、盖片、瓶身和植株基部的连接方式。", "sourceName":"北卡罗来纳州立大学推广植物资料库", "source":"https://plants.ces.ncsu.edu/plants/sarracenia/"},
+    {"name":"Utricularia", "zh":"狸藻", "traits":"以小型囊状陷阱捕捉猎物。水生种可补拍水下叶状结构与捕虫囊，花和囊宜分别取近照。", "sourceName":"北卡罗来纳州立大学推广植物资料库", "source":"https://plants.ces.ncsu.edu/plants/utricularia/"}
+  ]
+}

@@ -6,3 +6,7 @@
 .candidate-reference img{display:block;width:min(100%,320px);max-height:240px;object-fit:contain;object-position:left center;border-radius:10px;background:var(--paper)}
 .candidate-reference figcaption{margin-top:.5rem;font-size:.8rem;line-height:1.5;overflow-wrap:anywhere}
 .candidate-reference figcaption a{text-decoration:underline}
+
+.candidate-knowledge{margin-top:1rem;font-size:.9rem;line-height:1.6;overflow-wrap:anywhere}
+.candidate-knowledge a{text-decoration:underline}
+.candidate-knowledge summary{cursor:pointer;font-weight:600}

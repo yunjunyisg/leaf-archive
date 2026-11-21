@@ -54,12 +54,40 @@ function candidateReference(candidate){
   return figure;
  }
  figure.append(el('p','正在查找参考图…','muted'));
- referenceQueue.push({figure,name:candidate.scientificName,rank:candidate.rank});
+ referenceQueue.push({figure,name:candidate.knowledge?.name||candidate.scientificName,rank:candidate.rank});
  queueMicrotask(loadReferences);
  return figure;
 }
 
-function renderAnswer(answer,description,{append=true}={}){const section=el('article',undefined,'result saved-result');if(description)section.append(el('p',description,'user-description'));section.append(el('span','观察结果 · 请继续核对','eyebrow'));const first=answer.candidates[0],uncertain=answer.otherProbability>(first?.probability||0);section.append(el('h2',uncertain?'目前无法确定。'+answer.summary:answer.summary));for(const candidate of answer.candidates){const card=el('div',undefined,'candidate'),head=el('div',undefined,'candidate-head'),name=el('div');name.append(el('h3',candidate.name),el('span',[candidate.scientificName,candidate.rank].filter(Boolean).join(' · '),'scientific'));head.append(name,el('span',candidate.probability+'%','probability'));const progress=el('progress');progress.max=100;progress.value=candidate.probability;progress.setAttribute('aria-label',candidate.name+'估计概率');const evidence=el('div',undefined,'evidence');for(const [title,items]of [['为什么可能',candidate.evidence],['怎么区分',candidate.distinguish]]){const column=el('div');column.append(el('h4',title));appendList(column,items);evidence.append(column)}card.append(head,progress,candidateReference(candidate),evidence);section.append(card)}const other=el('div',undefined,'other');other.append(el('span','其他可能 / 证据不足'),el('strong',answer.otherProbability+'%'));section.append(other);const details=el('details',undefined,'observations');details.append(el('summary','查看本轮观察与待确认特征'));for(const [title,items]of [['照片中可见',answer.observations.visible],['用户描述',answer.observations.described],['待确认',answer.observations.uncertain]]){details.append(el('strong',title));appendList(details,items)}section.append(details);if(answer.followUp.length){const follow=el('div',undefined,'follow-up');follow.append(el('h3','下一步，拍清这些特征'));appendList(follow,answer.followUp);section.append(follow)}section.append(el('p','百分比是当前证据下的粗略估计，会随补充信息变化。','muted'));if(!append)$('#results').replaceChildren();$('#results').append(section);const saved=$('#results').querySelectorAll('.saved-result');for(const old of Array.from(saved).slice(0,-savedResultLimit))old.remove();return section}
+function candidateKnowledge(entry){
+ const details=el('details',undefined,'candidate-knowledge');
+ details.append(el('summary','查阅植物资料'));
+ const externalLink=(label,href)=>{
+  const link=el('a',label);
+  link.href=href;link.target='_blank';link.rel='noopener noreferrer';
+  return link;
+ };
+ const taxonomy=el('p',entry.synonym?'GBIF 接受名为 '+entry.name+'。':entry.name);
+ if(entry.family)taxonomy.append(' · '+entry.family);
+ taxonomy.append(' · ',externalLink('GBIF 分类记录',entry.source));
+ details.append(taxonomy);
+ if(entry.traits){
+  const traits=el('p',entry.traits.zh+'属级核对特征：'+entry.traits.traits);
+  traits.append(' ',externalLink(entry.traits.sourceName,entry.traits.source));
+  details.append(traits);
+ }
+ if(entry.observations.length){
+  const items=el('ul');
+  for(const observation of entry.observations){
+   const item=el('li');
+   item.append(externalLink(observation.platform+' 公开观察',observation.url));
+   items.append(item);
+  }
+  details.append(items);
+ }
+ return details;
+}
+function renderAnswer(answer,description,{append=true}={}){const section=el('article',undefined,'result saved-result');if(description)section.append(el('p',description,'user-description'));section.append(el('span','观察结果 · 请继续核对','eyebrow'));const first=answer.candidates[0],uncertain=answer.otherProbability>(first?.probability||0);section.append(el('h2',uncertain?'目前无法确定。'+answer.summary:answer.summary));for(const candidate of answer.candidates){const card=el('div',undefined,'candidate'),head=el('div',undefined,'candidate-head'),name=el('div');name.append(el('h3',candidate.name),el('span',[candidate.scientificName,candidate.rank].filter(Boolean).join(' · '),'scientific'));head.append(name,el('span',candidate.probability+'%','probability'));const progress=el('progress');progress.max=100;progress.value=candidate.probability;progress.setAttribute('aria-label',candidate.name+'估计概率');const evidence=el('div',undefined,'evidence');for(const [title,items]of [['为什么可能',candidate.evidence],['怎么区分',candidate.distinguish]]){const column=el('div');column.append(el('h4',title));appendList(column,items);evidence.append(column)}card.append(head,progress,candidateReference(candidate),evidence);if(candidate.knowledge)card.append(candidateKnowledge(candidate.knowledge));section.append(card)}const other=el('div',undefined,'other');other.append(el('span','其他可能 / 证据不足'),el('strong',answer.otherProbability+'%'));section.append(other);const details=el('details',undefined,'observations');details.append(el('summary','查看本轮观察与待确认特征'));for(const [title,items]of [['照片中可见',answer.observations.visible],['用户描述',answer.observations.described],['待确认',answer.observations.uncertain]]){details.append(el('strong',title));appendList(details,items)}section.append(details);if(answer.followUp.length){const follow=el('div',undefined,'follow-up');follow.append(el('h3','下一步，拍清这些特征'));appendList(follow,answer.followUp);section.append(follow)}section.append(el('p','百分比是当前证据下的粗略估计，会随补充信息变化。','muted'));if(!append)$('#results').replaceChildren();$('#results').append(section);const saved=$('#results').querySelectorAll('.saved-result');for(const old of Array.from(saved).slice(0,-savedResultLimit))old.remove();return section}
 async function history(){if(!state.user)return;const token=state.epoch,data=await api('threads');if(token!==state.epoch)return;const list=$('#history-list');list.replaceChildren();if(!data.threads.length)list.append(el('p','还没有记录，试着认识第一株植物。','muted'));for(const thread of data.threads){const row=el('div',undefined,'history-item'),open=el('button',undefined,'history-open');open.append(el('span',thread.title),el('small',new Date(thread.updated).toLocaleDateString('zh-CN')));open.onclick=async()=>{if(state.busy)return;const token=++state.epoch;try{const data=await api('threads/'+thread.id);if(token!==state.epoch)return;clearPhotos();$('#description').value='';$('#results').replaceChildren();state.threadId=thread.id;for(const turn of data.turns)renderAnswer(turn.answer,turn.description);setBusy(false);notice('已打开历史文字记录。旧照片不保存，需要重新看图时请再次选取。');$('#results').scrollIntoView({behavior:'instant'})}catch(error){notice(error.message)}};const remove=el('button','删除','subtle');remove.setAttribute('aria-label','删除记录 '+thread.title);remove.onclick=async()=>{if(!confirm('删除这条识别文字记录？此操作不会影响植藏。'))return;try{await api('threads/'+thread.id,{method:'DELETE'});if(state.threadId===thread.id)newRecord();await history()}catch(error){notice(error.message)}};row.append(open,remove);list.append(row)}setBusy(state.busy)}
 function newRecord(){state.epoch++;state.controller?.abort();state.threadId='';clearPhotos();$('#description').value='';$('#results').replaceChildren();setBusy(false);notice('已新建识别。你可以上传照片，也可以描述植物特征。')};$('#new').onclick=newRecord;
 $('#cancel').onclick=()=>{state.epoch++;state.controller?.abort();state.controller=null;setBusy(false);notice('已停止等待。已提交的请求仍可能产生模型用量。');session().catch(()=>{})};

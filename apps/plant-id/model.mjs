@@ -83,9 +83,9 @@ async function visionCompletion({config,messages,maxTokens,jsonMode=false,signal
  return {content,truncated};
 }
 
-export async function identify({config,images,text,previous,signal,fetchImpl=fetch}){
+export async function identify({config,images,text,previous,knowledge,signal,fetchImpl=fetch}){
  const content=[{type:'text',text:(previous?'以下为先前的观察与结果，仅作历史参考，不代表本轮照片：\n'+JSON.stringify(previous)+'\n\n':'')+'本轮用户描述：'+(text||'请识别本轮照片中的植物。')},...images.map(imageContent)];
- const result=await visionCompletion({config,messages:[{role:'system',content:persona+'\n\n'+format},{role:'user',content}],maxTokens:3200,jsonMode:true,signal,fetchImpl});
+ const result=await visionCompletion({config,messages:[{role:'system',content:persona+'\n\n'+format+(knowledge?'\n\n'+knowledge:'')},{role:'user',content}],maxTokens:3200,jsonMode:true,signal,fetchImpl});
  try{
   const answer=parseIdentification(result.content);
   if(!images.length)answer.observations.visible=[];

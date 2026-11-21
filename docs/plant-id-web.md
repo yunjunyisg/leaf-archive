@@ -16,16 +16,16 @@
 
 如果安装 1.0.0 时本机 3110 连接失败并回滚，直接安装当前版本。旧版启动入口比较了两种不同的路径，服务可能直接退出。新版支持通过安装程序使用的 current 符号链接启动。
 
-下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.5/plant-id-web-v1.0.5.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
+下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.6/plant-id-web-v1.0.6.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
 
 ```bash
 (
 set -e
 cd /root/leaf-migration
-echo "79d1bcbb158235b59aafd2b249ed8be7f078d0c1d484654f87ae151809503ebf  plant-id-web-v1.0.5.tar.gz" | sha256sum -c -
-gzip -t plant-id-web-v1.0.5.tar.gz
+echo "e5de31ccaccdf8f3b878f7b015c2b0838856dfebf3d2e872c3ae044c70fd4200  plant-id-web-v1.0.6.tar.gz" | sha256sum -c -
+gzip -t plant-id-web-v1.0.6.tar.gz
 PLANT_ID_INSTALL_DIR=$(mktemp -d /root/leaf-migration/plant-id-verified.XXXXXX)
-tar -xzf plant-id-web-v1.0.5.tar.gz -C "$PLANT_ID_INSTALL_DIR"
+tar -xzf plant-id-web-v1.0.6.tar.gz -C "$PLANT_ID_INSTALL_DIR"
 (cd "$PLANT_ID_INSTALL_DIR" && sha256sum -c SHA256SUMS)
 bash "$PLANT_ID_INSTALL_DIR/deploy/install.sh"
 )
@@ -108,8 +108,14 @@ systemctl show plant-id -p MemoryCurrent -p MemoryPeak
 
 植物识别支持多种结构化返回格式，可从常见的代码块或附带说明中读取结构化结果，并接受整数百分数字符串。1.0.4 会将无法整理为候选卡片的可读回复作为纯文本展示。截断的回复会标明只显示部分内容。原文只显示在当前页，不写入历史。已有智谱模型和密钥可继续使用。每次提交只调用一次模型。
 
+## 食虫植物资料库
+
+1.0.6 附带首批公开资料快照，包含 16 个属、1,010 个接受种、126 个异名及 41 条 iNaturalist 和 Pl@ntNet 社区观察。识别时可参考形态要点与相关名录条目。命中的候选会显示学名、异名和可打开的原始资料。详情见[资料来源与刷新方式](../apps/plant-id/knowledge/README.md)。
+
+分类快照随程序部署。识别时的模型调用沿用原设置，社区观察是供核对的样例。尚未用独立标注图像集测量准确率提升幅度。
+
 ## 本次验证范围
 
-16 项自动测试通过，包括从与生产相同的 current 符号链接启动进程并访问健康检查。其他测试覆盖真实本地 HTTP 与图片内容传输、独立账号与会话、历史归属、补充识别、密钥未配置时不伪造结果、授权与连接失败不泄露密钥、非法图像与来源检查、请求大小、旧配额停用、历史淘汰、参考图校验、并发及退出后不写入迟到结果、数据库重开后的会话和最新十条历史保留。脚本语法和安装包内文件摘要已检查。
+17 项自动测试通过，包括从与生产相同的 current 符号链接启动进程并访问健康检查。其他测试覆盖真实本地 HTTP 与图片内容传输、独立账号与会话、历史归属、补充识别、密钥未配置时不伪造结果、授权与连接失败不泄露密钥、非法图像与来源检查、请求大小、旧配额停用、历史淘汰、参考图校验、并发及退出后不写入迟到结果、数据库重开后的会话和最新十条历史保留。脚本语法和安装包内文件摘要已检查。
 
 模型调用测试使用模拟响应核对请求协议和图像字节，没有使用聊天中暴露的真实密钥发起推理。当前环境缺少可用的网页预览工具，未完成浏览器交互或手机实机验收；也没有目标服务器执行连接。因此需安装后用重新生成的密钥完成实际识别与设备验收。

@@ -7,6 +7,7 @@ import {randomBytes,randomUUID,createHash,scrypt as scryptCallback,timingSafeEqu
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {identify,recognizeText,modelConfiguration} from './model.mjs';
+import {enrichIdentification,knowledgeContext} from './knowledge.mjs';
 import {createReferences} from './references.mjs';
 const scrypt=promisify(scryptCallback),hash=value=>createHash('sha256').update(value).digest('hex'),base='/plant-id/';
 const fail=(message,status=400)=>Object.assign(Error(message),{status});
@@ -82,7 +83,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
   if(path==='api/logout'&&request.method==='POST'){const raw=request.headers.get('Cookie').split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'=')).slice(cookieName.length+1);sql.prepare('DELETE FROM sessions WHERE token=?').run(hash(raw));return json({ok:true},200,{'Set-Cookie':cookie('')})}
   if(path==='api/threads'&&request.method==='GET'){return json({threads:sql.prepare('SELECT id,title,created,updated FROM threads WHERE owner=? ORDER BY updated DESC,id').all(user.id)})}
   const match=/^api\/threads\/([a-f0-9-]{36})$/.exec(path);
-  if(match){const thread=sql.prepare('SELECT * FROM threads WHERE id=? AND owner=?').get(match[1],user.id);if(!thread)throw fail('记录不存在',404);if(request.method==='DELETE'){sql.prepare('DELETE FROM threads WHERE id=? AND owner=?').run(thread.id,user.id);return json({ok:true})}if(request.method==='GET')return json({thread,turns:sql.prepare('SELECT id,description,answer,created FROM turns WHERE thread=? AND owner=? ORDER BY created,rowid').all(thread.id,user.id).map(t=>({...t,answer:JSON.parse(t.answer)}))})}
+  if(match){const thread=sql.prepare('SELECT * FROM threads WHERE id=? AND owner=?').get(match[1],user.id);if(!thread)throw fail('记录不存在',404);if(request.method==='DELETE'){sql.prepare('DELETE FROM threads WHERE id=? AND owner=?').run(thread.id,user.id);return json({ok:true})}if(request.method==='GET')return json({thread,turns:sql.prepare('SELECT id,description,answer,created FROM turns WHERE thread=? AND owner=? ORDER BY created,rowid').all(thread.id,user.id).map(t=>({...t,answer:enrichIdentification(JSON.parse(t.answer))}))})}
   if(path==='api/reference'&&request.method==='GET'){
    limit('reference:'+user.id,120,60000);
    const name=url.searchParams.get('name')||'',rank=url.searchParams.get('rank')||'';
@@ -117,11 +118,11 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
      if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
      return json(result);
     }
-    const answer=await identify({config,images,text,previous,signal:request.signal,fetchImpl});
+    const answer=await identify({config,images,text,previous,knowledge:knowledgeContext(text,previous),signal:request.signal,fetchImpl});
     if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
     if(answer.fallback)return json({fallback:answer.fallback});
     const id=thread?.id||randomUUID(),created=now();sql.exec('BEGIN IMMEDIATE');try{if(thread){if(!sql.prepare('SELECT id FROM threads WHERE id=? AND owner=?').get(id,user.id))throw fail('记录已删除，未恢复记录',409)}else sql.prepare('INSERT INTO threads VALUES (?,?,?,?,?)').run(id,user.id,text.trim().slice(0,40)||'照片识别',created,created);sql.prepare('INSERT INTO turns VALUES (?,?,?,?,?,?)').run(randomUUID(),id,user.id,text,JSON.stringify(answer),created);sql.prepare('UPDATE threads SET updated=? WHERE id=? AND owner=?').run(created,id,user.id);pruneOwner.run(user.id,historyLimit);removeEmpty.run(user.id);refreshOwnerTitles.run(user.id);sql.exec('COMMIT')}catch(error){sql.exec('ROLLBACK');throw error}
-    return json({threadId:id,answer});
+    return json({threadId:id,answer:enrichIdentification(answer)});
    }finally{active.delete(user.id)}
   }
   return json({error:'接口不存在'},404);

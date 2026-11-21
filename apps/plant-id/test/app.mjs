@@ -163,3 +163,33 @@ test('reference photos require exact plant taxon matches, suitable licenses and 
   assert.equal(calls.length,4);
  }finally{await f.close()}
 });
+
+test('local botanical knowledge grounds vision requests and annotates new and historical candidates',async()=>{
+ const candidate={...answer.candidates[0],name:'捕蝇草',scientificName:'Dionaea corymbosa',rank:'种'};
+ let context;
+ const f=await fixture({fetchImpl:async (_url,options)=>{
+  const request=JSON.parse(options.body);
+  context=request.messages[0].content;
+  assert.equal(request.messages[1].content[1].type,'image_url');
+  return Response.json({choices:[{message:{content:JSON.stringify({...answer,candidates:[candidate]})}}]});
+ }});
+ try{
+  const {cookie}=await f.register();
+  const response=await f.request('api/identify',{method:'POST',cookie,body:f.form({text:'Dionaea muscipula？'})});
+  assert.equal(response.status,200);
+  assert.match(context,/Dionaea muscipula \/ species \/ Droseraceae/);
+  assert.match(context,/触毛/);
+  const data=await response.json();
+  const entry=data.answer.candidates[0].knowledge;
+  assert.equal(entry.source,'https://www.gbif.org/species/5421410');
+  assert.equal(entry.family,'Droseraceae');
+  assert.equal(entry.name,'Dionaea muscipula');
+  assert.equal(entry.synonym,true);
+  assert.deepEqual(new Set(entry.observations.map(row=>row.platform)),new Set(['iNaturalist','Pl@ntNet']));
+  assert.equal(entry.traits.name,'Dionaea');
+  assert.equal(data.answer.candidates[0].probability,candidate.probability);
+  const history=await(await f.request('api/threads/'+data.threadId,{cookie})).json();
+  assert.deepEqual(history.turns[0].answer.candidates[0].knowledge,entry);
+  assert.ok(!f.app.sql.prepare('SELECT answer FROM turns').get().answer.includes('"knowledge"'));
+ }finally{await f.close()}
+});
