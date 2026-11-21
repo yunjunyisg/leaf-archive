@@ -7,16 +7,17 @@ import {randomBytes,randomUUID,createHash,scrypt as scryptCallback,timingSafeEqu
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {identify,recognizeText,modelConfiguration} from './model.mjs';
+import {createReferences} from './references.mjs';
 const scrypt=promisify(scryptCallback),hash=value=>createHash('sha256').update(value).digest('hex'),base='/plant-id/';
 const fail=(message,status=400)=>Object.assign(Error(message),{status});
 const positive=(value,fallback)=>{const n=Number(value??fallback);if(!Number.isInteger(n)||n<1||n>100000)throw Error('识别限额配置无效');return n};
 async function body(request,limit){const reader=request.body?.getReader();if(!reader)return new Uint8Array();let size=0,parts=[];try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>limit){await reader.cancel();throw fail('提交内容过大，请减少照片或文字',413)}parts.push(value)}}finally{reader.releaseLock()}return Buffer.concat(parts)}
 function imageMime(bytes){if(bytes.length>3&&bytes[0]===255&&bytes[1]===216&&bytes[2]===255)return 'image/jpeg';if(bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))return 'image/png';if(bytes.length>12&&bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP')return 'image/webp';return null}
-export function createPlantId({dataDirectory,origin='https://gloriouscarnivorousplants.top',env=process.env,fetchImpl=fetch,now=Date.now}={}){
+export function createPlantId({dataDirectory,origin='https://gloriouscarnivorousplants.top',env=process.env,fetchImpl=fetch,referenceFetch=fetch,now=Date.now}={}){
  const site=new URL(origin);if(site.origin!==origin||!['https:','http:'].includes(site.protocol)||site.protocol==='http:'&&!['localhost','127.0.0.1'].includes(site.hostname))throw Error('应用来源必须是 HTTPS 域名');
- const config=modelConfiguration(env),daily=positive(env.PLANT_ID_DAILY_LIMIT,20),globalDaily=positive(env.PLANT_ID_GLOBAL_DAILY_LIMIT,100),concurrency=positive(env.PLANT_ID_CONCURRENCY,2),secure=site.protocol==='https:',cookieName=secure?'__Secure-plant_id_session':'plant_id_session',cookie=value=>`${cookieName}=${value}; Path=${base}; HttpOnly; SameSite=Strict; ${secure?'Secure; ':''}Max-Age=${value?604800:0}`;
+ const config=modelConfiguration(env),concurrency=positive(env.PLANT_ID_CONCURRENCY,2),secure=site.protocol==='https:',cookieName=secure?'__Secure-plant_id_session':'plant_id_session',cookie=value=>`${cookieName}=${value}; Path=${base}; HttpOnly; SameSite=Strict; ${secure?'Secure; ':''}Max-Age=${value?604800:0}`;
  if(!dataDirectory)throw Error('请配置独立应用的数据目录');mkdirSync(dataDirectory,{recursive:true,mode:0o700});chmodSync(dataDirectory,0o700);
- const sql=new DatabaseSync(join(dataDirectory,'plant-id.sqlite'));sql.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
+ const sql=new DatabaseSync(join(dataDirectory,'plant-id.sqlite'));sql.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA secure_delete=ON; PRAGMA busy_timeout=5000;
  CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,username TEXT NOT NULL UNIQUE,password TEXT NOT NULL,created INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,owner TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,expires INTEGER NOT NULL);
  CREATE INDEX IF NOT EXISTS session_owner ON sessions(owner);
@@ -24,10 +25,30 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
  CREATE INDEX IF NOT EXISTS thread_owner ON threads(owner,updated);
  CREATE TABLE IF NOT EXISTS turns(id TEXT PRIMARY KEY,thread TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,owner TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,description TEXT NOT NULL,answer TEXT NOT NULL,created INTEGER NOT NULL);
  CREATE INDEX IF NOT EXISTS turn_thread ON turns(owner,thread,created);
- CREATE TABLE IF NOT EXISTS usage(day TEXT NOT NULL,owner TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,count INTEGER NOT NULL,PRIMARY KEY(day,owner));`);chmodSync(join(dataDirectory,'plant-id.sqlite'),0o600);
+`);chmodSync(join(dataDirectory,'plant-id.sqlite'),0o600);
  const active=new Set(),rates=new Map();let authJobs=0;
  function limit(key,max,span){let entry=rates.get(key);if(!entry||entry.until<=now())entry={count:0,until:now()+span};entry.count++;rates.delete(key);rates.set(key,entry);if(rates.size>2000)rates.delete(rates.keys().next().value);if(entry.count>max)throw fail('操作过于频繁，请稍后重试',429)}
- const day=()=>new Date(now()+8*3600000).toISOString().slice(0,10),used=owner=>sql.prepare('SELECT count FROM usage WHERE day=? AND owner=?').get(day(),owner)?.count||0;
+ const references=createReferences(referenceFetch);
+ const historyLimit=10;
+ const pruneOwner=sql.prepare('DELETE FROM turns WHERE rowid IN (SELECT rowid FROM turns WHERE owner=? ORDER BY created DESC,rowid DESC LIMIT -1 OFFSET ?)');
+ const removeEmpty=sql.prepare('DELETE FROM threads WHERE owner=? AND NOT EXISTS (SELECT 1 FROM turns WHERE thread=threads.id)');
+ const refreshTitle=`UPDATE threads SET title=(
+  SELECT coalesce(nullif(substr(trim(description),1,40),''),'照片识别')
+  FROM turns WHERE thread=threads.id ORDER BY created,rowid LIMIT 1
+ )`;
+ const refreshOwnerTitles=sql.prepare(refreshTitle+' WHERE owner=?');
+ sql.exec('BEGIN IMMEDIATE');
+ try{
+  sql.prepare(`DELETE FROM turns WHERE rowid IN (
+   SELECT entry FROM (
+    SELECT rowid AS entry, row_number() OVER (PARTITION BY owner ORDER BY created DESC,rowid DESC) AS position
+    FROM turns
+   ) WHERE position>?
+  )`).run(historyLimit);
+  sql.exec('DELETE FROM threads WHERE NOT EXISTS (SELECT 1 FROM turns WHERE thread=threads.id)');
+  sql.exec(refreshTitle);
+  sql.exec('COMMIT');
+ }catch(error){sql.exec('ROLLBACK');sql.close();throw error}
  function account(request){const raw=request.headers.get('Cookie')?.split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1);if(!raw||!/^[a-f0-9]{64}$/.test(raw))return null;return sql.prepare('SELECT users.id,users.username FROM sessions JOIN users ON users.id=sessions.owner WHERE sessions.token=? AND sessions.expires>?').get(hash(raw),now())||null}
  const json=(value,status=200,extra={})=>Response.json(value,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',...extra}});
  const files=new Map([['', ['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']],['icon.svg',['icon.svg','image/svg+xml']],['apps',['apps.html','text/html; charset=utf-8']],['ocr',['ocr.html','text/html; charset=utf-8']],['ocr.js',['ocr.js','text/javascript; charset=utf-8']]]);
@@ -41,7 +62,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
   if(!path.startsWith('api/'))return json({error:'页面不存在'},404);
   if(!['GET','POST','DELETE'].includes(request.method))return json({error:'不支持此操作'},405);
   if(request.method!=='GET'&&request.headers.get('Origin')!==origin)return json({error:'请求来源无效'},403);
-  if(path==='api/session'&&request.method==='GET'){const user=account(request);return json({user,configured:Boolean(config.key),model:config.model,provider:config.providerName,remaining:user?Math.max(0,daily-used(user.id)):null,dailyLimit:daily,registration:env.PLANT_ID_REGISTRATION!=='false'})}
+  if(path==='api/session'&&request.method==='GET'){const user=account(request);return json({user,configured:Boolean(config.key),model:config.model,provider:config.providerName,historyLimit,registration:env.PLANT_ID_REGISTRATION!=='false'})}
   if(['api/login','api/register'].includes(path)&&request.method==='POST'){
    limit('auth:'+ip,25,15*60000);if(authJobs>=4)throw fail('登录服务繁忙，请稍后重试',429);
    let input;try{input=JSON.parse((await body(request,8192)).toString())}catch(error){if(error.status)throw error;throw fail('账号格式无效')}
@@ -59,9 +80,25 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
   }
   const user=account(request);if(!user)return json({error:'请先登录识植助手，植藏账号不能用于此应用'},401);
   if(path==='api/logout'&&request.method==='POST'){const raw=request.headers.get('Cookie').split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'=')).slice(cookieName.length+1);sql.prepare('DELETE FROM sessions WHERE token=?').run(hash(raw));return json({ok:true},200,{'Set-Cookie':cookie('')})}
-  if(path==='api/threads'&&request.method==='GET'){return json({threads:sql.prepare('SELECT id,title,created,updated FROM threads WHERE owner=? ORDER BY updated DESC,id LIMIT 50').all(user.id)})}
+  if(path==='api/threads'&&request.method==='GET'){return json({threads:sql.prepare('SELECT id,title,created,updated FROM threads WHERE owner=? ORDER BY updated DESC,id').all(user.id)})}
   const match=/^api\/threads\/([a-f0-9-]{36})$/.exec(path);
   if(match){const thread=sql.prepare('SELECT * FROM threads WHERE id=? AND owner=?').get(match[1],user.id);if(!thread)throw fail('记录不存在',404);if(request.method==='DELETE'){sql.prepare('DELETE FROM threads WHERE id=? AND owner=?').run(thread.id,user.id);return json({ok:true})}if(request.method==='GET')return json({thread,turns:sql.prepare('SELECT id,description,answer,created FROM turns WHERE thread=? AND owner=? ORDER BY created,rowid').all(thread.id,user.id).map(t=>({...t,answer:JSON.parse(t.answer)}))})}
+  if(path==='api/reference'&&request.method==='GET'){
+   limit('reference:'+user.id,120,60000);
+   const name=url.searchParams.get('name')||'',rank=url.searchParams.get('rank')||'';
+   if(rank.length>80)throw fail('分类层级过长');
+   try{return json({photo:await references.lookup(name,rank,request.signal)})}
+   catch{throw fail('参考图暂时无法加载',503)}
+  }
+  const referenceImage=/^api\/reference-image\/(\d{1,16})$/.exec(path);
+  if(referenceImage&&request.method==='GET'){
+   limit('reference-image:'+user.id,120,60000);
+   try{
+    const photo=await references.image(referenceImage[1],request.signal);
+    if(!photo)return json({error:'参考图不可用'},404);
+    return new Response(photo.bytes,{headers:{'Content-Type':photo.type,'Cache-Control':'private, max-age=600','X-Content-Type-Options':'nosniff'}});
+   }catch{throw fail('参考图暂时无法加载',503)}
+  }
   if((path==='api/identify'||path==='api/ocr')&&request.method==='POST'){
    const ocr=path==='api/ocr';
    if(!config.key)throw fail('识别服务尚未配置，请联系网站管理员开通视觉模型',503);
@@ -74,19 +111,17 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
     if(ocr&&(images.length!==1||text||threadId))throw fail('文字识别每次需要一张照片');
     if(images.length>3||total>10*1024*1024)throw fail('每轮最多三张识别副本，合计不超过 10 MiB');if(!images.length&&!text.trim())throw fail('请上传照片或填写植物特征');
     const thread=threadId?sql.prepare('SELECT * FROM threads WHERE id=? AND owner=?').get(threadId,user.id):null;if(threadId&&!thread)throw fail('记录不存在',404);
-    if(thread&&sql.prepare('SELECT count(*) AS n FROM turns WHERE thread=? AND owner=?').get(threadId,user.id).n>=30)throw fail('本次记录已满三十轮，请新建识别');
     const previous=thread?JSON.parse(sql.prepare('SELECT answer FROM turns WHERE thread=? AND owner=? ORDER BY created DESC,rowid DESC LIMIT 1').get(threadId,user.id)?.answer||'null'):null;
-    limit('identify:'+user.id,6,60000);sql.exec('BEGIN IMMEDIATE');try{if(used(user.id)>=daily||(sql.prepare('SELECT SUM(count) AS n FROM usage WHERE day=?').get(day()).n||0)>=globalDaily)throw fail('今日识别额度已用完，请明天再试',429);sql.prepare('INSERT INTO usage VALUES (?,?,1) ON CONFLICT(day,owner) DO UPDATE SET count=count+1').run(day(),user.id);sql.exec('COMMIT')}catch(error){sql.exec('ROLLBACK');throw error}
     if(ocr){
      const result=await recognizeText({config,image:images[0],signal:request.signal,fetchImpl});
      if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
-     return json({...result,remaining:Math.max(0,daily-used(user.id))});
+     return json(result);
     }
     const answer=await identify({config,images,text,previous,signal:request.signal,fetchImpl});
     if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
-    if(answer.fallback)return json({fallback:answer.fallback,remaining:Math.max(0,daily-used(user.id))});
-    const id=thread?.id||randomUUID(),created=now();sql.exec('BEGIN IMMEDIATE');try{if(thread){if(!sql.prepare('SELECT id FROM threads WHERE id=? AND owner=?').get(id,user.id))throw fail('记录已删除，未恢复记录',409)}else sql.prepare('INSERT INTO threads VALUES (?,?,?,?,?)').run(id,user.id,text.trim().slice(0,40)||'照片识别',created,created);sql.prepare('INSERT INTO turns VALUES (?,?,?,?,?,?)').run(randomUUID(),id,user.id,text,JSON.stringify(answer),created);sql.prepare('UPDATE threads SET updated=? WHERE id=? AND owner=?').run(created,id,user.id);sql.exec('COMMIT')}catch(error){sql.exec('ROLLBACK');throw error}
-    return json({threadId:id,answer,remaining:Math.max(0,daily-used(user.id))});
+    if(answer.fallback)return json({fallback:answer.fallback});
+    const id=thread?.id||randomUUID(),created=now();sql.exec('BEGIN IMMEDIATE');try{if(thread){if(!sql.prepare('SELECT id FROM threads WHERE id=? AND owner=?').get(id,user.id))throw fail('记录已删除，未恢复记录',409)}else sql.prepare('INSERT INTO threads VALUES (?,?,?,?,?)').run(id,user.id,text.trim().slice(0,40)||'照片识别',created,created);sql.prepare('INSERT INTO turns VALUES (?,?,?,?,?,?)').run(randomUUID(),id,user.id,text,JSON.stringify(answer),created);sql.prepare('UPDATE threads SET updated=? WHERE id=? AND owner=?').run(created,id,user.id);pruneOwner.run(user.id,historyLimit);removeEmpty.run(user.id);refreshOwnerTitles.run(user.id);sql.exec('COMMIT')}catch(error){sql.exec('ROLLBACK');throw error}
+    return json({threadId:id,answer});
    }finally{active.delete(user.id)}
   }
   return json({error:'接口不存在'},404);

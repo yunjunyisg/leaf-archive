@@ -21,4 +21,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: python3 apps/distribution/publish.py 1.8.4
+        run: python3 apps/distribution/publish.py 1.8.5

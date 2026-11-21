@@ -18,8 +18,8 @@ async function api(path, options){
  return data;
 }
 
-function showQuota(remaining){
- find('ocr-session').textContent = '今日还可提交 ' + remaining + ' 次，与植物识别共用额度。';
+function showAvailability(){
+ find('ocr-session').textContent = '站内不限每日识别次数，仍受模型服务额度和并发限制。';
 }
 
 api('session').then(data => {
@@ -28,7 +28,7 @@ api('session').then(data => {
  start.disabled = !available;
  if(!data.user) find('ocr-session').textContent = '请先登录识植助手，再回到这里提取文字。';
  else if(!data.configured) find('ocr-session').textContent = '视觉服务尚未配置。';
- else showQuota(data.remaining);
+ else showAvailability();
  if(data.provider)consent.nextElementSibling.textContent = '同意把图片发送给' + data.provider + '。本站不保存本次图片或识别文字。';
 }).catch(error => { find('ocr-session').textContent = error.message; });
 
@@ -59,7 +59,7 @@ find('ocr-form').addEventListener('submit', async event => {
   const data = await api('ocr', {method:'POST', body:form});
   output.value = data.text;
   result.hidden = !data.text;
-  showQuota(data.remaining);
+  showAvailability();
   notice.textContent = data.truncated ? '结果达到长度上限，请把图片分段后再识别。' :
    data.text ? '文字已提取。' : '没有找到可辨认的文字。';
  }catch(error){ notice.textContent = error.message; }
