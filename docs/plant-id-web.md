@@ -16,16 +16,16 @@
 
 如果安装 1.0.0 时本机 3110 连接失败并回滚，直接安装当前版本。旧版启动入口比较了两种不同的路径，服务可能直接退出。新版支持通过安装程序使用的 current 符号链接启动。
 
-下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.11/plant-id-web-v1.0.11.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
+下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.12/plant-id-web-v1.0.12.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
 
 ```bash
 (
 set -e
 cd /root/leaf-migration
-echo "9e563b609e6c7ab5f159f45fea17ddf5ce00228c62ab6afa488784856d22676d  plant-id-web-v1.0.11.tar.gz" | sha256sum -c -
-gzip -t plant-id-web-v1.0.11.tar.gz
+echo "f3c484ce7c725360c28d0e077cc2e190c4369d09fea393113c410bb61a8159b8  plant-id-web-v1.0.12.tar.gz" | sha256sum -c -
+gzip -t plant-id-web-v1.0.12.tar.gz
 PLANT_ID_INSTALL_DIR=$(mktemp -d /root/leaf-migration/plant-id-verified.XXXXXX)
-tar -xzf plant-id-web-v1.0.11.tar.gz -C "$PLANT_ID_INSTALL_DIR"
+tar -xzf plant-id-web-v1.0.12.tar.gz -C "$PLANT_ID_INSTALL_DIR"
 (cd "$PLANT_ID_INSTALL_DIR" && sha256sum -c SHA256SUMS)
 bash "$PLANT_ID_INSTALL_DIR/deploy/install.sh"
 )
@@ -136,6 +136,10 @@ bash /opt/plant-id/current/deploy/install-dsh.sh
 
 密钥密文保存在应用数据库，加密用的文件是 `/var/lib/plant-id/ask-credentials.key`。迁移时需一并保存这两个文件，并限制访问权限。服务端为每次问答建立临时工作目录，处理结束后删除。各服务商的回答均可使用共享植物资料。
 
+### 智谱问答
+
+智谱问答默认用 `glm-4.7-flash`，以关闭思考模式的方式生成可显示的回答。智谱返回模型繁忙（1305）或模型不存在（1211）时，站点会自动尝试一次 `glm-4.5-flash`。账号额度、欠费、模型权限和密钥错误会分别提示。模型调用权限和用量由智谱开放平台账号决定。 [智谱错误码](https://docs.bigmodel.cn/cn/api/api-code)
+
 ### 添加其他兼容服务商
 
 管理员可在 `/etc/plant-id.env` 添加 `PLANT_ID_ASK_GATEWAYS`。网关需使用受信任的 HTTPS 公网地址，支持 OpenAI Chat Completions 的流式响应和 Bearer 密钥认证。将下面的域名和模型替换为服务商提供的接口地址和模型标识，再运行 `systemctl restart plant-id`。用户刷新后可在问答窗口选择新服务商，并填写自己的 Key。
@@ -150,4 +154,4 @@ PLANT_ID_ASK_GATEWAYS='[{"id":"custom-example","label":"示例网关","baseURL":
 
 ## 本次验证范围
 
-25 项自动测试通过，覆盖问答密钥的账号与服务商隔离、加密保存、重启复用、更换和失效。另用真实 DSH 运行时和模拟模型服务检查了鉴权失败、额度限制和兼容接口调用，通过移动尺寸浏览器验证了问答表单。安装包内文件校验通过。模型测试使用模拟接口，目标服务器仍需部署后实测。
+26 项自动测试通过，覆盖问答密钥的账号与服务商隔离、加密保存、重启复用、更换和失效。另用真实 DSH 运行时和模拟模型服务检查了智谱回答正文、模型繁忙时的备用调用、欠费和鉴权失败，通过移动尺寸浏览器验证了问答表单。安装包内文件校验通过。模型测试使用模拟接口，目标服务器仍需部署后实测。

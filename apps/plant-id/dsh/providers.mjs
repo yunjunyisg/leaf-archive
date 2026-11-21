@@ -2,7 +2,7 @@ import {isIP} from 'node:net';
 
 const builtins=[
  {id:'deepseek',label:'DeepSeek',model:'deepseek-v4-flash',apiKeyEnv:'DEEPSEEK_API_KEY'},
- {id:'bigmodel',label:'智谱开放平台',model:'glm-4.7-flash',baseURL:'https://open.bigmodel.cn/api/paas/v4'},
+ {id:'bigmodel',label:'智谱开放平台',model:'glm-4.7-flash',fallbackModel:'glm-4.5-flash',baseURL:'https://open.bigmodel.cn/api/paas/v4'},
  {id:'dashscope',label:'阿里云百炼（中国内地）',model:'qwen-plus',baseURL:'https://dashscope.aliyuncs.com/compatible-mode/v1'},
  {id:'siliconflow',label:'硅基流动（中国内地）',model:'Qwen/Qwen3-8B',baseURL:'https://api.siliconflow.cn/v1'},
  {id:'openai',label:'OpenAI',model:'gpt-4.1-mini',baseURL:'https://api.openai.com/v1'},
@@ -50,10 +50,11 @@ export function routeForQuestion(providers,providerId,requestedModel){
  const provider=providers.get(providerId);
  const model=requestedModel.trim()||provider?.model;
  if(!provider||!validModel(model)||(!provider.allowModel&&model!==provider.model))return null;
- return {...provider,model};
+ return {...provider,model,fallbackModel:model===provider.model?provider.fallbackModel:undefined};
 }
 
 export function compatibleProviderPatch(route){
+ const bigmodel=route.id==='bigmodel';
  return [{insert:[{
   id:'plant-id-ask-compatible-provider',
   name:'@deepseek-ai/dsh-llm-pi-ai',
@@ -62,7 +63,10 @@ export function compatibleProviderPatch(route){
    api:'openai-completions',baseURL:route.baseURL,
    defaultContextWindow:32000,defaultMaxTokens:2200,
    retryPolicy:{mode:'normal',maxRetries:0},
-   models:[{id:route.model,name:route.model,contextWindow:32000,maxTokens:2200}],
+   ...(bigmodel?{compat:{thinkingFormat:'zai',maxTokensField:'max_tokens',supportsStore:false,
+    supportsDeveloperRole:false,supportsUsageInStreaming:false}}:{}),
+   models:[{id:route.model,name:route.model,contextWindow:32000,maxTokens:2200,
+    ...(bigmodel?{reasoningEfforts:{off:null,low:'low'}}:{})}],
   }}},
  }]}];
 }

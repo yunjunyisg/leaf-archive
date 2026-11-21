@@ -4,6 +4,7 @@ import {mkdtemp,rm,stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createPlantId} from '../server.mjs';
+import {askProviderRegistry,compatibleProviderPatch,routeForQuestion} from '../dsh/providers.mjs';
 
 const origin='https://gloriouscarnivorousplants.top';
 async function appFixture(dshAnswer,env={}){
@@ -153,4 +154,18 @@ test('a saved question key survives reloads, is scoped to account and provider, 
   assert.deepEqual((await session(cookie)).savedAskProviders,[]);
   assert.equal((await ask()).status,400);
  }finally{await f.close()}
+});
+
+test('Zhipu uses its thinking controls and only the default model can select a fallback',()=>{
+ const providers=askProviderRegistry({});
+ const route=routeForQuestion(providers,'bigmodel','');
+ assert.equal(route.fallbackModel,'glm-4.5-flash');
+ const [{insert:[plugin]}]=compatibleProviderPatch(route);
+ const profile=plugin.config.providers['plant-id-compatible'];
+ assert.equal(profile.compat.thinkingFormat,'zai');
+ assert.equal(profile.compat.maxTokensField,'max_tokens');
+ assert.equal(profile.compat.supportsUsageInStreaming,false);
+ assert.equal(profile.models[0].reasoningEfforts.off,null);
+ assert.equal(routeForQuestion(providers,'bigmodel','glm-4.6v-flashx').fallbackModel,undefined);
+ assert.equal(routeForQuestion(providers,'dashscope','').fallbackModel,undefined);
 });

@@ -18,6 +18,26 @@ function rejectedKey(failure){
  return failure.status===401||/^(?:HTTP\s+)?401\b|\bauthentication_error\b|\binvalid_api_key\b|\bapi[ _-]?key (?:is )?(?:invalid|expired|revoked|incorrect)\b|\b(?:invalid|incorrect|expired|revoked) api[ _-]?key\b/i.test(failure.message||'');
 }
 
+// Only map documented codes from the HTTP error envelope. Never return its raw text.
+function bigmodelFailure(failure){
+ const match=/^(?:HTTP\s+)?\d{3}:\s*(\{[\s\S]*\})\s*$/.exec(failure?.message||'');
+ let code;
+ if(match){
+  try{const payload=JSON.parse(match[1]);code=String(payload?.error?.code??payload?.code??'')}catch{}
+ }
+ switch(code){
+  case '1211':return new AskError('智谱暂未提供当前问答模型（1211）',502,'ask_model_unavailable');
+  case '1305':return new AskError('智谱问答模型当前繁忙（1305），请稍后再试',503,'ask_model_busy');
+  case '1302':return new AskError('智谱账号请求频率达到上限（1302），请稍后再试',429);
+  case '1113':return new AskError('智谱账号欠费（1113），请检查开放平台余额',429);
+  case '1308':
+  case '1310':return new AskError('智谱账号用量达到上限（'+code+'），请在开放平台检查额度',429);
+  case '1311':return new AskError('智谱当前套餐没有此模型的使用权限（1311）',502);
+  case '1315':return new AskError('此智谱密钥仅限企业编程套餐（1315），请在问答中更换为开放平台 API Key',422);
+  default:return null;
+ }
+}
+
 export function createDshAnswer(runtimeDirectory){
  let sdkModule;
  async function sdk(){
@@ -36,10 +56,9 @@ export function createDshAnswer(runtimeDirectory){
    throw new AskError('植物问答的 DSH 运行时加载失败，请联系管理员执行安装检查',503);
   }
  }
- return async function answer({apiKey,route,question,plant,history,knowledge,signal}){
+ async function run({apiKey,route,question,plant,history,knowledge},stop){
   const {DeepSeekHarness}=await sdk();
   const work=await mkdtemp(join(tmpdir(),'plant-id-dsh-'));
-  const stop=AbortSignal.any([signal,AbortSignal.timeout(75000)]);
   let harness;
   const abort=()=>{void harness?.close().catch(()=>{})};
   try{
@@ -53,6 +72,7 @@ export function createDshAnswer(runtimeDirectory){
    harness=new DeepSeekHarness({
     profile:'sdk-minimal',patches,dshHome:work,cwd:work,processCwd:work,
     provider:route.baseURL?'plant-id-compatible':'deepseek-official',model:route.model,maxTokens:2200,initializeTimeoutMs:15000,
+    ...(route.id==='bigmodel'?{reasoningEffort:'off'}:{}),
     requestTimeoutMs:18000,shutdownTimeoutMs:700,disposeEofGraceMs:1000,
     env:{PATH:'/usr/bin:/bin',LANG:'C.UTF-8',[route.baseURL?'PLANT_ASK_API_KEY':'DEEPSEEK_API_KEY']:apiKey,DSH_SYSTEM_PROMPT:persona,
      DSH_TELEMETRY_DISABLED:'1',NODE_OPTIONS:'--max-old-space-size=128'},
@@ -64,7 +84,11 @@ export function createDshAnswer(runtimeDirectory){
    if(stop.aborted)throw stop.reason;
    if(reply.finishReason==='error'||reply.finishReason==='aborted'||!text){
     const failure=reply.events.findLast(event=>event.type==='turn/end')?.data.reason?.error;
+    const upstream=route.id==='bigmodel'?bigmodelFailure(failure):null;
+    if(upstream)throw upstream;
     if(rejectedKey(failure))throw new AskError('所选服务商拒绝了该 API Key，请重新填写',422,'ask_key_invalid');
+    if(route.id==='bigmodel'&&!failure&&!text)
+     throw new AskError('智谱没有返回可显示的回答正文，请缩短问题后重试',502);
     throw new AskError('所选服务商未完成回答，请检查模型权限、平台额度或稍后再试',502);
    }
    return {text:text.slice(0,12000),model:route.model,truncated:reply.finishReason==='length'||text.length>12000};
@@ -75,6 +99,15 @@ export function createDshAnswer(runtimeDirectory){
   }finally{
    stop.removeEventListener('abort',abort);
    try{await harness?.close()}finally{await rm(work,{recursive:true,force:true})}
+  }
+ };
+ return async function answer(input){
+  const stop=AbortSignal.any([input.signal,AbortSignal.timeout(75000)]);
+  const {route}=input;
+  try{return await run(input,stop)}
+  catch(error){
+   if(!route.fallbackModel||stop.aborted||!['ask_model_busy','ask_model_unavailable'].includes(error.code))throw error;
+   return run({...input,route:{...route,model:route.fallbackModel}},stop);
   }
  };
 }
