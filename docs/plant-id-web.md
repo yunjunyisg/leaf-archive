@@ -13,7 +13,7 @@
 
 ## 安卓与 Windows 安装包
 
-识植助手客户端启动后进入 `https://gloriouscarnivorousplants.top/plant-id/`。请使用识植助手自己的账号。客户端需联网，功能随服务器上的识植助手版本更新。
+识植助手客户端启动后进入 `https://gloriouscarnivorousplants.top/plant-id/`。请使用识植助手自己的账号。客户端需联网，功能和页面布局随服务器上的识植助手版本更新。升级服务器后，重新打开客户端即可加载新版页面。
 
 - 安卓 10 或更新版本使用 `PlantId-Android-1.0.1.apk`。
 - Windows 10/11 64 位使用 `PlantId-Windows-x64-1.0.1.exe`。
@@ -27,16 +27,16 @@
 
 如果安装 1.0.0 时本机 3110 连接失败并回滚，直接安装当前版本。旧版启动入口比较了两种不同的路径，服务可能直接退出。新版支持通过安装程序使用的 current 符号链接启动。
 
-下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.12/plant-id-web-v1.0.12.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
+下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.13/plant-id-web-v1.0.13.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
 
 ```bash
 (
 set -e
 cd /root/leaf-migration
-echo "f3c484ce7c725360c28d0e077cc2e190c4369d09fea393113c410bb61a8159b8  plant-id-web-v1.0.12.tar.gz" | sha256sum -c -
-gzip -t plant-id-web-v1.0.12.tar.gz
+echo "0ea6e536fa138b06908f57a2dcbf7ae91f53809fcb2ddc7999a7146f3d00d48f  plant-id-web-v1.0.13.tar.gz" | sha256sum -c -
+gzip -t plant-id-web-v1.0.13.tar.gz
 PLANT_ID_INSTALL_DIR=$(mktemp -d /root/leaf-migration/plant-id-verified.XXXXXX)
-tar -xzf plant-id-web-v1.0.12.tar.gz -C "$PLANT_ID_INSTALL_DIR"
+tar -xzf plant-id-web-v1.0.13.tar.gz -C "$PLANT_ID_INSTALL_DIR"
 (cd "$PLANT_ID_INSTALL_DIR" && sha256sum -c SHA256SUMS)
 bash "$PLANT_ID_INSTALL_DIR/deploy/install.sh"
 )
