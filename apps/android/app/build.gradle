@@ -7,8 +7,8 @@ android {
         applicationId (plantId ? 'top.gloriouscarnivorousplants.plantid' : 'top.gloriouscarnivorousplants.leafarchive')
         minSdk 29
         targetSdk 35
-        versionCode (plantId ? 1 : 3)
-        versionName (plantId ? '1.0.0' : '1.1.0')
+        versionCode (plantId ? 2 : 3)
+        versionName (plantId ? '1.0.1' : '1.1.0')
         manifestPlaceholders = [
             title: plantId ? '识植助手' : '植藏',
             icon: plantId ? '@drawable/plant_id_icon' : '@mipmap/ic_launcher',

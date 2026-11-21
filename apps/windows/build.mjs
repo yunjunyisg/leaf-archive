@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';import path from 'node:path';import os from 'n
 const root=path.dirname(fileURLToPath(import.meta.url)),output=path.resolve(process.env.APP_OUTPUT_DIR||path.join(root,'out')),temp=await fs.mkdtemp(path.join(os.tmpdir(),'leaf-desktop-'));
 const plantId=process.argv.includes('--plant-id');
 const product=plantId?{
- name:'PlantId',title:'识植助手',description:'识植助手植物识别与问答',version:'1.0.0',
+ name:'PlantId',title:'识植助手',description:'识植助手植物识别与问答',version:'1.0.1',
  identifier:'top.gloriouscarnivorousplants.plantid',icon:'plant-id.ico',
 }:{
  name:'LeafArchive',title:'植藏',description:'植藏植物档案',

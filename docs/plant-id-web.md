@@ -15,10 +15,10 @@
 
 识植助手客户端启动后进入 `https://gloriouscarnivorousplants.top/plant-id/`。请使用识植助手自己的账号。客户端需联网，功能随服务器上的识植助手版本更新。
 
-- 安卓 10 或更新版本使用 `PlantId-Android-1.0.0.apk`。
-- Windows 10/11 64 位使用 `PlantId-Windows-x64-1.0.0.exe`。
+- 安卓 10 或更新版本使用 `PlantId-Android-1.0.1.apk`。
+- Windows 10/11 64 位使用 `PlantId-Windows-x64-1.0.1.exe`。
 
-[客户端安装包下载](https://github.com/yunjunyisg/leaf-archive/releases/tag/plant-id-apps-v1.0.0)
+[客户端安装包下载](https://github.com/yunjunyisg/leaf-archive/releases/tag/plant-id-apps-v1.0.1)
 
 
 ## 一、下载并安装独立服务

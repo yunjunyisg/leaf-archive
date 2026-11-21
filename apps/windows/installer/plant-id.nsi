@@ -7,10 +7,10 @@ RequestExecutionLevel user
 SetCompressor /SOLID lzma
 Icon "..\assets\plant-id.ico"
 UninstallIcon "..\assets\plant-id.ico"
-VIProductVersion "1.0.0.0"
+VIProductVersion "1.0.1.0"
 VIAddVersionKey /LANG=2052 "FileDescription" "识植助手安装程序"
 VIAddVersionKey /LANG=2052 "ProductName" "识植助手"
-VIAddVersionKey /LANG=2052 "FileVersion" "1.0.0"
+VIAddVersionKey /LANG=2052 "FileVersion" "1.0.1"
 VIAddVersionKey /LANG=2052 "LegalCopyright" "识植助手"
 
 Function .onInit
@@ -32,7 +32,7 @@ Section "识植助手"
   CreateShortcut "$SMPROGRAMS\识植助手.lnk" "$INSTDIR\app\PlantId.exe"
   CreateShortcut "$DESKTOP\识植助手.lnk" "$INSTDIR\app\PlantId.exe"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PlantId" "DisplayName" "识植助手"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PlantId" "DisplayVersion" "1.0.0"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PlantId" "DisplayVersion" "1.0.1"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PlantId" "DisplayIcon" "$INSTDIR\app\PlantId.exe"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PlantId" "UninstallString" '\"$INSTDIR\Uninstall.exe\"'
 SectionEnd

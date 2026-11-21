@@ -53,6 +53,10 @@ jobs:
           $installed = Start-Process -FilePath $installer -ArgumentList '/S' -PassThru -Wait
           $installedExe = Join-Path $env:LOCALAPPDATA 'Programs\PlantId\app\PlantId.exe'
           if ($installed.ExitCode -ne 0 -or !(Test-Path $installedExe)) { throw '静默安装验证失败' }
+          $application = Start-Process -FilePath $installedExe -PassThru
+          if ($application.WaitForExit(7000)) { throw "安装后的应用提前退出，状态码 $($application.ExitCode)" }
+          $null = $application.CloseMainWindow()
+          if (!$application.WaitForExit(3000)) { Stop-Process -Id $application.Id -Force }
           $checksum = "$installer.sha256"
           "$( (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant() )  $name" | Set-Content -Path $checksum -Encoding ascii
           gh release upload $env:PLANT_ID_RELEASE $installer $checksum --clobber

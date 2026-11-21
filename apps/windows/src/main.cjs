@@ -1,9 +1,14 @@
 const {app,BrowserWindow,Menu,shell,session,dialog,ipcMain}=require('electron');
 const path=require('node:path');
+const {mkdirSync}=require('node:fs');
 const product=require('./product.cjs');
 const {isTrusted,isExternal,isDownload,isTrustedMainFrame}=require('./policy.cjs');
 app.setName(product.name);app.setAppUserModelId(product.id);
-if(product.pathPrefix)app.setPath('userData',path.join(app.getPath('appData'),'PlantId'));
+if(product.pathPrefix){
+ const data=path.join(app.getPath('appData'),'PlantId');
+ mkdirSync(data,{recursive:true});
+ app.setPath('userData',data);
+}
 const lock=app.requestSingleInstanceLock();if(!lock)app.quit();
 let window;
 function openExternal(url){if(isExternal(url))shell.openExternal(url).catch(()=>{})}
