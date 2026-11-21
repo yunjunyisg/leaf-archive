@@ -6,9 +6,9 @@ import {join} from 'node:path';
 import {createPlantId} from '../server.mjs';
 
 const origin='https://gloriouscarnivorousplants.top';
-async function appFixture(dshAnswer){
+async function appFixture(dshAnswer,env={}){
  const dir=await mkdtemp(join(tmpdir(),'plant-ask-test-'));
- const app=createPlantId({dataDirectory:dir,origin,env:{PLANT_ID_API_KEY:'server-vision-key'},dshAnswer});
+ const app=createPlantId({dataDirectory:dir,origin,env:{PLANT_ID_API_KEY:'server-vision-key',...env},dshAnswer});
  const post=(path,value,{cookie='',source=origin}={})=>app.fetch(new Request(origin+'/plant-id/'+path,{
   method:'POST',headers:{Cookie:cookie,Origin:source,'Content-Type':'application/json'},body:JSON.stringify(value),
  }));
@@ -60,5 +60,43 @@ test('remote knowledge plugin exposes only public read-only lookup without an AI
   const rejected=await(await rpc('tools/call',{name:'write',arguments:{name:'任意植物'}})).json();
   assert.equal(rejected.error.code,-32602);
   assert.equal((await f.post('mcp',{jsonrpc:'2.0',id:1,method:'tools/list'},{source:'https://example.com'})).status,403);
+ }finally{await f.close()}
+});
+
+test('different user keys route only to selected trusted providers and models',async()=>{
+ const calls=[];
+ const f=await appFixture(async input=>{
+  calls.push(input);
+  return {text:'植物问答的测试答复。',model:input.route.model,truncated:false};
+ },{PLANT_ID_ASK_GATEWAYS:JSON.stringify([{id:'custom-example',label:'示例网关',baseURL:'https://models.example.com/v1',model:'vendor/plant-chat'}])});
+ try{
+  const cookie=await f.login('gateway_user');
+  const session=await(await f.app.fetch(new Request(origin+'/plant-id/api/session'))).json();
+  assert.ok(session.askProviders.some(row=>row.id==='bigmodel'));
+  assert.ok(session.askProviders.some(row=>row.id==='custom-example'));
+  assert.ok(session.askProviders.every(row=>!Object.hasOwn(row,'baseURL')));
+  const question={apiKey:'opaque123.example_Token',plant:'Rosa chinensis',question:'怎么和相似的植物区分？'};
+  for(const invalid of [
+   {provider:'unknown'},
+   {provider:'deepseek',model:'arbitrary'},
+   {provider:'bigmodel',model:'not a model'},
+   {provider:'bigmodel',baseURL:'https://example.com/v1'},
+   {provider:'bigmodel',apiKey:'Bearer token123'},
+  ])assert.equal((await f.post('api/ask',{...question,...invalid},{cookie})).status,400);
+  assert.equal(calls.length,0);
+  const first=await f.post('api/ask',{...question,provider:'bigmodel',model:'glm-4.6v-flashx'},{cookie});
+  assert.equal(first.status,200);
+  const payload=await first.json();
+  assert.equal(payload.provider,'智谱开放平台');
+  assert.equal(payload.model,'glm-4.6v-flashx');
+  assert.equal(calls[0].apiKey,question.apiKey);
+  assert.equal(calls[0].route.baseURL,'https://open.bigmodel.cn/api/paas/v4');
+  assert.equal(calls[0].knowledge[0].name,'Rosa chinensis');
+  assert.doesNotMatch(JSON.stringify(payload),/opaque123|open\.bigmodel\.cn/);
+  const second=await f.post('api/ask',{...question,provider:'custom-example',apiKey:'another_provider-token'},{cookie});
+  assert.equal(second.status,200);
+  assert.equal(calls[1].route.baseURL,'https://models.example.com/v1');
+  assert.equal(calls[1].route.model,'vendor/plant-chat');
+  assert.equal(calls[1].apiKey,'another_provider-token');
  }finally{await f.close()}
 });

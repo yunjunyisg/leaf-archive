@@ -11,9 +11,12 @@
 <form>
 <div class="dialog-heading"><h2 id="ask-title">植物问答</h2><button type="button" class="subtle" id="ask-close">关闭</button></div>
 <p id="ask-target" class="muted"></p>
-<label class="field" for="ask-key">你的 DeepSeek API Key</label>
-<input id="ask-key" type="password" autocomplete="off" spellcheck="false" maxlength="160" placeholder="sk-…" required>
-<p class="muted">密钥只用于当前窗口的请求，关闭后清除。问答由 DSH 调用，计入你的 DeepSeek 开放平台用量。</p>
+<label class="field" for="ask-provider">问答服务商</label>
+<select id="ask-provider" required></select>
+<div id="ask-model-field"><label class="field" for="ask-model">模型</label><input id="ask-model" maxlength="128" spellcheck="false" required></div>
+<label class="field" for="ask-key">你的 API Key</label>
+<input id="ask-key" type="password" autocomplete="off" spellcheck="false" maxlength="512" required>
+<p class="muted">密钥用于所选服务商的问答请求，关闭窗口后清除。用量计入你在该服务商的账号。切换平台时会清除旧密钥和对话。</p>
 <div id="ask-messages" role="log" aria-label="问答内容"></div>
 <label class="field" for="ask-question">你想了解哪个方面？</label>
 <textarea id="ask-question" rows="3" maxlength="2000" placeholder="例如：怎样和另一种植物区分？" required></textarea>

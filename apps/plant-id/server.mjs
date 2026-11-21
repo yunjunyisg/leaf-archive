@@ -10,6 +10,7 @@ import {identify,recognizeText,modelConfiguration} from './model.mjs';
 import {enrichIdentification,knowledgeContext,reviewPlantNames} from './knowledge.mjs';
 import {createReferences} from './references.mjs';
 import {createDshAnswer} from './dsh/ask.mjs';
+import {askProviderRegistry,publicAskProviders,routeForQuestion,validApiKey} from './dsh/providers.mjs';
 import {knowledgeMcp,plantKnowledge} from './dsh/mcp.mjs';
 const scrypt=promisify(scryptCallback),hash=value=>createHash('sha256').update(value).digest('hex'),base='/plant-id/';
 const fail=(message,status=400)=>Object.assign(Error(message),{status});
@@ -34,6 +35,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
  const references=createReferences(referenceFetch);
  const dshDirectory=env.PLANT_ID_DSH_RUNTIME||'/opt/plant-id/dsh-runtime';
  const askDsh=dshAnswer||createDshAnswer(dshDirectory);
+ const askProviders=askProviderRegistry(env);
  const dshAvailable=Boolean(dshAnswer)||existsSync(join(dshDirectory,'node_modules/@deepseek-ai/dsh-sdk-client/package.json'));
  let asking=false;
  const historyLimit=10;
@@ -79,7 +81,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
   if(!path.startsWith('api/'))return json({error:'页面不存在'},404);
   if(!['GET','POST','DELETE'].includes(request.method))return json({error:'不支持此操作'},405);
   if(request.method!=='GET'&&request.headers.get('Origin')!==origin)return json({error:'请求来源无效'},403);
-  if(path==='api/session'&&request.method==='GET'){const user=account(request);return json({user,configured:Boolean(config.key),model:config.model,provider:config.providerName,dshAvailable,historyLimit,registration:env.PLANT_ID_REGISTRATION!=='false'})}
+  if(path==='api/session'&&request.method==='GET'){const user=account(request);return json({user,configured:Boolean(config.key),model:config.model,provider:config.providerName,dshAvailable,askProviders:publicAskProviders(askProviders),historyLimit,registration:env.PLANT_ID_REGISTRATION!=='false'})}
   if(['api/login','api/register'].includes(path)&&request.method==='POST'){
    limit('auth:'+ip,25,15*60000);if(authJobs>=4)throw fail('登录服务繁忙，请稍后重试',429);
    let input;try{input=JSON.parse((await body(request,8192)).toString())}catch(error){if(error.status)throw error;throw fail('账号格式无效')}
@@ -110,8 +112,11 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
     try{input=JSON.parse((await body(request,48*1024)).toString())}
     catch(error){if(error.status)throw error;throw fail('问答提交格式无效')}
     if(!input||typeof input!=='object')throw fail('问答提交格式无效');
-    const {apiKey,question,plant='',history=[]}=input;
-    if(typeof apiKey!=='string'||!/^sk-[A-Za-z0-9_-]{16,157}$/.test(apiKey.trim()))throw fail('请填写 DeepSeek 开放平台 API Key');
+    const {apiKey,provider='deepseek',model='',question,plant='',history=[]}=input;
+    if(!validApiKey(apiKey))throw fail('请填写所选平台的 API Key');
+    if(['baseURL','endpoint','url'].some(field=>Object.hasOwn(input,field)))throw fail('请选择站点已配置的服务商');
+    const route=routeForQuestion(askProviders,provider,model);
+    if(!route)throw fail('请选择受支持的服务商和模型');
     if(typeof question!=='string'||!question.trim()||question.length>2000||typeof plant!=='string'||plant.length>120)throw fail('问题最多 2000 字，植物名称最多 120 字');
     if(!Array.isArray(history)||history.length>4||history.some(item=>!item||
      typeof item.question!=='string'||item.question.length>2000||typeof item.answer!=='string'||item.answer.length>3000))throw fail('问答上下文过长或格式无效');
@@ -122,14 +127,14 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
      const [entry]=await plantKnowledge(hint.name);
      if(entry)knowledge.push(entry);
     }
-    const result=await askDsh({apiKey:apiKey.trim(),question:question.trim(),plant:plant.trim(),
+    const result=await askDsh({apiKey:apiKey.trim(),route,question:question.trim(),plant:plant.trim(),
      history:history.map(({question,answer})=>({question,answer})),knowledge,signal:request.signal});
     if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
     const sources=knowledge.flatMap(entry=>[
      {title:entry.name+' · '+entry.sourceName,url:entry.source},
      ...(entry.traits?[{title:entry.traits.sourceName,url:entry.traits.source}]:[]),
     ]).filter((item,index,all)=>all.findIndex(other=>other.url===item.url)===index);
-    return json({text:result.text,model:result.model,truncated:result.truncated,sources});
+    return json({text:result.text,model:result.model,provider:route.label,truncated:result.truncated,sources});
    }finally{asking=false}
   }
   if(path==='api/reference'&&request.method==='GET'){

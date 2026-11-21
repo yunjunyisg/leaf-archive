@@ -2,12 +2,37 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
  const dialog=document.querySelector('#ask-dialog');
  const form=dialog.querySelector('form');
  const key=dialog.querySelector('#ask-key');
+ const provider=dialog.querySelector('#ask-provider');
+ const model=dialog.querySelector('#ask-model');
  const question=dialog.querySelector('#ask-question');
  const status=dialog.querySelector('#ask-status');
  const messages=dialog.querySelector('#ask-messages');
  const target=dialog.querySelector('#ask-target');
  const submit=dialog.querySelector('#ask-send');
  let plant='',history=[],pending=null;
+ let choices=new Map();
+
+ function updateProvider(){
+  const choice=choices.get(provider.value);
+  model.value=choice?.model||'';
+  model.readOnly=!choice?.allowModel;
+  model.disabled=!choice;
+  submit.disabled=!choice||Boolean(pending);
+ }
+ function configure(options){
+  const selected=provider.value;
+  choices=new Map(options.map(item=>[item.id,item]));
+  provider.replaceChildren(...options.map(item=>new Option(item.label,item.id)));
+  if(choices.has(selected))provider.value=selected;
+  if(!dialog.open||!choices.has(selected))updateProvider();
+ }
+ provider.addEventListener('change',()=>{
+  key.value='';
+  history=[];
+  messages.replaceChildren();
+  updateProvider();
+  status.textContent='请输入新服务商的 API Key。';
+ });
 
  function close(){
   pending?.abort();
@@ -18,7 +43,9 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
   plant='';
   status.textContent='';
   messages.replaceChildren();
-  submit.disabled=false;
+  provider.disabled=false;
+  model.disabled=false;
+  updateProvider();
  }
  function open(name=''){
   if(!isLoggedIn())return showAuth();
@@ -26,6 +53,7 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
   plant=String(name).slice(0,120);
   target.textContent=plant?'关于 '+plant:'可以询问鉴别、形态、生境或养护。';
   dialog.showModal();
+  if(!choices.size)status.textContent='问答服务商尚未加载，请刷新后再试。';
  }
  function message(title,text){
   const entry=document.createElement('section');
@@ -39,21 +67,23 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
  }
  form.addEventListener('submit',async event=>{
   event.preventDefault();
-  if(pending||!question.value.trim())return;
+  const choice=choices.get(provider.value);
+  if(!choice||pending||!question.value.trim())return;
   const current=new AbortController();
   pending=current;
   const input=question.value.trim();
   submit.disabled=true;
-  status.textContent='正在读取植物资料并调用 DeepSeek…';
+  provider.disabled=model.disabled=true;
+  status.textContent='正在读取植物资料并调用 '+choice.label+'…';
   try{
    const reply=await api('ask',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({apiKey:key.value,question:input,plant,history:history.slice(-4)}),
+    body:JSON.stringify({provider:choice.id,model:model.value,apiKey:key.value,question:input,plant,history:history.slice(-4)}),
     signal:current.signal,
    });
    if(pending!==current||!dialog.open)return;
    message('你',input);
-   const entry=message('DeepSeek · DSH',reply.text);
+   const entry=message((reply.provider||choice.label)+' · DSH',reply.text);
    if(reply.sources?.length){
     const details=document.createElement('details'),summary=document.createElement('summary'),list=document.createElement('ul');
     summary.textContent='本轮查到的植物资料';
@@ -72,11 +102,11 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
   }catch(error){
    if(pending===current)status.textContent=error.message;
   }finally{
-   if(pending===current){pending=null;submit.disabled=false}
+   if(pending===current){pending=null;provider.disabled=false;model.disabled=false;submit.disabled=false}
   }
  });
  dialog.querySelector('#ask-close').onclick=close;
  dialog.addEventListener('cancel',event=>{event.preventDefault();close()});
  window.addEventListener('pagehide',close);
- return {open,close};
+ return {open,close,configure};
 }

@@ -21,3 +21,5 @@
 .ask-message p{white-space:pre-wrap;overflow-wrap:anywhere;margin:.45rem 0}
 #ask-dialog .field{display:block;margin-top:.65rem}
 #ask-status{min-height:1.5em}
+
+#ask-provider{width:100%}
