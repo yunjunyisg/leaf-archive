@@ -6,10 +6,16 @@ on:
         description: 识植助手客户端发行标签
         required: true
         type: string
+      target:
+        description: 构建目标
+        type: choice
+        options: [all, android, windows]
+        default: all
 permissions:
   contents: write
 jobs:
   windows:
+    if: inputs.target != 'android'
     runs-on: windows-latest
     timeout-minutes: 20
     env:
@@ -63,6 +69,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw '上传 EXE 失败' }
 
   android:
+    if: inputs.target != 'windows'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -81,9 +88,11 @@ jobs:
       - name: 编译待签名的安卓包
         working-directory: apps/android
         run: bash gradlew --no-daemon -PplantId :app:assembleRelease
-      - uses: actions/upload-artifact@v4
-        with:
-          name: plant-id-android-unsigned
-          path: apps/android/app/build/outputs/apk/release/app-release-unsigned.apk
-          if-no-files-found: error
-          retention-days: 1
+      - name: 暂存待签名 APK 到未发布草稿
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          test "$(gh release view "$PLANT_ID_RELEASE" --json isDraft --jq .isDraft)" = true
+          cp apps/android/app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/plant-id-android-unsigned.apk"
+          gh release upload "$PLANT_ID_RELEASE" "$RUNNER_TEMP/plant-id-android-unsigned.apk" --clobber
