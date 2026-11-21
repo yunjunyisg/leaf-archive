@@ -1,0 +1,9 @@
+- insert:
+    - id: leaf-archive-plant-knowledge
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: leaf_archive_plant_knowledge
+        transport: streamable-http
+        url: https://gloriouscarnivorousplants.top/plant-id/mcp
+        startupTimeoutMs: 5000
+        toolCallTimeoutMs: 5000

@@ -14,3 +14,10 @@
 .candidate-description{margin:1rem 0;line-height:1.7;overflow-wrap:anywhere}
 .candidate-description h4,.candidate-description p{margin:.25rem 0}
 .candidate-description small{color:var(--muted)}
+
+#ask-dialog{width:min(660px,calc(100% - 1.5rem));max-height:calc(100dvh - 1.5rem);overflow:auto}
+#ask-messages{max-height:36dvh;overflow:auto}
+.ask-message{margin:.65rem 0;padding:.75rem 1rem;border:1px solid var(--line);border-radius:12px}
+.ask-message p{white-space:pre-wrap;overflow-wrap:anywhere;margin:.45rem 0}
+#ask-dialog .field{display:block;margin-top:.65rem}
+#ask-status{min-height:1.5em}

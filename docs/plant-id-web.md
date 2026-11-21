@@ -16,16 +16,16 @@
 
 如果安装 1.0.0 时本机 3110 连接失败并回滚，直接安装当前版本。旧版启动入口比较了两种不同的路径，服务可能直接退出。新版支持通过安装程序使用的 current 符号链接启动。
 
-下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.8/plant-id-web-v1.0.8.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
+下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.9/plant-id-web-v1.0.9.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
 
 ```bash
 (
 set -e
 cd /root/leaf-migration
-echo "f336d993e93cf135c07e403975670487cb7fd4a3ddbc36a19290701b05f36fbe  plant-id-web-v1.0.8.tar.gz" | sha256sum -c -
-gzip -t plant-id-web-v1.0.8.tar.gz
+echo "fc5e5ff97ef7d7d698e910775ae0e87562767ae5a60e92aa424043676d77c03c  plant-id-web-v1.0.9.tar.gz" | sha256sum -c -
+gzip -t plant-id-web-v1.0.9.tar.gz
 PLANT_ID_INSTALL_DIR=$(mktemp -d /root/leaf-migration/plant-id-verified.XXXXXX)
-tar -xzf plant-id-web-v1.0.8.tar.gz -C "$PLANT_ID_INSTALL_DIR"
+tar -xzf plant-id-web-v1.0.9.tar.gz -C "$PLANT_ID_INSTALL_DIR"
 (cd "$PLANT_ID_INSTALL_DIR" && sha256sum -c SHA256SUMS)
 bash "$PLANT_ID_INSTALL_DIR/deploy/install.sh"
 )
@@ -120,8 +120,24 @@ systemctl show plant-id -p MemoryCurrent -p MemoryPeak
 
 「当前判定层级」反映模型认为现有证据支持的精度。可以在同一记录中补拍花、果、叶序或模型指出的关键部位，继续比较同属种。仅有名称而缺少个体证据时会保留待定。
 
+## 启用 DSH 植物问答
+
+正常安装识植助手 1.0.9 后，在阿里云管理员终端执行：
+
+```bash
+bash /opt/plant-id/current/deploy/install-dsh.sh
+```
+
+需要 Node.js 24.9 或更新版本和 npm。首次运行会下载固定版本的官方 DeepSeek Harness 及 SDK 依赖，测试环境安装后的依赖约 1.3 GiB。升级时相同版本可复用。看到「识植助手的 DSH 问答已启用」后刷新网页，打开「植物问答」，或从候选卡片点击「询问这株植物」。
+
+问答用户在窗口填写自己的 DeepSeek 开放平台 API Key。识植助手后台运行 DSH，按该用户自己的用量及余额计费。识别和 OCR 继续使用服务器原有视觉配置。问答密钥不写入浏览器持久存储或服务器配置，对话仅在窗口内延续。服务端为每次问答建立临时工作目录，关闭本次运行后删除。问答页面只展示最终文字和实际查到的公开资料。[DeepSeek 开放平台](https://platform.deepseek.com/)
+
+### 共享资料库插件
+
+网站用户可直接使用网页，无需安装本地工具。有自己 DSH 环境的人也可下载[共享植物资料库插件](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.9/plant-knowledge-dsh-v1.0.0.tar.gz)，按包内说明把公共资料库挂进自己的配置。这个连接只提供公开、只读的名录检索。运营者可按[资料库导入流程](../apps/plant-id/knowledge/README.md)维护和部署自己的共享索引，所有已连接的用户自动读取新版资料。用户的私有账号资料不在 MCP 的读取范围内。
+
 ## 本次验证范围
 
-21 项自动测试通过，包括从与生产相同的 current 符号链接启动进程并访问健康检查。其他测试覆盖真实本地 HTTP 与图片内容传输、独立账号与会话、历史归属、补充识别、密钥未配置时不伪造结果、授权与连接失败不泄露密钥、非法图像与来源检查、请求大小、旧配额停用、历史淘汰、参考图校验、并发及退出后不写入迟到结果、数据库重开后的会话和最新十条历史保留。脚本语法和安装包内文件摘要已检查。
+23 项自动测试通过，包括从与生产相同的 current 符号链接启动进程并访问健康检查。其他测试覆盖真实本地 HTTP 与图片内容传输、独立账号与会话、历史归属、补充识别、密钥未配置时不伪造结果、授权与连接失败不泄露密钥、非法图像与来源检查、请求大小、旧配额停用、历史淘汰、参考图校验、并发及退出后不写入迟到结果、数据库重开后的会话和最新十条历史保留。脚本语法和安装包内文件摘要已检查。
 
 模型调用测试使用模拟响应核对请求协议和图像字节，没有使用聊天中暴露的真实密钥发起推理。当前环境缺少可用的网页预览工具，未完成浏览器交互或手机实机验收；也没有目标服务器执行连接。因此需安装后用重新生成的密钥完成实际识别与设备验收。

@@ -1,0 +1,7 @@
+{
+  "name": "@leaf-archive/dsh-plant-knowledge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "只读连接识植助手共享植物资料库",
+  "dsh": {"bundle":{"patch":"./cordis.patch.yml"}}
+}

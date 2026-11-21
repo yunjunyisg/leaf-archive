@@ -1,0 +1,28 @@
+# Overlay for the pinned SDK minimal profile used by the public Plant ID web app.
+# Disable all model-facing filesystem, shell, and MCP tools in this profile.
+- id: tool-working-directory
+  disabled: true
+- id: tool-fs
+  disabled: true
+- id: persistent-bash
+  disabled: true
+- id: persistent-pwsh
+  disabled: true
+- id: terminal-bash
+  disabled: true
+- id: terminal-pwsh
+  disabled: true
+- id: pty
+  disabled: true
+- id: mcp-resources
+  disabled: true
+- id: compaction-basic
+  disabled: true
+- id: image-offload
+  disabled: true
+- id: llm-deepseek
+  config:
+    apiKeyEnv: DEEPSEEK_API_KEY
+    baseURL: https://api.deepseek.com/anthropic
+    defaultContextWindow: 128000
+    streamIdleTimeoutMs: 45000

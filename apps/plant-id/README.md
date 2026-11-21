@@ -67,3 +67,7 @@ npm test --prefix apps/plant-id
 配置项见 `.env.example`。密钥配置脚本保留其他设置，但会选择智谱和默认视觉模型。服务日志不记录用户照片、描述、识别结果或密钥。
 
 全球学名索引来自 World Flora Online 2026-06，覆盖 382,386 个接受种名。候选的「植物描述」是模型整理的典型形态与可能生境。公开文章有可匹配摘要时，另显示原文节选与出处。参见[资料来源及导入方法](knowledge/README.md)。
+
+## 植物问答与 DSH
+
+安装独立 DSH 运行时后，网页「植物问答」使用各用户自己的 DeepSeek 开放平台 API Key。网页版按需从共享索引检索资料后交给受限的 DSH SDK profile。问答窗口支持连续追问，关闭时清除输入密钥和对话。其他 DSH 客户端可安装[共享知识库插件](dsh/knowledge-plugin/README.md)。

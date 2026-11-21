@@ -1,0 +1,15 @@
+{
+  "tag": "plant-id-web-v1.0.9",
+  "files": [
+    {
+      "name": "plant-id-web-v1.0.9.tar.gz",
+      "url": "https://tmpfiles.org/wkA1boWk0RE1/plant-id-web-v1.0.9.tar.gz",
+      "sha256": "fc5e5ff97ef7d7d698e910775ae0e87562767ae5a60e92aa424043676d77c03c"
+    },
+    {
+      "name": "plant-knowledge-dsh-v1.0.0.tar.gz",
+      "url": "https://tmpfiles.org/wqAJbCWg0spq/plant-knowledge-dsh-v1.0.0.tar.gz",
+      "sha256": "ab9ef6cb08b20785073563cea35cf6c926463f915c1c0ea41b3c1e6fd5ce8602"
+    }
+  ]
+}
