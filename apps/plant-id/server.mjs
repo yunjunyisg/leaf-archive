@@ -88,7 +88,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
    limit('reference:'+user.id,120,60000);
    const name=url.searchParams.get('name')||'',rank=url.searchParams.get('rank')||'';
    if(rank.length>80)throw fail('分类层级过长');
-   try{return json({photo:await references.lookup(name,rank,request.signal)})}
+   try{return json(await references.lookup(name,rank,request.signal))}
    catch{throw fail('参考图暂时无法加载',503)}
   }
   const referenceImage=/^api\/reference-image\/(\d{1,16})$/.exec(path);

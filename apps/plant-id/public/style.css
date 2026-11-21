@@ -10,3 +10,7 @@
 .candidate-knowledge{margin-top:1rem;font-size:.9rem;line-height:1.6;overflow-wrap:anywhere}
 .candidate-knowledge a{text-decoration:underline}
 .candidate-knowledge summary{cursor:pointer;font-weight:600}
+
+.candidate-description{margin:1rem 0;line-height:1.7;overflow-wrap:anywhere}
+.candidate-description h4,.candidate-description p{margin:.25rem 0}
+.candidate-description small{color:var(--muted)}

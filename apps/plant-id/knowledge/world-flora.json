@@ -1,0 +1,12 @@
+{
+  "release": "2026-06",
+  "source": "https://doi.org/10.5281/zenodo.20782718",
+  "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "stats": {
+    "family": 738,
+    "genus": 16252,
+    "species": 382386,
+    "synonymNameLinks": 608087
+  },
+  "sha256": "a0dd0599fe9b03ef094e557c57f7946d0e2e19fbb45c46d40ff0688e6b365d95"
+}

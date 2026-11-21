@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,rm,readdir} from 'node:fs/promises';import os from 'node:os';
 import {createPlantId,listen} from '../server.mjs';import {modelConfiguration,validateAnswer} from '../model.mjs';
+import {findKnowledge} from '../knowledge.mjs';
 const origin='https://gloriouscarnivorousplants.top',answer={summary:'可能是蒲公英属，需要核对叶片。',observations:{visible:['黄色头状花序'],described:[],uncertain:['叶片未拍清']},candidates:[{name:'蒲公英属',scientificName:'Taraxacum',rank:'属',probability:65,evidence:['黄色花序'],distinguish:['核对叶片和总苞']}],otherProbability:35,followUp:['补拍基生叶与总苞的近照']},image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lXcAAAAASUVORK5CYII=','base64');
 async function fixture(overrides={}){const directory=await mkdtemp(os.tmpdir()+'/plant-id-test-'),calls=[],env={PLANT_ID_API_KEY:'test-only-not-a-real-key',...overrides.env};let time=Date.now();const app=createPlantId({dataDirectory:directory,origin,env,referenceFetch:overrides.referenceFetch,now:()=>time,fetchImpl:overrides.fetchImpl||(async(url,options)=>{calls.push({url,options,body:JSON.parse(options.body)});return Response.json({choices:[{message:{content:JSON.stringify(answer)}}]})})});const f={app,directory,calls,async request(path,{method='GET',cookie,body,headers={}}={}){return app.fetch(new Request(origin+'/plant-id/'+path,{method,headers:{Origin:origin,...(cookie?{Cookie:cookie}:{}),...headers},...(body?{body}: {})}))},async register(name='first_user'){const r=await this.request('api/register',{method:'POST',body:JSON.stringify({username:name,password:'test-password-123'}),headers:{'Content-Type':'application/json'}});assert.equal(r.status,200);return {cookie:r.headers.get('Set-Cookie').split(';')[0],user:(await r.json()).user}},form({threadId='',text='在成都拍摄',images=[image],consent='yes'}={}){const form=new FormData();form.set('text',text);form.set('consent',consent);if(threadId)form.set('threadId',threadId);for(const bytes of images)form.append('images',new Blob([bytes],{type:'image/png'}),'leaf.png');return form},advance(ms){time+=ms},async close(){app.close();await rm(directory,{recursive:true,force:true})}};return f}
 test('independent accounts, scoped sessions and separate history; actual image bytes reach the mainland vision endpoint',async()=>{const f=await fixture();try{const a=await f.register(),b=await f.register('second_user');const r=await f.request('api/identify',{method:'POST',cookie:a.cookie,body:f.form()});assert.equal(r.status,200);const data=await r.json();assert.equal(data.answer.candidates[0].name,'蒲公英属');assert.equal(data.remaining,undefined);assert.equal(f.calls[0].url,'https://open.bigmodel.cn/api/paas/v4/chat/completions');assert.equal(f.calls[0].body.model,'glm-4.6v-flash');assert.deepEqual(f.calls[0].body.messages[1].content[1].image_url,{url:'data:image/png;base64,'+image.toString('base64')});assert.equal(f.calls[0].body.thinking.type,'disabled');assert.deepEqual((await (await f.request('api/threads',{cookie:b.cookie})).json()).threads,[]);for(const method of ['GET','DELETE'])assert.equal((await f.request('api/threads/'+data.threadId,{method,cookie:b.cookie})).status,404);assert.equal((await f.request('api/threads',{cookie:'leaf_session=forged'})).status,401);assert.ok((await readdir(f.directory)).every(name=>name.startsWith('plant-id.sqlite')));const session=await f.request('api/session',{cookie:a.cookie});assert.equal((await session.json()).provider,'智谱开放平台');const logout=await f.request('api/logout',{method:'POST',cookie:a.cookie});assert.match(logout.headers.get('Set-Cookie'),/Path=\/plant-id\/; HttpOnly; SameSite=Strict; Secure/);assert.equal((await f.request('api/threads',{cookie:a.cookie})).status,401)}finally{await f.close()}});
@@ -136,8 +137,9 @@ test('reference photos require exact plant taxon matches, suitable licenses and 
   assert.equal(options.headers.Authorization,undefined);
   if(url.pathname.includes('autocomplete'))return Response.json({results:[
    {id:1,name:'Taraxacum officinale',iconic_taxon_name:'Plantae',rank:'species'},
-   {id:42,name:'Taraxacum',iconic_taxon_name:'Plantae',rank:'genus'},
+   {id:42,name:'Taraxacum',iconic_taxon_name:'Plantae',rank:'genus',wikipedia_url:'https://en.wikipedia.org/wiki/Taraxacum'},
   ]});
+  if(url.pathname==='/v1/taxa/42')return Response.json({results:[{id:42,name:'Taraxacum',wikipedia_url:'https://en.wikipedia.org/wiki/Taraxacum',wikipedia_summary:'<i>Taraxacum</i> is a genus of flowering plants.'}]});
   if(url.pathname==='/v1/observations'){
    assert.equal(url.searchParams.get('taxon_id'),'42');
    return Response.json({results:[{id:12,taxon:{id:1,name:'Taraxacum officinale',ancestor_ids:[42]},photos:[
@@ -153,19 +155,21 @@ test('reference photos require exact plant taxon matches, suitable licenses and 
   const {cookie}=await f.register(),lookup='api/reference?name=Taraxacum&rank='+encodeURIComponent('属');
   assert.equal((await f.request(lookup)).status,401);
   assert.equal((await f.request('api/reference-image/9',{cookie})).status,404);
-  const {photo}=await(await f.request(lookup,{cookie})).json();
+  const {photo,reading}=await(await f.request(lookup,{cookie})).json();
   assert.deepEqual(photo,{id:'9',scientificName:'Taraxacum officinale',attribution:'C',license:'CC BY',licenseUrl:'https://creativecommons.org/licenses/by/4.0/',source:'https://www.inaturalist.org/observations/12'});
   assert.equal((await f.request('api/reference-image/8',{cookie})).status,404);
   const response=await f.request('api/reference-image/9',{cookie});
   assert.equal(response.headers.get('Content-Type'),'image/png');
   assert.deepEqual(Buffer.from(await response.arrayBuffer()),image);
   assert.deepEqual((await(await f.request('api/reference?name=Unknown',{cookie})).json()),{photo:null});
-  assert.equal(calls.length,4);
+  assert.equal(reading.text,'Taraxacum is a genus of flowering plants.');
+  assert.equal(reading.url,'https://en.wikipedia.org/wiki/Taraxacum');
+  assert.equal(calls.length,5);
  }finally{await f.close()}
 });
 
 test('local botanical knowledge grounds vision requests and annotates new and historical candidates',async()=>{
- const candidate={...answer.candidates[0],name:'捕蝇草',scientificName:'Dionaea corymbosa',rank:'种'};
+ const candidate={...answer.candidates[0],name:'捕蝇草',scientificName:'Dionaea corymbosa',rank:'种',description:'具可闭合捕虫夹的多年生草本。'};
  let context;
  const f=await fixture({fetchImpl:async (_url,options)=>{
   const request=JSON.parse(options.body);
@@ -181,15 +185,37 @@ test('local botanical knowledge grounds vision requests and annotates new and hi
   assert.match(context,/触毛/);
   const data=await response.json();
   const entry=data.answer.candidates[0].knowledge;
-  assert.equal(entry.source,'https://www.gbif.org/species/5421410');
+  assert.equal(entry.source,'https://www.worldfloraonline.org/taxon/wfo-0000943687');
+  assert.equal(entry.gbifSource,'https://www.gbif.org/species/5421410');
   assert.equal(entry.family,'Droseraceae');
   assert.equal(entry.name,'Dionaea muscipula');
   assert.equal(entry.synonym,true);
   assert.deepEqual(new Set(entry.observations.map(row=>row.platform)),new Set(['iNaturalist','Pl@ntNet']));
   assert.equal(entry.traits.name,'Dionaea');
   assert.equal(data.answer.candidates[0].probability,candidate.probability);
+  assert.equal(data.answer.candidates[0].description,candidate.description);
+  assert.match(context,/典型特征与本轮照片观察区分/);
   const history=await(await f.request('api/threads/'+data.threadId,{cookie})).json();
   assert.deepEqual(history.turns[0].answer.candidates[0].knowledge,entry);
   assert.ok(!f.app.sql.prepare('SELECT answer FROM turns').get().answer.includes('"knowledge"'));
  }finally{await f.close()}
+});
+
+
+test('the WFO index resolves plant names across flowering plants, gymnosperms, ferns and bryophytes',()=>{
+ for(const [name,family] of [
+  ['Rosa chinensis','Rosaceae'],['Oryza sativa','Poaceae'],['Ginkgo biloba','Ginkgoaceae'],
+  ['Dryopteris filix-mas','Dryopteridaceae'],['Marchantia polymorpha','Marchantiaceae'],
+ ]){
+  const match=findKnowledge(name,'种');
+  assert.equal(match.name,name);
+  assert.equal(match.family,family);
+  assert.equal(match.sourceName,'World Flora Online');
+  assert.equal(match.sourceVersion,'2026-06');
+  assert.match(match.source,/^https:\/\/www.worldfloraonline.org\/taxon\/wfo-/);
+ }
+ assert.equal(findKnowledge('Rosa','属').rank,'genus');
+ assert.equal(findKnowledge('Rosaceae','科').rank,'family');
+ assert.equal(findKnowledge('Rosa chinensis','属'),null);
+ assert.equal(findKnowledge('Nonexistentaceae xxyyxzz','种'),null);
 });
