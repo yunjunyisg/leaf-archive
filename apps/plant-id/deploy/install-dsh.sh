@@ -13,8 +13,19 @@ if [ -e "$PLANT_ID_DSH_LINK" ] && [ ! -L "$PLANT_ID_DSH_LINK" ]; then
  echo '安装路径已有普通目录，请先核对现有 DSH 配置。'
  exit 1
 fi
+verify_sdk()(
+ cd -- "$1" && runuser -u plant-id -- /usr/bin/node --input-type=module - "$1" <<'JS'
+import {createRequire} from 'node:module';
+import {join} from 'node:path';
+import {pathToFileURL} from 'node:url';
+const load=createRequire(join(process.argv[2],'package.json'));
+const {DeepSeekHarness}=await import(pathToFileURL(load.resolve('@deepseek-ai/dsh-sdk-client')).href);
+if(typeof DeepSeekHarness!=='function')throw Error('DSH SDK 入口无效');
+JS
+)
 if [ -f "$PLANT_ID_DSH_LINK/node_modules/@deepseek-ai/dsh-sdk-client/package.json" ] &&
-   cmp -s "$PLANT_ID_SOURCE/dsh/runtime/package-lock.json" "$PLANT_ID_DSH_LINK/package-lock.json"; then
+   cmp -s "$PLANT_ID_SOURCE/dsh/runtime/package-lock.json" "$PLANT_ID_DSH_LINK/package-lock.json" &&
+   verify_sdk "$PLANT_ID_DSH_LINK"; then
  echo '已安装匹配的 DSH 运行时。'
 else
  PLANT_ID_NEW_RUNTIME=$(mktemp -d /opt/plant-id/dsh-releases/runtime.XXXXXX)
@@ -24,6 +35,7 @@ else
  /usr/bin/node "$PLANT_ID_NPM" --prefix "$PLANT_ID_NEW_RUNTIME" ci --omit=dev --ignore-scripts --no-audit --no-fund
  /usr/bin/node "$PLANT_ID_NEW_RUNTIME/node_modules/@deepseek-ai/dsh/lib/bin.js" --version
  chmod 755 "$PLANT_ID_NEW_RUNTIME"
+ verify_sdk "$PLANT_ID_NEW_RUNTIME"
  ln -sfn "$PLANT_ID_NEW_RUNTIME" "$PLANT_ID_DSH_LINK"
  PLANT_ID_NEW_RUNTIME=
  trap - EXIT

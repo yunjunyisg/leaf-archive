@@ -16,16 +16,16 @@
 
 如果安装 1.0.0 时本机 3110 连接失败并回滚，直接安装当前版本。旧版启动入口比较了两种不同的路径，服务可能直接退出。新版支持通过安装程序使用的 current 符号链接启动。
 
-下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.10/plant-id-web-v1.0.10.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
+下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.11/plant-id-web-v1.0.11.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
 
 ```bash
 (
 set -e
 cd /root/leaf-migration
-echo "e73784e623ed7260213a73c47ddaf2182077ff310612e2f2e360face5ebd15bb  plant-id-web-v1.0.10.tar.gz" | sha256sum -c -
-gzip -t plant-id-web-v1.0.10.tar.gz
+echo "9e563b609e6c7ab5f159f45fea17ddf5ce00228c62ab6afa488784856d22676d  plant-id-web-v1.0.11.tar.gz" | sha256sum -c -
+gzip -t plant-id-web-v1.0.11.tar.gz
 PLANT_ID_INSTALL_DIR=$(mktemp -d /root/leaf-migration/plant-id-verified.XXXXXX)
-tar -xzf plant-id-web-v1.0.10.tar.gz -C "$PLANT_ID_INSTALL_DIR"
+tar -xzf plant-id-web-v1.0.11.tar.gz -C "$PLANT_ID_INSTALL_DIR"
 (cd "$PLANT_ID_INSTALL_DIR" && sha256sum -c SHA256SUMS)
 bash "$PLANT_ID_INSTALL_DIR/deploy/install.sh"
 )
@@ -128,11 +128,13 @@ systemctl show plant-id -p MemoryCurrent -p MemoryPeak
 bash /opt/plant-id/current/deploy/install-dsh.sh
 ```
 
-需要 Node.js 24.9 或更新版本和 npm。首次运行会下载固定版本的官方 DeepSeek Harness 及 SDK 依赖，测试环境安装后的依赖约 1.3 GiB。升级时相同版本可复用。看到「识植助手的 DSH 问答已启用」后刷新网页，打开「植物问答」，或从候选卡片点击「询问这株植物」。
+需要 Node.js 24.9 或更新版本和 npm。首次运行会下载固定版本的官方 DeepSeek Harness 及 SDK 依赖，测试环境安装后的依赖约 1.3 GiB。升级时相同版本可复用。如果安装后页面仍提示运行时加载失败，重新执行上面的脚本。新版会用网站服务账号验证 SDK 能否加载，失败时在终端显示原因。看到「识植助手的 DSH 问答已启用」后刷新网页，打开「植物问答」，或从候选卡片点击「询问这株植物」。
 
-用户先选择服务商，再填写该平台签发的 API Key。支持 DeepSeek、智谱开放平台、阿里云百炼中国内地站、硅基流动中国内地站、OpenAI，以及管理员配置的兼容网关。问答按所选服务商和用户账号计费。服务端所在网络需要能访问所选接口。识别和 OCR 继续使用原有视觉配置。
+用户只需选择服务商。网站会使用该平台预设的模型。第一次使用某家服务商时，填写该平台签发的 API Key 并发送问题。支持 DeepSeek、智谱开放平台、阿里云百炼中国内地站、硅基流动中国内地站、OpenAI，以及管理员配置的兼容网关。问答按所选服务商和用户账号计费。服务端所在网络需要能访问所选接口。识别和 OCR 继续使用原有视觉配置。
 
-问答密钥只在当前窗口和处理请求时暂存。切换服务商或关闭窗口会清除密钥及对话。服务端为每次问答建立临时工作目录，处理结束后删除。各服务商的回答均可使用共享植物资料。
+首次成功回答后，密钥按识植助手账号与服务商加密保存。下次登录或换设备，可以直接提问。要主动修改时点「更换密钥」，用新密钥成功回答后更新保存记录。服务商明确拒绝已保存的密钥时，网页会提示重新填写。额度不足或暂时连接不上时保留原密钥。切换服务商或关闭窗口会清除当前对话和未保存的输入。
+
+密钥密文保存在应用数据库，加密用的文件是 `/var/lib/plant-id/ask-credentials.key`。迁移时需一并保存这两个文件，并限制访问权限。服务端为每次问答建立临时工作目录，处理结束后删除。各服务商的回答均可使用共享植物资料。
 
 ### 添加其他兼容服务商
 
@@ -148,4 +150,4 @@ PLANT_ID_ASK_GATEWAYS='[{"id":"custom-example","label":"示例网关","baseURL":
 
 ## 本次验证范围
 
-24 项自动测试通过，覆盖独立服务启动、登录会话、识别、OCR、共享资料检索、问答服务商选择及密钥路由。另用真实 DSH 运行时和模拟模型接口验证了兼容服务商的问答请求，用移动尺寸浏览器验证了切换服务商时清除上一平台的密钥和对话。安装包内文件校验通过。模型测试使用模拟接口，线上模型与目标服务器仍需部署后实测。
+25 项自动测试通过，覆盖问答密钥的账号与服务商隔离、加密保存、重启复用、更换和失效。另用真实 DSH 运行时和模拟模型服务检查了鉴权失败、额度限制和兼容接口调用，通过移动尺寸浏览器验证了问答表单。安装包内文件校验通过。模型测试使用模拟接口，目标服务器仍需部署后实测。

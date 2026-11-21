@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,rm,stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createPlantId} from '../server.mjs';
@@ -8,7 +8,8 @@ import {createPlantId} from '../server.mjs';
 const origin='https://gloriouscarnivorousplants.top';
 async function appFixture(dshAnswer,env={}){
  const dir=await mkdtemp(join(tmpdir(),'plant-ask-test-'));
- const app=createPlantId({dataDirectory:dir,origin,env:{PLANT_ID_API_KEY:'server-vision-key',...env},dshAnswer});
+ const options={dataDirectory:dir,origin,env:{PLANT_ID_API_KEY:'server-vision-key',...env},dshAnswer};
+ let app=createPlantId(options);
  const post=(path,value,{cookie='',source=origin}={})=>app.fetch(new Request(origin+'/plant-id/'+path,{
   method:'POST',headers:{Cookie:cookie,Origin:source,'Content-Type':'application/json'},body:JSON.stringify(value),
  }));
@@ -17,7 +18,7 @@ async function appFixture(dshAnswer,env={}){
   assert.equal(response.status,200);
   return response.headers.get('Set-Cookie').split(';')[0];
  };
- return {app,post,login,close:async()=>{app.close();await rm(dir,{recursive:true,force:true})}};
+ return {get app(){return app},dir,post,login,restart(){app.close();app=createPlantId(options)},close:async()=>{app.close();await rm(dir,{recursive:true,force:true})}};
 }
 
 test('web questions require individual credentials and use the same public catalogue as the plugin',async()=>{
@@ -98,5 +99,58 @@ test('different user keys route only to selected trusted providers and models',a
   assert.equal(calls[1].route.baseURL,'https://models.example.com/v1');
   assert.equal(calls[1].route.model,'vendor/plant-chat');
   assert.equal(calls[1].apiKey,'another_provider-token');
+ }finally{await f.close()}
+});
+
+
+test('a saved question key survives reloads, is scoped to account and provider, and is replaced only on success',async()=>{
+ const calls=[];
+ const f=await appFixture(async input=>{
+  calls.push(input);
+  if(input.apiKey==='rejected-token'||input.question==='拒绝已保存的密钥')
+   throw Object.assign(Error('服务商拒绝了该密钥'),{status:422,code:'ask_key_invalid'});
+  if(input.question==='服务商暂时不可用')throw Object.assign(Error('暂时不可用'),{status:502});
+  return {text:'结果',model:input.route.model};
+ });
+ const first='personal-original-key',second='personal-replacement-key';
+ const body={provider:'bigmodel',question:'如何养护？'};
+ try{
+  const cookie=await f.login('credential_owner'),other=await f.login('another_owner');
+  const session=async cookie=>await(await f.app.fetch(new Request(origin+'/plant-id/api/session',{headers:{Cookie:cookie}}))).json();
+  const ask=(overrides={},c=cookie)=>f.post('api/ask',{...body,...overrides},{cookie:c});
+  for(const response of [await ask(),await ask({},other)]){
+   assert.equal(response.status,400);
+   assert.equal((await response.json()).code,'ask_key_required');
+  }
+  assert.equal((await ask({apiKey:'rejected-token',rememberKey:true})).status,422);
+  assert.deepEqual((await session(cookie)).savedAskProviders,[]);
+  assert.equal((await(await ask({apiKey:first,rememberKey:true})).json()).savedKey,true);
+  const {sealed}=f.app.sql.prepare('SELECT sealed FROM ask_credentials').get();
+  assert.ok(!Buffer.from(sealed).includes(Buffer.from(first)));
+  assert.equal((await stat(join(f.dir,'ask-credentials.key'))).mode&0o777,0o600);
+
+  f.restart();
+  const metadata=await session(cookie);
+  assert.deepEqual(metadata.savedAskProviders,['bigmodel']);
+  assert.deepEqual((await session(other)).savedAskProviders,[]);
+  assert.doesNotMatch(JSON.stringify(metadata),/personal-original-key/);
+  assert.equal((await ask()).status,200);
+  assert.equal(calls.at(-1).apiKey,first);
+  assert.equal(calls.at(-1).route.model,'glm-4.7-flash');
+  assert.equal((await ask({provider:'dashscope'})).status,400);
+  assert.equal((await ask({},other)).status,400);
+
+  assert.equal((await ask({apiKey:'rejected-token',rememberKey:true})).status,422);
+  assert.equal((await ask()).status,200);
+  assert.equal(calls.at(-1).apiKey,first);
+  assert.equal((await ask({apiKey:second,rememberKey:true})).status,200);
+  assert.equal((await ask({question:'服务商暂时不可用'})).status,502);
+  assert.equal((await ask()).status,200);
+  assert.equal(calls.at(-1).apiKey,second);
+  const revoked=await ask({question:'拒绝已保存的密钥'});
+  assert.equal(revoked.status,422);
+  assert.equal((await revoked.json()).code,'ask_key_invalid');
+  assert.deepEqual((await session(cookie)).savedAskProviders,[]);
+  assert.equal((await ask()).status,400);
  }finally{await f.close()}
 });

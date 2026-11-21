@@ -3,48 +3,73 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
  const form=dialog.querySelector('form');
  const key=dialog.querySelector('#ask-key');
  const provider=dialog.querySelector('#ask-provider');
- const model=dialog.querySelector('#ask-model');
+ const keyEntry=dialog.querySelector('#ask-key-entry');
+ const savedKey=dialog.querySelector('#ask-saved-key');
+ const changeKey=dialog.querySelector('#ask-change-key');
+ const cancelKey=dialog.querySelector('#ask-cancel-key');
  const question=dialog.querySelector('#ask-question');
  const status=dialog.querySelector('#ask-status');
  const messages=dialog.querySelector('#ask-messages');
  const target=dialog.querySelector('#ask-target');
  const submit=dialog.querySelector('#ask-send');
- let plant='',history=[],pending=null;
- let choices=new Map();
+ let plant='',history=[],pending=null,editing=false;
+ let choices=new Map(),savedProviders=new Set();
 
  function updateProvider(){
-  const choice=choices.get(provider.value);
-  model.value=choice?.model||'';
-  model.readOnly=!choice?.allowModel;
-  model.disabled=!choice;
-  submit.disabled=!choice||Boolean(pending);
+  const available=choices.has(provider.value);
+  const saved=savedProviders.has(provider.value);
+  const showKey=available&&(!saved||editing);
+  savedKey.hidden=!saved||editing;
+  keyEntry.hidden=!showKey;
+  key.required=showKey;
+  key.disabled=!showKey||Boolean(pending);
+  changeKey.disabled=cancelKey.disabled=provider.disabled=Boolean(pending);
+  cancelKey.hidden=!saved;
+  submit.disabled=!available||Boolean(pending);
  }
- function configure(options){
+ function configure(options,saved){
   const selected=provider.value;
   choices=new Map(options.map(item=>[item.id,item]));
+  savedProviders=new Set(saved.filter(id=>choices.has(id)));
   provider.replaceChildren(...options.map(item=>new Option(item.label,item.id)));
-  if(choices.has(selected))provider.value=selected;
-  if(!dialog.open||!choices.has(selected))updateProvider();
+  if(choices.has(selected)&&(dialog.open||savedProviders.has(selected)))provider.value=selected;
+  else if(savedProviders.size)provider.value=savedProviders.values().next().value;
+  updateProvider();
  }
  provider.addEventListener('change',()=>{
   key.value='';
+  editing=false;
   history=[];
   messages.replaceChildren();
+  status.textContent='';
   updateProvider();
-  status.textContent='请输入新服务商的 API Key。';
  });
+ changeKey.onclick=()=>{
+  editing=true;
+  status.textContent='';
+  updateProvider();
+  key.focus();
+ };
+ cancelKey.onclick=()=>{
+  editing=false;
+  key.value='';
+  status.textContent='';
+  updateProvider();
+  changeKey.focus();
+ };
 
  function close(){
   pending?.abort();
   pending=null;
   if(dialog.open)dialog.close();
+  const selected=provider.value;
   form.reset();
+  if(choices.has(selected))provider.value=selected;
+  editing=false;
   history=[];
   plant='';
   status.textContent='';
   messages.replaceChildren();
-  provider.disabled=false;
-  model.disabled=false;
   updateProvider();
  }
  function open(name=''){
@@ -72,16 +97,20 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
   const current=new AbortController();
   pending=current;
   const input=question.value.trim();
-  submit.disabled=true;
-  provider.disabled=model.disabled=true;
+  const submitted=key.required;
+  const credential=submitted?{apiKey:key.value,rememberKey:true}:{};
+  updateProvider();
   status.textContent='正在读取植物资料并调用 '+choice.label+'…';
   try{
    const reply=await api('ask',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({provider:choice.id,model:model.value,apiKey:key.value,question:input,plant,history:history.slice(-4)}),
+    body:JSON.stringify({provider:choice.id,...credential,question:input,plant,history:history.slice(-4)}),
     signal:current.signal,
    });
    if(pending!==current||!dialog.open)return;
+   if(reply.savedKey)savedProviders.add(choice.id);
+   key.value='';
+   editing=false;
    message('你',input);
    const entry=message((reply.provider||choice.label)+' · DSH',reply.text);
    if(reply.sources?.length){
@@ -100,9 +129,14 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
    status.textContent=reply.truncated?'回答达到长度上限。可以继续追问。':'';
    messages.scrollTop=messages.scrollHeight;
   }catch(error){
-   if(pending===current)status.textContent=error.message;
+   if(pending!==current)return;
+   if(['ask_key_invalid','ask_key_required'].includes(error.code)){
+    if(!submitted)savedProviders.delete(choice.id);
+    key.value='';
+   }
+   status.textContent=error.message;
   }finally{
-   if(pending===current){pending=null;provider.disabled=false;model.disabled=false;submit.disabled=false}
+   if(pending===current){pending=null;updateProvider()}
   }
  });
  dialog.querySelector('#ask-close').onclick=close;
