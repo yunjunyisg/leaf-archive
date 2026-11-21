@@ -7,7 +7,7 @@ import {randomBytes,randomUUID,createHash,scrypt as scryptCallback,timingSafeEqu
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {identify,recognizeText,modelConfiguration} from './model.mjs';
-import {enrichIdentification,knowledgeContext} from './knowledge.mjs';
+import {enrichIdentification,knowledgeContext,reviewPlantNames} from './knowledge.mjs';
 import {createReferences} from './references.mjs';
 const scrypt=promisify(scryptCallback),hash=value=>createHash('sha256').update(value).digest('hex'),base='/plant-id/';
 const fail=(message,status=400)=>Object.assign(Error(message),{status});
@@ -106,11 +106,11 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
    if(active.has(user.id)||active.size>=concurrency)throw fail('识别服务忙，请等待当前识别完成',429);
    active.add(user.id);try{
     const raw=await body(request,(ocr?6:11)*1024*1024);let form;try{form=await new Response(raw,{headers:{'Content-Type':request.headers.get('Content-Type')||''}}).formData()}catch{throw fail('照片提交格式无效')}
-    const text=form.get('text')||'',threadId=form.get('threadId')||'';if(typeof text!=='string'||text.length>6000||typeof threadId!=='string'||threadId&&!/^[a-f0-9-]{36}$/.test(threadId))throw fail('文字或记录格式无效');
+    const text=form.get('text')||'',name=form.get('plantName')||'',threadId=form.get('threadId')||'';if(typeof name!=='string'||name.length>120||typeof text!=='string'||text.length>6000||typeof threadId!=='string'||threadId&&!/^[a-f0-9-]{36}$/.test(threadId))throw fail('文字或记录格式无效');
     if(form.get('consent')!=='yes')throw fail('请先同意将本轮照片和描述发送给视觉模型');
     const images=[];let total=0;for(const file of form.getAll('images')){if(typeof file==='string'||file.size>5*1024*1024||!file.size)throw fail('识别副本单张不能超过 5 MiB');const bytes=Buffer.from(await file.arrayBuffer()),mime=imageMime(bytes);if(!mime||mime!==file.type||(ocr||config.provider==='bigmodel')&&mime==='image/webp')throw fail(ocr?'请选择有效的 JPG 或 PNG 图片':'请选择有效的 JPG、PNG 或 WebP 图片');total+=bytes.length;images.push({bytes,mime})}
-    if(ocr&&(images.length!==1||text||threadId))throw fail('文字识别每次需要一张照片');
-    if(images.length>3||total>10*1024*1024)throw fail('每轮最多三张识别副本，合计不超过 10 MiB');if(!images.length&&!text.trim())throw fail('请上传照片或填写植物特征');
+    if(ocr&&(images.length!==1||text||name||threadId))throw fail('文字识别每次需要一张照片');
+    if(images.length>3||total>10*1024*1024)throw fail('每轮最多三张识别副本，合计不超过 10 MiB');if(!images.length&&!text.trim()&&!name.trim())throw fail('请上传照片，或填写植物名称与特征');
     const thread=threadId?sql.prepare('SELECT * FROM threads WHERE id=? AND owner=?').get(threadId,user.id):null;if(threadId&&!thread)throw fail('记录不存在',404);
     const previous=thread?JSON.parse(sql.prepare('SELECT answer FROM turns WHERE thread=? AND owner=? ORDER BY created DESC,rowid DESC LIMIT 1').get(threadId,user.id)?.answer||'null'):null;
     if(ocr){
@@ -118,9 +118,14 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
      if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
      return json(result);
     }
-    const answer=await identify({config,images,text,previous,knowledge:knowledgeContext(text,previous),signal:request.signal,fetchImpl});
+    const nameReview=await reviewPlantNames({name,description:text,previous,commonSearch:references.commonNames,signal:request.signal});
+    const textWithoutLabel=text.trim().replace(/^(?:学名|名称)[：:]\s*/,'').replace(/[？?。]$/,'').trim();
+    const nameOnly=!images.length&&!previous&&(Boolean(name.trim()&&!textWithoutLabel)||
+     nameReview.some(review=>review.input===textWithoutLabel&&Boolean(textWithoutLabel)));
+    const answer=await identify({config,images,text,plantName:name,nameOnly,previous,knowledge:knowledgeContext(text,previous,nameReview),signal:request.signal,fetchImpl});
     if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
-    if(answer.fallback)return json({fallback:answer.fallback});
+    if(answer.fallback)return json({fallback:answer.fallback,...(nameReview.length?{nameReview}:{})});
+    if(nameReview.length)answer.nameReview=nameReview;
     const id=thread?.id||randomUUID(),created=now();sql.exec('BEGIN IMMEDIATE');try{if(thread){if(!sql.prepare('SELECT id FROM threads WHERE id=? AND owner=?').get(id,user.id))throw fail('记录已删除，未恢复记录',409)}else sql.prepare('INSERT INTO threads VALUES (?,?,?,?,?)').run(id,user.id,text.trim().slice(0,40)||'照片识别',created,created);sql.prepare('INSERT INTO turns VALUES (?,?,?,?,?,?)').run(randomUUID(),id,user.id,text,JSON.stringify(answer),created);sql.prepare('UPDATE threads SET updated=? WHERE id=? AND owner=?').run(created,id,user.id);pruneOwner.run(user.id,historyLimit);removeEmpty.run(user.id);refreshOwnerTitles.run(user.id);sql.exec('COMMIT')}catch(error){sql.exec('ROLLBACK');throw error}
     return json({threadId:id,answer:enrichIdentification(answer)});
    }finally{active.delete(user.id)}

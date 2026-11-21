@@ -1,8 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,rm,readdir} from 'node:fs/promises';import os from 'node:os';
 import {createPlantId,listen} from '../server.mjs';import {modelConfiguration,validateAnswer} from '../model.mjs';
-import {findKnowledge} from '../knowledge.mjs';
+import {findKnowledge,reviewPlantNames} from '../knowledge.mjs';
 const origin='https://gloriouscarnivorousplants.top',answer={summary:'可能是蒲公英属，需要核对叶片。',observations:{visible:['黄色头状花序'],described:[],uncertain:['叶片未拍清']},candidates:[{name:'蒲公英属',scientificName:'Taraxacum',rank:'属',probability:65,evidence:['黄色花序'],distinguish:['核对叶片和总苞']}],otherProbability:35,followUp:['补拍基生叶与总苞的近照']},image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lXcAAAAASUVORK5CYII=','base64');
-async function fixture(overrides={}){const directory=await mkdtemp(os.tmpdir()+'/plant-id-test-'),calls=[],env={PLANT_ID_API_KEY:'test-only-not-a-real-key',...overrides.env};let time=Date.now();const app=createPlantId({dataDirectory:directory,origin,env,referenceFetch:overrides.referenceFetch,now:()=>time,fetchImpl:overrides.fetchImpl||(async(url,options)=>{calls.push({url,options,body:JSON.parse(options.body)});return Response.json({choices:[{message:{content:JSON.stringify(answer)}}]})})});const f={app,directory,calls,async request(path,{method='GET',cookie,body,headers={}}={}){return app.fetch(new Request(origin+'/plant-id/'+path,{method,headers:{Origin:origin,...(cookie?{Cookie:cookie}:{}),...headers},...(body?{body}: {})}))},async register(name='first_user'){const r=await this.request('api/register',{method:'POST',body:JSON.stringify({username:name,password:'test-password-123'}),headers:{'Content-Type':'application/json'}});assert.equal(r.status,200);return {cookie:r.headers.get('Set-Cookie').split(';')[0],user:(await r.json()).user}},form({threadId='',text='在成都拍摄',images=[image],consent='yes'}={}){const form=new FormData();form.set('text',text);form.set('consent',consent);if(threadId)form.set('threadId',threadId);for(const bytes of images)form.append('images',new Blob([bytes],{type:'image/png'}),'leaf.png');return form},advance(ms){time+=ms},async close(){app.close();await rm(directory,{recursive:true,force:true})}};return f}
+async function fixture(overrides={}){const directory=await mkdtemp(os.tmpdir()+'/plant-id-test-'),calls=[],env={PLANT_ID_API_KEY:'test-only-not-a-real-key',...overrides.env};let time=Date.now();const app=createPlantId({dataDirectory:directory,origin,env,referenceFetch:overrides.referenceFetch,now:()=>time,fetchImpl:overrides.fetchImpl||(async(url,options)=>{calls.push({url,options,body:JSON.parse(options.body)});return Response.json({choices:[{message:{content:JSON.stringify(answer)}}]})})});const f={app,directory,calls,async request(path,{method='GET',cookie,body,headers={}}={}){return app.fetch(new Request(origin+'/plant-id/'+path,{method,headers:{Origin:origin,...(cookie?{Cookie:cookie}:{}),...headers},...(body?{body}: {})}))},async register(name='first_user'){const r=await this.request('api/register',{method:'POST',body:JSON.stringify({username:name,password:'test-password-123'}),headers:{'Content-Type':'application/json'}});assert.equal(r.status,200);return {cookie:r.headers.get('Set-Cookie').split(';')[0],user:(await r.json()).user}},form({threadId='',text='在成都拍摄',plantName='',images=[image],consent='yes'}={}){const form=new FormData();form.set('text',text);if(plantName)form.set('plantName',plantName);form.set('consent',consent);if(threadId)form.set('threadId',threadId);for(const bytes of images)form.append('images',new Blob([bytes],{type:'image/png'}),'leaf.png');return form},advance(ms){time+=ms},async close(){app.close();await rm(directory,{recursive:true,force:true})}};return f}
 test('independent accounts, scoped sessions and separate history; actual image bytes reach the mainland vision endpoint',async()=>{const f=await fixture();try{const a=await f.register(),b=await f.register('second_user');const r=await f.request('api/identify',{method:'POST',cookie:a.cookie,body:f.form()});assert.equal(r.status,200);const data=await r.json();assert.equal(data.answer.candidates[0].name,'蒲公英属');assert.equal(data.remaining,undefined);assert.equal(f.calls[0].url,'https://open.bigmodel.cn/api/paas/v4/chat/completions');assert.equal(f.calls[0].body.model,'glm-4.6v-flash');assert.deepEqual(f.calls[0].body.messages[1].content[1].image_url,{url:'data:image/png;base64,'+image.toString('base64')});assert.equal(f.calls[0].body.thinking.type,'disabled');assert.deepEqual((await (await f.request('api/threads',{cookie:b.cookie})).json()).threads,[]);for(const method of ['GET','DELETE'])assert.equal((await f.request('api/threads/'+data.threadId,{method,cookie:b.cookie})).status,404);assert.equal((await f.request('api/threads',{cookie:'leaf_session=forged'})).status,401);assert.ok((await readdir(f.directory)).every(name=>name.startsWith('plant-id.sqlite')));const session=await f.request('api/session',{cookie:a.cookie});assert.equal((await session.json()).provider,'智谱开放平台');const logout=await f.request('api/logout',{method:'POST',cookie:a.cookie});assert.match(logout.headers.get('Set-Cookie'),/Path=\/plant-id\/; HttpOnly; SameSite=Strict; Secure/);assert.equal((await f.request('api/threads',{cookie:a.cookie})).status,401)}finally{await f.close()}});
 test('follow-up uses only the selected owner history; deleting a thread does not delete another app or other accounts',async()=>{const f=await fixture();try{const a=await f.register(),b=await f.register('second_user');const data=await(await f.request('api/identify',{method:'POST',cookie:a.cookie,body:f.form()})).json();assert.equal((await f.request('api/identify',{method:'POST',cookie:b.cookie,body:f.form({threadId:data.threadId})})).status,404);const next=await f.request('api/identify',{method:'POST',cookie:a.cookie,body:f.form({threadId:data.threadId,text:'叶缘有锯齿',images:[]})});assert.equal(next.status,200);assert.match(f.calls[1].body.messages[1].content[0].text,/蒲公英属/);assert.equal(f.calls[1].body.messages[1].content.length,1);const turns=(await(await f.request('api/threads/'+data.threadId,{cookie:a.cookie})).json()).turns;assert.equal(turns.length,2);assert.equal((await f.request('api/threads/'+data.threadId,{method:'DELETE',cookie:a.cookie})).status,200);assert.equal(f.app.sql.prepare('SELECT count(*) n FROM turns').get().n,0);assert.equal(f.app.sql.prepare('SELECT count(*) n FROM users').get().n,2)}finally{await f.close()}});
 test('origin, consent, malformed images and empty input fail before any paid request',async()=>{const f=await fixture();try{const a=await f.register();assert.equal((await f.request('api/identify',{method:'POST',cookie:a.cookie,body:f.form(),headers:{Origin:'https://other.example'}})).status,403);for(const form of [f.form({consent:'no'}),f.form({images:[Buffer.from('not an image')]}),f.form({images:[],text:''}),f.form({images:[image,image,image,image]})])assert.equal((await f.request('api/identify',{method:'POST',cookie:a.cookie,body:form})).status,400);assert.equal(f.calls.length,0)}finally{await f.close()}});
@@ -218,4 +218,80 @@ test('the WFO index resolves plant names across flowering plants, gymnosperms, f
  assert.equal(findKnowledge('Rosaceae','科').rank,'family');
  assert.equal(findKnowledge('Rosa chinensis','属'),null);
  assert.equal(findKnowledge('Nonexistentaceae xxyyxzz','种'),null);
+});
+
+test('name review resolves accepted names, synonyms and bounded spelling suggestions without guessing abbreviations',async()=>{
+ const lookup=(name,description='',previous=null)=>reviewPlantNames({
+  name,description,previous,commonSearch:async()=>[],
+ });
+ for(const [label,kind,accepted] of [
+  ['Dionaea muscipula','exact','Dionaea muscipula'],
+  ['Dionaea corymbosa','synonym','Dionaea muscipula'],
+  ['Dionaea musciupula','spelling','Dionaea muscipula'],
+  ['月季','common','Rosa chinensis'],
+ ]){
+  const [hint]=await lookup(label);
+  assert.equal(hint.kind,kind);
+  assert.equal(hint.name,accepted);
+ }
+ assert.deepEqual(await lookup('R. chinensis'),[{input:'R. chinensis',kind:'unmatched'}]);
+ const [hint]=await lookup('','我怀疑是 N. ampullaria',{candidates:[{scientificName:'Nepenthes',rank:'属'}]});
+ assert.equal(hint.name,'Nepenthes ampullaria');
+ assert.equal(hint.kind,'expanded');
+ const inline=await lookup('','可能是 rosa chinensis');
+ assert.equal(inline[0].name,'Rosa chinensis');
+});
+
+test('follow-up uses the prior genus and new evidence to support a species result',async()=>{
+ const payloads=[];
+ const genus={...answer,candidates:[{...answer.candidates[0],name:'猪笼草属',scientificName:'Nepenthes',rank:'属'}],resolution:{rank:'genus',reason:'只看清叶端卷须和笼口'}};
+ const species={...answer,candidates:[{...answer.candidates[0],name:'苹果猪笼草',scientificName:'Nepenthes ampullaria',rank:'种'}],resolution:{rank:'species',reason:'补拍显示植株基部有簇生短壶状下位笼及狭小反折笼盖'}};
+ const f=await fixture({fetchImpl:async (_url,options)=>{
+  payloads.push(JSON.parse(options.body));
+  return Response.json({choices:[{message:{content:JSON.stringify(payloads.length===1?genus:species)}}]});
+ }});
+ try{
+  const {cookie}=await f.register();
+  const submit=body=>f.request('api/identify',{method:'POST',cookie,body});
+  const initial=await(await submit(f.form({text:'叶端有卷须'}))).json();
+  assert.equal(initial.answer.resolution.rank,'genus');
+  const next=await(await submit(f.form({threadId:initial.threadId,plantName:'N. ampullaria',text:'盲端笼盖狭小反折，近照可见基部簇生短壶状下位笼'}))).json();
+  assert.equal(next.answer.resolution.rank,'species');
+  assert.equal(next.answer.nameReview[0].kind,'expanded');
+  assert.equal(next.answer.candidates[0].knowledge.name,'Nepenthes ampullaria');
+  assert.match(payloads[1].messages[0].content,/仍不足时保留保守层级/);
+  assert.match(payloads[1].messages[1].content[0].text,/"rank":"genus"/);
+  assert.match(payloads[1].messages[1].content[0].text,/狭小反折/);
+  assert.equal(payloads.length,2);
+ }finally{await f.close()}
+});
+
+test('only explicit common names go to the lookup service and a name alone cannot establish a specimen as a species',async()=>{
+ const calls=[];
+ const f=await fixture({
+  referenceFetch:async input=>{
+   const query=new URL(input);
+   calls.push(query.searchParams.get('q'));
+   return Response.json({results:[
+    {name:'Ginkgo biloba',rank:'species',iconic_taxon_name:'Plantae',matched_term:'公孙树'},
+    {name:'Fungus',rank:'species',iconic_taxon_name:'Fungi',matched_term:'公孙树'},
+   ]});
+  },
+  fetchImpl:async ()=>{
+   const result={...answer,candidates:[{...answer.candidates[0],scientificName:'Ginkgo biloba',rank:'种'}],resolution:{rank:'species',reason:'仅根据标签'}};
+   return Response.json({choices:[{message:{content:JSON.stringify(result)}}]});
+  },
+ });
+ try{
+  const {cookie}=await f.register();
+  const call=body=>f.request('api/identify',{method:'POST',cookie,body});
+  await call(f.form({text:'名称：公孙树，我在私人庭院拍摄'}));
+  assert.deepEqual(calls,[]);
+  const response=await call(f.form({text:'',images:[],plantName:'公孙树'}));
+  assert.equal(response.status,200);
+  const {answer:result}=await response.json();
+  assert.equal(result.nameReview[0].name,'Ginkgo biloba');
+  assert.equal(result.resolution.rank,'undetermined');
+  assert.deepEqual(calls,['公孙树']);
+ }finally{await f.close()}
 });

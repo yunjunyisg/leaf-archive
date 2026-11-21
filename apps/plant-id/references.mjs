@@ -47,7 +47,7 @@ async function readLimited(response,limit){
 }
 
 export function createReferences(fetchImpl=fetch){
- const photos=new Map(),cache=new Map();
+ const photos=new Map(),cache=new Map(),commonCache=new Map();
  let active=0;
  const remember=(map,key,value)=>{
   map.delete(key);
@@ -118,6 +118,16 @@ export function createReferences(fetchImpl=fetch){
   try{return await action()}finally{active--}
  }
  return {
+  commonNames(name,signal){return limited(async ()=>{
+   const cached=commonCache.get(name);
+   if(cached&&cached.expires>Date.now())return cached.matches;
+   const rows=await records('/v1/taxa/autocomplete',{q:name,locale:'zh-CN',per_page:'10',is_active:'true'},AbortSignal.any([signal,AbortSignal.timeout(2500)]));
+   const matches=rows.filter(row=>row.is_active!==false&&row.iconic_taxon_name==='Plantae'&&
+    ['species','genus','family'].includes(row.rank)&&typeof row.name==='string'&&
+    [row.preferred_common_name,row.matched_term].includes(name)).slice(0,3).map(row=>({name:row.name,rank:row.rank}));
+   remember(commonCache,name,{matches,expires:Date.now()+30*60*1000});
+   return matches;
+  })},
   lookup(name,rank,signal){return limited(async ()=>{
    const result=await find(name,rank,signal);
    if(!result)return {photo:null};
