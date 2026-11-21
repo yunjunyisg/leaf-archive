@@ -1,0 +1,59 @@
+name: 构建识植助手 Windows 安装程序
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 识植助手客户端发行标签
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      PLANT_ID_RELEASE: ${{ inputs.tag }}
+      APP_OUTPUT_DIR: ${{ runner.temp }}\plant-id-windows
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: 检查目标发行标签
+        run: |
+          if ($env:PLANT_ID_RELEASE -notmatch '^plant-id-apps-v\d+\.\d+\.\d+$') { throw '发行标签格式不正确' }
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: 构建并测试 Windows 应用
+        shell: bash
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: |
+          npm ci --prefix apps/windows
+          npm test --prefix apps/windows
+          npm run package --prefix apps/windows -- --plant-id
+      - name: 生成并校验 EXE
+        run: |
+          $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if (!(Test-Path $nsis)) {
+            choco install nsis --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw '安装 NSIS 失败' }
+          }
+          $build = Join-Path $env:APP_OUTPUT_DIR 'PlantId-win32-x64'
+          if (!(Test-Path (Join-Path $build 'PlantId.exe'))) { throw '缺少应用程序' }
+          $version = $env:PLANT_ID_RELEASE -replace '^plant-id-apps-v', ''
+          $name = "PlantId-Windows-x64-$version.exe"
+          $installer = Join-Path $env:APP_OUTPUT_DIR $name
+          & $nsis "/DPLANT_ID_BUILD=$build" "/DPLANT_ID_INSTALLER=$installer" 'apps/windows/installer/plant-id.nsi'
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $installer)) { throw '生成 EXE 失败' }
+          if ((Get-Item $installer).Length -lt 10MB) { throw '安装包不完整' }
+          $installed = Start-Process -FilePath $installer -ArgumentList '/S' -PassThru -Wait
+          $installedExe = Join-Path $env:LOCALAPPDATA 'Programs\PlantId\app\PlantId.exe'
+          if ($installed.ExitCode -ne 0 -or !(Test-Path $installedExe)) { throw '静默安装验证失败' }
+          $checksum = "$installer.sha256"
+          "$( (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant() )  $name" | Set-Content -Path $checksum -Encoding ascii
+          gh release upload $env:PLANT_ID_RELEASE $installer $checksum --clobber
+          if ($LASTEXITCODE -ne 0) { throw '上传 EXE 失败' }

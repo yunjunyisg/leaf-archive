@@ -1,17 +1,24 @@
 plugins { id 'com.android.application' }
+def plantId = providers.gradleProperty('plantId').isPresent()
 android {
     namespace 'top.gloriouscarnivorousplants.leafarchive'
     compileSdk 35
     defaultConfig {
-        applicationId 'top.gloriouscarnivorousplants.leafarchive'
+        applicationId (plantId ? 'top.gloriouscarnivorousplants.plantid' : 'top.gloriouscarnivorousplants.leafarchive')
         minSdk 29
         targetSdk 35
-        versionCode 3
-        versionName '1.1.0'
+        versionCode (plantId ? 1 : 3)
+        versionName (plantId ? '1.0.0' : '1.1.0')
+        manifestPlaceholders = [
+            title: plantId ? '识植助手' : '植藏',
+            icon: plantId ? '@drawable/plant_id_icon' : '@mipmap/ic_launcher',
+        ]
+        buildConfigField 'String', 'ENTRY_PATH', plantId ? '"/plant-id/"' : '"/"'
+        buildConfigField 'boolean', 'PLANT_ID', plantId ? 'true' : 'false'
     }
     signingConfigs {
         release {
-            if (System.getenv('LEAF_ANDROID_KEYSTORE')) {
+            if (!plantId && System.getenv('LEAF_ANDROID_KEYSTORE')) {
                 storeFile file(System.getenv('LEAF_ANDROID_KEYSTORE'))
                 storePassword System.getenv('LEAF_ANDROID_KEYSTORE_PASSWORD')
                 keyAlias 'leafarchive'
@@ -22,9 +29,10 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            if (System.getenv('LEAF_ANDROID_KEYSTORE')) signingConfig signingConfigs.release
+            if (!plantId && System.getenv('LEAF_ANDROID_KEYSTORE')) signingConfig signingConfigs.release
         }
     }
+    buildFeatures { buildConfig = true }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 dependencies { implementation 'androidx.webkit:webkit:1.14.0' }

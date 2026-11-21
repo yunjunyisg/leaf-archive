@@ -18,6 +18,7 @@ import java.util.concurrent.ExecutorService;
 
 public class MainActivity extends Activity {
     private static final String ORIGIN="https://gloriouscarnivorousplants.top";
+    private static final String ENTRY=ORIGIN+BuildConfig.ENTRY_PATH;
     private static final int PICK_PHOTOS=10,SAVE_FILE=11,MAX_FILE=24*1024*1024;
     private WebView web;
     private LinearLayout root;
@@ -29,23 +30,25 @@ public class MainActivity extends Activity {
     private boolean destroyed=false;
     private final ExecutorService io=Executors.newSingleThreadExecutor();
 
-    static boolean trusted(Uri uri){return uri!=null&&"https".equals(uri.getScheme())&&"gloriouscarnivorousplants.top".equals(uri.getHost())&&(uri.getPort()==-1||uri.getPort()==443)&&uri.getUserInfo()==null;}
+    static boolean trusted(Uri uri){return uri!=null&&"https".equals(uri.getScheme())&&"gloriouscarnivorousplants.top".equals(uri.getHost())&&(uri.getPort()==-1||uri.getPort()==443)&&uri.getUserInfo()==null&&(!BuildConfig.PLANT_ID||allowedPlantPath(uri.getPath()));}
+    static boolean allowedPlantPath(String path){return "/plant-id".equals(path)||(path!=null&&path.startsWith(BuildConfig.ENTRY_PATH));}
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
+        String appName=getApplicationInfo().loadLabel(getPackageManager()).toString();
         root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Color.rgb(248,249,245));
         root.setOnApplyWindowInsetsListener((view,insets)->{
             if(Build.VERSION.SDK_INT>=30){android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars());view.setPadding(bars.left,bars.top,bars.right,bars.bottom);}
             else view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
             return insets;
         });
-        notice=new TextView(this);notice.setText("暂时无法连接植藏，请检查网络后重试。");notice.setPadding(dp(24),dp(40),dp(24),dp(40));notice.setTextSize(17);notice.setVisibility(View.GONE);root.addView(notice);
-        retryButton=new Button(this);retryButton.setText("重新连接");retryButton.setVisibility(View.GONE);retryButton.setOnClickListener(v->{notice.setVisibility(View.GONE);retryButton.setVisibility(View.GONE);web.setVisibility(View.VISIBLE);String url=web.getUrl();web.loadUrl(url!=null&&trusted(Uri.parse(url))?url:ORIGIN);});root.addView(retryButton);
+        notice=new TextView(this);notice.setText("暂时无法连接"+appName+"，请检查网络后重试。");notice.setPadding(dp(24),dp(40),dp(24),dp(40));notice.setTextSize(17);notice.setVisibility(View.GONE);root.addView(notice);
+        retryButton=new Button(this);retryButton.setText("重新连接");retryButton.setVisibility(View.GONE);retryButton.setOnClickListener(v->{notice.setVisibility(View.GONE);retryButton.setVisibility(View.GONE);web.setVisibility(View.VISIBLE);String url=web.getUrl();web.loadUrl(url!=null&&trusted(Uri.parse(url))?url:ENTRY);});root.addView(retryButton);
         web=new WebView(this);root.addView(web,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
         WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(true);settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);settings.setGeolocationEnabled(false);settings.setSupportMultipleWindows(true);settings.setJavaScriptCanOpenWindowsAutomatically(false);settings.setSafeBrowsingEnabled(true);
         CookieManager.getInstance().setAcceptCookie(true);CookieManager.getInstance().setAcceptThirdPartyCookies(web,false);WebView.setWebContentsDebuggingEnabled(false);
         try(InputStream input=getAssets().open("downloads.js")){ByteArrayOutputStream bytes=new ByteArrayOutputStream();byte[] chunk=new byte[4096];int count;while((count=input.read(chunk))!=-1)bytes.write(chunk,0,count);downloadScript=bytes.toString(StandardCharsets.UTF_8.name());}catch(IOException e){downloadScript="";}
-        if(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))WebViewCompat.addWebMessageListener(web,"LeafDownloads",java.util.Collections.singleton(ORIGIN),(view,message,source,isMainFrame,reply)->{
+        if(!BuildConfig.PLANT_ID&&WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))WebViewCompat.addWebMessageListener(web,"LeafDownloads",java.util.Collections.singleton(ORIGIN),(view,message,source,isMainFrame,reply)->{
             if(!isMainFrame||!trusted(source)||!trusted(Uri.parse(view.getUrl()==null?"":view.getUrl())))return;
             String raw=message.getData();if(raw==null||raw.length()>MAX_FILE*4/3+4096)return;
             try{JSONObject signal=new JSONObject(raw);if("quit".equals(signal.optString("type"))){finishAndRemoveTask();return;}}catch(Exception ignored){return;}
@@ -63,7 +66,7 @@ public class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){Uri url=request.getUrl();if(trusted(url))return false;if(request.isForMainFrame())openExternal(url);return true;}
             @Override public void onPageStarted(WebView view,String url,android.graphics.Bitmap icon){if(!trusted(Uri.parse(url))){view.stopLoading();openExternal(Uri.parse(url));}}
-            @Override public void onPageFinished(WebView view,String url){CookieManager.getInstance().flush();if(Uri.parse(url).getPath()!=null&&Uri.parse(url).getPath().equals("/auth/local"))view.clearHistory();if(trusted(Uri.parse(url))&&WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))view.evaluateJavascript(downloadScript,null);}
+            @Override public void onPageFinished(WebView view,String url){CookieManager.getInstance().flush();if(Uri.parse(url).getPath()!=null&&Uri.parse(url).getPath().equals("/auth/local"))view.clearHistory();if(!BuildConfig.PLANT_ID&&trusted(Uri.parse(url))&&WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))view.evaluateJavascript(downloadScript,null);}
             @Override public void onReceivedError(WebView view,WebResourceRequest request,WebResourceError error){if(request.isForMainFrame())showOffline();}
             @Override public void onReceivedHttpError(WebView view,WebResourceRequest request,WebResourceResponse response){if(request.isForMainFrame()&&response.getStatusCode()>=500)showOffline();}
         });
@@ -74,9 +77,9 @@ public class MainActivity extends Activity {
                 Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT);pick.addCategory(Intent.CATEGORY_OPENABLE);pick.setType("image/*");pick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,params.getMode()==FileChooserParams.MODE_OPEN_MULTIPLE);
                 try{startActivityForResult(pick,PICK_PHOTOS);}catch(ActivityNotFoundException e){photoCallback.onReceiveValue(null);photoCallback=null;toast("无法打开照片选择器");}return true;
             }
-            @Override public boolean onJsAlert(WebView view,String url,String text,JsResult result){if(!trusted(Uri.parse(url))){result.cancel();return true;}new AlertDialog.Builder(MainActivity.this).setTitle("植藏").setMessage(text).setPositiveButton("确定",(d,w)->result.confirm()).setOnCancelListener(d->result.cancel()).show();return true;}
+            @Override public boolean onJsAlert(WebView view,String url,String text,JsResult result){if(!trusted(Uri.parse(url))){result.cancel();return true;}new AlertDialog.Builder(MainActivity.this).setTitle(appName).setMessage(text).setPositiveButton("确定",(d,w)->result.confirm()).setOnCancelListener(d->result.cancel()).show();return true;}
             @Override public boolean onJsConfirm(WebView view,String url,String text,JsResult result){if(!trusted(Uri.parse(url))){result.cancel();return true;}new AlertDialog.Builder(MainActivity.this).setTitle("请确认").setMessage(text).setPositiveButton("确定",(d,w)->result.confirm()).setNegativeButton("取消",(d,w)->result.cancel()).setOnCancelListener(d->result.cancel()).show();return true;}
-            @Override public boolean onJsPrompt(WebView view,String url,String text,String initial,JsPromptResult result){if(!trusted(Uri.parse(url))){result.cancel();return true;}EditText input=new EditText(MainActivity.this);input.setSingleLine(true);input.setText(initial);new AlertDialog.Builder(MainActivity.this).setTitle("植藏").setMessage(text).setView(input).setPositiveButton("确定",(d,w)->result.confirm(input.getText().toString())).setNegativeButton("取消",(d,w)->result.cancel()).setOnCancelListener(d->result.cancel()).show();return true;}
+            @Override public boolean onJsPrompt(WebView view,String url,String text,String initial,JsPromptResult result){if(!trusted(Uri.parse(url))){result.cancel();return true;}EditText input=new EditText(MainActivity.this);input.setSingleLine(true);input.setText(initial);new AlertDialog.Builder(MainActivity.this).setTitle(appName).setMessage(text).setView(input).setPositiveButton("确定",(d,w)->result.confirm(input.getText().toString())).setNegativeButton("取消",(d,w)->result.cancel()).setOnCancelListener(d->result.cancel()).show();return true;}
             @Override public boolean onCreateWindow(WebView view,boolean dialog,boolean userGesture,Message message){
                 if(!userGesture)return false;
                 WebView popup=new WebView(MainActivity.this);popup.setWebViewClient(new WebViewClient(){@Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest request){Uri url=request.getUrl();if(trusted(url))web.loadUrl(url.toString());else openExternal(url);popup.destroy();return true;}});
@@ -85,7 +88,7 @@ public class MainActivity extends Activity {
         });
         web.setDownloadListener((url,userAgent,disposition,mime,length)->{if(!url.startsWith("blob:"))saveHttpDownload(url,mime,userAgent);});
         if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::goBack);
-        if(saved==null||web.restoreState(saved)==null)web.loadUrl(ORIGIN);
+        if(saved==null||web.restoreState(saved)==null)web.loadUrl(ENTRY);
     }
     private void toast(String text){if(!destroyed)Toast.makeText(this,text,Toast.LENGTH_LONG).show();}
     private void showOffline(){notice.setVisibility(View.VISIBLE);retryButton.setVisibility(View.VISIBLE);web.setVisibility(View.GONE);}

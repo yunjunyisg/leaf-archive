@@ -10,6 +10,17 @@
 
 新应用使用独立服务、数据库和登录会话，不导入原植物档案。入口需完成以下安装和代理配置才会生效，源码及下载包发布不代表已经部署。
 
+
+## 安卓与 Windows 安装包
+
+识植助手客户端启动后进入 `https://gloriouscarnivorousplants.top/plant-id/`。请使用识植助手自己的账号。客户端需联网，功能随服务器上的识植助手版本更新。
+
+- 安卓 10 或更新版本使用 `PlantId-Android-1.0.0.apk`。
+- Windows 10/11 64 位使用 `PlantId-Windows-x64-1.0.0.exe`。
+
+[客户端安装包下载](https://github.com/yunjunyisg/leaf-archive/releases/tag/plant-id-apps-v1.0.0)
+
+
 ## 一、下载并安装独立服务
 
 安装 1.0.5 后，识植助手首次启动时会删除每个账号超过最近 10 条的旧植物识别结果。每轮成功保存算一条，同一会话的多轮结果各自计数。请在升级前复制需要另外保留的旧结果。
