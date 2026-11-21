@@ -1,4 +1,4 @@
-name: 构建识植助手 Windows 安装程序
+name: 构建识植助手客户端
 on:
   workflow_dispatch:
     inputs:
@@ -14,13 +14,13 @@ jobs:
     timeout-minutes: 20
     env:
       PLANT_ID_RELEASE: ${{ inputs.tag }}
-      APP_OUTPUT_DIR: ${{ runner.temp }}\plant-id-windows
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
       - name: 检查目标发行标签
         run: |
           if ($env:PLANT_ID_RELEASE -notmatch '^plant-id-apps-v\d+\.\d+\.\d+$') { throw '发行标签格式不正确' }
+          "APP_OUTPUT_DIR=$(Join-Path $env:RUNNER_TEMP 'plant-id-windows')" >> $env:GITHUB_ENV
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag }}
@@ -57,3 +57,29 @@ jobs:
           "$( (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant() )  $name" | Set-Content -Path $checksum -Encoding ascii
           gh release upload $env:PLANT_ID_RELEASE $installer $checksum --clobber
           if ($LASTEXITCODE -ne 0) { throw '上传 EXE 失败' }
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PLANT_ID_RELEASE: ${{ inputs.tag }}
+    steps:
+      - name: 检查目标发行标签
+        run: |
+          [[ "$PLANT_ID_RELEASE" =~ ^plant-id-apps-v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: 编译待签名的安卓包
+        working-directory: apps/android
+        run: bash gradlew --no-daemon -PplantId :app:assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plant-id-android-unsigned
+          path: apps/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 1
