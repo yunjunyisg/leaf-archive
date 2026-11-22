@@ -48,17 +48,35 @@ test('web questions require individual credentials and use the same public catal
  }finally{await f.close()}
 });
 
-test('remote knowledge plugin exposes only public read-only lookup without an AI key',async()=>{
+test('remote plant agent supplies prompts and public read-only candidate lookup without an AI key',async()=>{
  const f=await appFixture();
  const rpc=(method,params,id=1)=>f.post('mcp',{jsonrpc:'2.0',method,params,id});
  try{
   const init=await(await rpc('initialize',{protocolVersion:'2025-06-18'})).json();
   assert.equal(init.result.protocolVersion,'2025-06-18');
+  assert.deepEqual(init.result.capabilities,{tools:{},prompts:{}});
   assert.equal((await f.post('mcp',{jsonrpc:'2.0',method:'notifications/initialized'})).status,202);
   const list=await(await rpc('tools/list')).json();
-  assert.deepEqual(list.result.tools.map(t=>t.name),['lookup_plant']);
+  assert.deepEqual(list.result.tools.map(t=>t.name),['lookup_plant','plant_agent']);
+  assert.ok(list.result.tools.every(t=>t.annotations.readOnlyHint&&!t.annotations.destructiveHint));
+  const prompts=await(await rpc('prompts/list')).json();
+  assert.deepEqual(prompts.result.prompts.map(p=>p.name),['identify_plant','plant_question']);
+  const prompt=await(await rpc('prompts/get',{name:'identify_plant'})).json();
+  assert.match(prompt.result.messages[0].content.text,/查看|照片/);
+  assert.match(prompt.result.messages[0].content.text,/补拍/);
   const result=await(await rpc('tools/call',{name:'lookup_plant',arguments:{name:'月季'}})).json();
   assert.equal(result.result.structuredContent.entries[0].name,'Rosa chinensis');
+  const run=async args=>(await(await rpc('tools/call',{name:'plant_agent',arguments:args})).json());
+  const identification=await run({task:'identify',names:['月季','Dionaea corymbosa',' 月季 ']});
+  assert.deepEqual(identification.result.structuredContent.candidates.map(it=>it.entries[0].name),['Rosa chinensis','Dionaea muscipula']);
+  assert.match(identification.result.structuredContent.instructions,/不足/);
+  const question=await run({task:'question'});
+  assert.deepEqual(question.result.structuredContent.candidates,[]);
+  assert.match(question.result.structuredContent.instructions,/一般养护经验/);
+  for(const invalid of [{task:'write'},{task:'identify',names:null},{task:'identify',names:Array(5).fill('月季')},
+   {task:'identify',names:['月季'],image:'private fixture'}]){
+   assert.equal((await run(invalid)).error.code,-32602);
+  }
   const rejected=await(await rpc('tools/call',{name:'write',arguments:{name:'任意植物'}})).json();
   assert.equal(rejected.error.code,-32602);
   assert.equal((await f.post('mcp',{jsonrpc:'2.0',id:1,method:'tools/list'},{source:'https://example.com'})).status,403);

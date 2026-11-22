@@ -1,17 +1,30 @@
-# 识植助手共享植物资料库
+# 识植助手 MCP 插件
 
-这是 DeepSeek Harness 的只读 MCP 连接配置。加载后，DSH 可以按学名、异名或本库已有的中文名称查阅共享资料库，取得接受名、科属和原始来源。资料由网站运营者维护，部署新版资料后，已连接的用户即可查询。
+把识植助手接入支持远程 MCP 的 AI 客户端，并在原来的聊天窗口完成植物识别和问答。AI 账号与模型用量继续由用户自己的客户端管理。连接此只读插件无需识植助手账号或额外 API Key。
 
-网页问答由识植助手服务器运行 DSH。网站用户只需在网页输入各自的 DeepSeek 开放平台 API Key，网页路径无需安装本地插件。这个配置另外提供给想在自己的 DSH 中使用资料库的人。
+## 连接
 
-## 在用户自己的 DSH 中连接
+在 AI 客户端的 MCP、扩展或连接器设置中新增「识植助手」，选择 Streamable HTTP，再填写服务器地址。
 
-需要支持 `@deepseek-ai/dsh-mcp-client` 及 Streamable HTTP 的 DSH。可把 `cordis.patch.yml` 下载到本机，运行：
-
-```bash
-dsh --profile headless --patch /absolute/path/to/cordis.patch.yml "请用共享植物资料库核对 Dionaea corymbosa 现行接受的学名"
+```text
+https://gloriouscarnivorousplants.top/plant-id/mcp
 ```
 
-也可把配置中的 `insert` 支持项合并到自己的 DSH profile 配置。保留原有配置内容。MCP 连接本身无需 API Key，用户自己的 DSH 按原有模型配置调用。
+需要 JSON 配置的客户端可参考 `mcp.json`，把 `plant_id` 条目加入客户端现有配置。各客户端的自定义连接权限和配置格式以自身设置为准。有些客户端只显示工具，不单独提供提示菜单。
 
-公开工具只读取识植助手的公开分类索引和公开来源，无账号资料、私有收藏、识别上传图片或写入权限。插件不会把整套名录复制进个人记忆，也不修改其他用户的私有知识。站点完成部署后，端点为 `https://gloriouscarnivorousplants.top/plant-id/mcp`。
+## 在对话中使用
+
+- 上传植物照片后问「用识植助手鉴别这株植物，给我候选和最有用的补拍建议」。
+- 也可以问「用识植助手核对 Dionaea corymbosa 的接受名，并给出原始来源」。
+- 有提示菜单的客户端可选「识别植物」或「植物问答」。客户端也可以直接调用 `plant_agent` 或 `lookup_plant`。
+- 当前 AI 需支持图片理解才能看图；也可用文字描述。照片由该 AI 客户端读取，发送给插件的资料查询参数只包含候选名称。插件只能访问站点的公开植物索引。
+
+## 在 DeepSeek Harness 中加载
+
+需要支持 `@deepseek-ai/dsh-mcp-client` 及 Streamable HTTP 的 DSH。把 `cordis.patch.yml` 保存到本机，再用已有模型配置运行：
+
+```bash
+dsh --profile headless --patch /absolute/path/to/cordis.patch.yml "请用识植助手核对 Dionaea corymbosa 的接受名，并列出资料出处"
+```
+
+之前已连接共享植物资料库的 DSH 用户可继续使用原来的连接地址。服务器升级后，刷新工具列表或重新连接即可看到新工具。

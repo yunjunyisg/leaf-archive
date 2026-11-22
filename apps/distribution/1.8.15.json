@@ -1,0 +1,15 @@
+{
+  "tag": "plant-id-web-v1.0.14",
+  "files": [
+    {
+      "name": "plant-id-web-v1.0.14.tar.gz",
+      "url": "https://tmpfiles.org/wTAAbdsDu4Ts/plant-id-web-v1.0.14.tar.gz",
+      "sha256": "3fd663b384373072495feda2ea102aba63a771f5650f916786656cc0e08cbf90"
+    },
+    {
+      "name": "plant-id-mcp-v1.1.0.tar.gz",
+      "url": "https://tmpfiles.org/wzAhbfsduLJ4/plant-id-mcp-v1.1.0.tar.gz",
+      "sha256": "f507fe1f0d7f9cbc6c5d09a27ed56c44c4cd97bf65e98a9d9967e9e684a0b0d7"
+    }
+  ]
+}

@@ -1,1 +1,1 @@
-{"name":"plant-id-web","version":"1.0.13","private":true,"type":"module","engines":{"node":">=24"},"scripts":{"start":"node server.mjs","test":"node --test test/*.mjs","pretest":"node knowledge/prepare-world-flora.mjs","prestart":"node knowledge/prepare-world-flora.mjs"}}
+{"name":"plant-id-web","version":"1.0.14","private":true,"type":"module","engines":{"node":">=24"},"scripts":{"start":"node server.mjs","test":"node --test test/*.mjs","pretest":"node knowledge/prepare-world-flora.mjs","prestart":"node knowledge/prepare-world-flora.mjs"}}

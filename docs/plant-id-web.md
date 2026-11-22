@@ -27,16 +27,16 @@
 
 如果安装 1.0.0 时本机 3110 连接失败并回滚，直接安装当前版本。旧版启动入口比较了两种不同的路径，服务可能直接退出。新版支持通过安装程序使用的 current 符号链接启动。
 
-下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.13/plant-id-web-v1.0.13.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
+下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.14/plant-id-web-v1.0.14.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
 
 ```bash
 (
 set -e
 cd /root/leaf-migration
-echo "0ea6e536fa138b06908f57a2dcbf7ae91f53809fcb2ddc7999a7146f3d00d48f  plant-id-web-v1.0.13.tar.gz" | sha256sum -c -
-gzip -t plant-id-web-v1.0.13.tar.gz
+echo "3fd663b384373072495feda2ea102aba63a771f5650f916786656cc0e08cbf90  plant-id-web-v1.0.14.tar.gz" | sha256sum -c -
+gzip -t plant-id-web-v1.0.14.tar.gz
 PLANT_ID_INSTALL_DIR=$(mktemp -d /root/leaf-migration/plant-id-verified.XXXXXX)
-tar -xzf plant-id-web-v1.0.13.tar.gz -C "$PLANT_ID_INSTALL_DIR"
+tar -xzf plant-id-web-v1.0.14.tar.gz -C "$PLANT_ID_INSTALL_DIR"
 (cd "$PLANT_ID_INSTALL_DIR" && sha256sum -c SHA256SUMS)
 bash "$PLANT_ID_INSTALL_DIR/deploy/install.sh"
 )
@@ -159,10 +159,20 @@ bash /opt/plant-id/current/deploy/install-dsh.sh
 PLANT_ID_ASK_GATEWAYS='[{"id":"custom-example","label":"示例网关","baseURL":"https://gateway.example.com/v1","model":"vendor/model"}]'
 ```
 
-### 共享资料库插件
+### 在自己的 AI 对话中使用识植助手
 
-网站用户可直接使用网页，无需安装本地工具。有自己 DSH 环境的人也可下载[共享植物资料库插件](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.9/plant-knowledge-dsh-v1.0.0.tar.gz)，按包内说明把公共资料库挂进自己的配置。这个连接只提供公开、只读的名录检索。运营者可按[资料库导入流程](../apps/plant-id/knowledge/README.md)维护和部署自己的共享索引，所有已连接的用户自动读取新版资料。用户的私有账号资料不在 MCP 的读取范围内。
+服务器升级到 1.0.14 后，支持远程 MCP 的 AI 客户端可新增「识植助手」连接。传输类型选择 Streamable HTTP，服务器地址填写：
+
+```text
+https://gloriouscarnivorousplants.top/plant-id/mcp
+```
+
+接入后，在 AI 对话里上传照片，再问「用识植助手识别这株植物，给出候选和补拍建议」。AI 也可以用插件核对学名，查询植物分类和来源，回答养护或鉴别问题。看照片需要客户端当前使用的模型支持图像。模型调用使用用户自己的 AI 配置和额度，插件连接无需另填 API Key。
+
+插件提供「识别植物」「植物问答」提示，以及供客户端自动调用的只读工具。照片由当前 AI 客户端读取。工具只接收任务类型及候选名称，查询公开植物资料。原先已经连接共享资料库的用户可继续使用原地址。
+
+[插件配置包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.14/plant-id-mcp-v1.1.0.tar.gz) · [通用连接和 DSH 使用说明](../apps/plant-id/dsh/knowledge-plugin/README.md) · [资料库导入流程](../apps/plant-id/knowledge/README.md)
 
 ## 本次验证范围
 
-26 项自动测试通过，覆盖问答密钥的账号与服务商隔离、加密保存、重启复用、更换和失效。另用真实 DSH 运行时和模拟模型服务检查了智谱回答正文、模型繁忙时的备用调用、欠费和鉴权失败，通过移动尺寸浏览器验证了问答表单。安装包内文件校验通过。模型测试使用模拟接口，目标服务器仍需部署后实测。
+26 项自动测试通过，覆盖问答密钥的账号与服务商隔离、加密保存、重启复用、更换和失效。另用真实 DSH 运行时和模拟模型服务检查了智谱回答正文、模型繁忙时的备用调用、欠费和鉴权失败，通过移动尺寸浏览器验证了问答表单。安装包内文件校验通过。亦用真实 DSH 客户端和模拟模型验证了识植助手 MCP 工具调用。模型测试使用模拟接口，目标服务器仍需部署后实测。
