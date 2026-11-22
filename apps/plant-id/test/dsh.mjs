@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,rm,stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {randomUUID} from 'node:crypto';
 import {createPlantId} from '../server.mjs';
 import {askProviderRegistry,compatibleProviderPatch,routeForQuestion} from '../dsh/providers.mjs';
 
@@ -19,17 +20,34 @@ async function appFixture(dshAnswer,env={}){
   assert.equal(response.status,200);
   return response.headers.get('Set-Cookie').split(';')[0];
  };
- return {get app(){return app},dir,post,login,restart(){app.close();app=createPlantId(options)},close:async()=>{app.close();await rm(dir,{recursive:true,force:true})}};
+ function seed(username,scientificName='Rosa chinensis'){
+  const owner=app.sql.prepare('SELECT id FROM users WHERE username=?').get(username).id;
+  const threadId=randomUUID(),turnId=randomUUID(),created=Date.now();
+  app.sql.prepare('INSERT INTO threads VALUES (?,?,?,?,?)').run(threadId,owner,'测试记录',created,created);
+  app.sql.prepare('INSERT INTO turns VALUES (?,?,?,?,?,?)').run(turnId,threadId,owner,'私有原描述',
+   JSON.stringify({summary:'测试记录摘要',candidates:[{scientificName}]}),created);
+  return {threadId,turnId};
+ }
+ return {get app(){return app},dir,post,login,seed,restart(){app.close();app=createPlantId(options)},close:async()=>{app.close();await rm(dir,{recursive:true,force:true})}};
 }
 
 test('web questions require individual credentials and use the same public catalogue as the plugin',async()=>{
  let request;
  const f=await appFixture(async input=>{request=input;return {text:'可对比叶片和捕虫夹。',model:'deepseek-v4-flash',truncated:false}});
  const apiKey='sk-personal-key-in-test-1234';
- const body={apiKey,question:'捕蝇草怎么鉴别？',plant:'Dionaea corymbosa',history:[{question:'第一问',answer:'第一答'}]};
+ const body={apiKey,question:'捕蝇草怎么鉴别？',history:[{question:'第一问',answer:'第一答'}]};
  try{
   assert.equal((await f.post('api/ask',body)).status,401);
   const cookie=await f.login('answer_user');
+  const other=await f.login('unrelated_user');
+  const missing=await f.post('api/ask',body,{cookie});
+  assert.equal(missing.status,400);
+  assert.equal((await missing.json()).code,'ask_record_required');
+  Object.assign(body,f.seed('answer_user','Dionaea corymbosa'));
+  const foreign=await f.post('api/ask',body,{cookie:other});
+  assert.equal(foreign.status,404);
+  assert.equal((await foreign.json()).code,'ask_record_missing');
+  assert.equal(request,undefined);
   assert.equal((await f.post('api/ask',body,{cookie,source:'https://example.com'})).status,403);
   assert.equal((await f.post('api/ask',{...body,apiKey:''},{cookie})).status,400);
   assert.equal((await f.post('api/ask',{...body,question:''},{cookie})).status,400);
@@ -41,10 +59,14 @@ test('web questions require individual credentials and use the same public catal
   assert.equal(result.text,'可对比叶片和捕虫夹。');
   assert.equal(result.sources[0].url,'https://www.worldfloraonline.org/taxon/wfo-0000943687');
   assert.equal(request.apiKey,apiKey);
+  assert.deepEqual(request.record,{summary:'测试记录摘要',candidates:['Dionaea corymbosa']});
+  assert.equal((await f.post('api/ask',{...body,candidateIndex:12},{cookie})).status,400);
   assert.equal(request.knowledge[0].name,'Dionaea muscipula');
   assert.deepEqual(request.history,body.history);
   assert.doesNotMatch(JSON.stringify(result),/sk-personal|server-vision-key/);
-  assert.equal(f.app.sql.prepare('SELECT count(*) n FROM turns').get().n,0);
+  assert.equal(f.app.sql.prepare('SELECT count(*) n FROM turns').get().n,1);
+  f.app.sql.prepare('DELETE FROM threads WHERE id=?').run(body.threadId);
+  assert.equal((await f.post('api/ask',body,{cookie})).status,404);
  }finally{await f.close()}
 });
 
@@ -95,7 +117,7 @@ test('different user keys route only to selected trusted providers and models',a
   assert.ok(session.askProviders.some(row=>row.id==='bigmodel'));
   assert.ok(session.askProviders.some(row=>row.id==='custom-example'));
   assert.ok(session.askProviders.every(row=>!Object.hasOwn(row,'baseURL')));
-  const question={apiKey:'opaque123.example_Token',plant:'Rosa chinensis',question:'怎么和相似的植物区分？'};
+  const question={...f.seed('gateway_user'),apiKey:'opaque123.example_Token',question:'怎么和相似的植物区分？'};
   for(const invalid of [
    {provider:'unknown'},
    {provider:'deepseek',model:'arbitrary'},
@@ -135,9 +157,11 @@ test('a saved question key survives reloads, is scoped to account and provider, 
  const body={provider:'bigmodel',question:'如何养护？'};
  try{
   const cookie=await f.login('credential_owner'),other=await f.login('another_owner');
+  Object.assign(body,f.seed('credential_owner'));
+  const otherRecord=f.seed('another_owner');
   const session=async cookie=>await(await f.app.fetch(new Request(origin+'/plant-id/api/session',{headers:{Cookie:cookie}}))).json();
   const ask=(overrides={},c=cookie)=>f.post('api/ask',{...body,...overrides},{cookie:c});
-  for(const response of [await ask(),await ask({},other)]){
+  for(const response of [await ask(),await ask(otherRecord,other)]){
    assert.equal(response.status,400);
    assert.equal((await response.json()).code,'ask_key_required');
   }
@@ -157,7 +181,7 @@ test('a saved question key survives reloads, is scoped to account and provider, 
   assert.equal(calls.at(-1).apiKey,first);
   assert.equal(calls.at(-1).route.model,'glm-4.7-flash');
   assert.equal((await ask({provider:'dashscope'})).status,400);
-  assert.equal((await ask({},other)).status,400);
+  assert.equal((await ask(otherRecord,other)).status,400);
 
   assert.equal((await ask({apiKey:'rejected-token',rememberKey:true})).status,422);
   assert.equal((await ask()).status,200);

@@ -12,7 +12,7 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
  const messages=dialog.querySelector('#ask-messages');
  const target=dialog.querySelector('#ask-target');
  const submit=dialog.querySelector('#ask-send');
- let plant='',history=[],pending=null,editing=false;
+ let record=null,history=[],pending=null,editing=false;
  let choices=new Map(),savedProviders=new Set();
 
  function updateProvider(){
@@ -67,16 +67,17 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
   if(choices.has(selected))provider.value=selected;
   editing=false;
   history=[];
-  plant='';
+  record=null;
   status.textContent='';
   messages.replaceChildren();
   updateProvider();
  }
- function open(name=''){
+ function open({threadId,turnId,candidateIndex,label}){
   if(!isLoggedIn())return showAuth();
+  if(!threadId)return;
   close();
-  plant=String(name).slice(0,120);
-  target.textContent=plant?'关于 '+plant:'可以询问鉴别、形态、生境或养护。';
+  record={threadId,turnId,candidateIndex};
+  target.textContent='关于 '+(label||'这条识别记录');
   dialog.showModal();
   if(!choices.size)status.textContent='问答服务商尚未加载，请刷新后再试。';
  }
@@ -93,7 +94,7 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
  form.addEventListener('submit',async event=>{
   event.preventDefault();
   const choice=choices.get(provider.value);
-  if(!choice||pending||!question.value.trim())return;
+  if(!record||!choice||pending||!question.value.trim())return;
   const current=new AbortController();
   pending=current;
   const input=question.value.trim();
@@ -104,7 +105,7 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
   try{
    const reply=await api('ask',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({provider:choice.id,...credential,question:input,plant,history:history.slice(-4)}),
+    body:JSON.stringify({provider:choice.id,...credential,question:input,...record,history:history.slice(-4)}),
     signal:current.signal,
    });
    if(pending!==current||!dialog.open)return;

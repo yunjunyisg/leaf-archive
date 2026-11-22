@@ -27,16 +27,16 @@
 
 如果安装 1.0.0 时本机 3110 连接失败并回滚，直接安装当前版本。旧版启动入口比较了两种不同的路径，服务可能直接退出。新版支持通过安装程序使用的 current 符号链接启动。
 
-下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.16/plant-id-web-v1.0.16.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
+下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.17/plant-id-web-v1.0.17.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
 
 ```bash
 (
 set -e
 cd /root/leaf-migration
-echo "b84707c2e4fdb442bd39ec2f7b2e1ce614ed599fa265b70583b303810526ef68  plant-id-web-v1.0.16.tar.gz" | sha256sum -c -
-gzip -t plant-id-web-v1.0.16.tar.gz
+echo "98044f18a3e22c0da9b36dc338cc798913b2502daf49df591f7fee7b9478ee17  plant-id-web-v1.0.17.tar.gz" | sha256sum -c -
+gzip -t plant-id-web-v1.0.17.tar.gz
 PLANT_ID_INSTALL_DIR=$(mktemp -d /root/leaf-migration/plant-id-verified.XXXXXX)
-tar -xzf plant-id-web-v1.0.16.tar.gz -C "$PLANT_ID_INSTALL_DIR"
+tar -xzf plant-id-web-v1.0.17.tar.gz -C "$PLANT_ID_INSTALL_DIR"
 (cd "$PLANT_ID_INSTALL_DIR" && sha256sum -c SHA256SUMS)
 bash "$PLANT_ID_INSTALL_DIR/deploy/install.sh"
 )
@@ -139,7 +139,7 @@ systemctl show plant-id -p MemoryCurrent -p MemoryPeak
 bash /opt/plant-id/current/deploy/install-dsh.sh
 ```
 
-需要 Node.js 24.9 或更新版本和 npm。首次运行会下载固定版本的官方 DeepSeek Harness 及 SDK 依赖，测试环境安装后的依赖约 1.3 GiB。升级时相同版本可复用。如果安装后页面仍提示运行时加载失败，重新执行上面的脚本。新版会用网站服务账号验证 SDK 能否加载，失败时在终端显示原因。看到「识植助手的 DSH 问答已启用」后刷新网页，打开「植物问答」，或从候选卡片点击「询问这株植物」。
+需要 Node.js 24.9 或更新版本和 npm。首次运行会下载固定版本的官方 DeepSeek Harness 及 SDK 依赖，测试环境安装后的依赖约 1.3 GiB。升级时相同版本可复用。如果安装后页面仍提示运行时加载失败，重新执行上面的脚本。新版会用网站服务账号验证 SDK 能否加载，失败时在终端显示原因。看到「识植助手的 DSH 问答已启用」后刷新网页，先保存一条识别结果，再从结果点击「就此记录提问」或从候选卡片点击「询问这株植物」。已有记录可以在「识别记录」中直接点击「提问」。
 
 用户只需选择服务商。网站会使用该平台预设的模型。第一次使用某家服务商时，填写该平台签发的 API Key 并发送问题。支持 DeepSeek、智谱开放平台、阿里云百炼中国内地站、硅基流动中国内地站、OpenAI，以及管理员配置的兼容网关。问答按所选服务商和用户账号计费。服务端所在网络需要能访问所选接口。识别和 OCR 继续使用原有视觉配置。
 

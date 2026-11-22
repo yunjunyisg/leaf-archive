@@ -37,7 +37,7 @@ export function createApp({dataDirectory,origin,env={}}){
    if(url.pathname==='/ui.css')return new Response(request.method==='HEAD'?null:presentation,{headers:{...publicHeaders,'Content-Type':'text/css; charset=utf-8'}});
    if(url.pathname==='/'){
     const rootHeaders={'Cache-Control':'no-store',Vary:'User-Agent','X-Content-Type-Options':'nosniff'};
-    if(/\bLeafArchiveClient\//.test(headers.get('User-Agent')||''))return new Response(null,{status:302,headers:{...rootHeaders,Location:'/collection'}});
+    if(/\bLeafArchiveClient\/|; wv\)/.test(headers.get('User-Agent')||''))return new Response(null,{status:302,headers:{...rootHeaders,Location:'/collection'}});
     return htmlPage(new Response(request.method==='HEAD'?null:launcher,{headers:{...rootHeaders,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'"}}));
    }
   }

@@ -43,6 +43,10 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
  const dshAvailable=Boolean(dshAnswer)||existsSync(join(dshDirectory,'node_modules/@deepseek-ai/dsh-sdk-client/package.json'));
  let asking=false;
  const historyLimit=10;
+ const askTurn=sql.prepare(`SELECT id,answer FROM turns
+  WHERE thread=? AND owner=? AND (? IS NULL OR id=?)
+  ORDER BY created DESC,rowid DESC LIMIT 1`);
+ const recordId=value=>typeof value==='string'&&/^[a-f0-9-]{36}$/.test(value);
  const pruneOwner=sql.prepare('DELETE FROM turns WHERE rowid IN (SELECT rowid FROM turns WHERE owner=? ORDER BY created DESC,rowid DESC LIMIT -1 OFFSET ?)');
  const removeEmpty=sql.prepare('DELETE FROM threads WHERE owner=? AND NOT EXISTS (SELECT 1 FROM turns WHERE thread=threads.id)');
  const refreshTitle=`UPDATE threads SET title=(
@@ -77,7 +81,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
     const agent=request.headers.get('User-Agent')||'';
     const native=/\bPlantIdClient\//.test(agent);
     const app=native||/\bElectron\/|; wv\)/.test(agent);
-    if(native)content=content.replace('<body class="id-app">','<body class="id-app id-native">');
+    if(app)content=content.replace('<body class="id-app">','<body class="id-app id-native">');
     // Avoid a duplicate from proxies configured to insert text before </body>.
     content=content.replace(/<\/body>(?=\s*(?:<\/html>)?\s*$)/i, app?'':filingFooter);
    }
@@ -128,12 +132,24 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
     try{input=JSON.parse((await body(request,48*1024)).toString())}
     catch(error){if(error.status)throw error;throw fail('问答提交格式无效')}
     if(!input||typeof input!=='object')throw fail('问答提交格式无效');
-    const {apiKey:submittedKey,rememberKey=false,provider='deepseek',model='',question,plant='',history=[]}=input;
+    const {apiKey:submittedKey,rememberKey=false,provider='deepseek',model='',question,threadId,turnId=null,candidateIndex,history=[]}=input;
+    if(!recordId(threadId))throw fail('请先保存一条识别记录，再从记录中提问',400,'ask_record_required');
+    if(turnId!==null&&!recordId(turnId))throw fail('识别结果无效',400,'ask_record_required');
+    const saved=askTurn.get(threadId,user.id,turnId,turnId);
+    if(!saved)throw fail('这条识别记录已不存在，请从现有记录中提问',404,'ask_record_missing');
+    const answer=JSON.parse(saved.answer);
+    const candidates=Array.isArray(answer.candidates)?answer.candidates.slice(0,4):[];
+    if(candidateIndex!==undefined&&(!Number.isInteger(candidateIndex)||!candidates[candidateIndex])){
+     throw fail('这条记录中没有该候选植物',400);
+    }
+    const name=candidate=>String(candidate?.scientificName||candidate?.name||'').trim().slice(0,120);
+    const plant=name(candidates[candidateIndex??0]);
+    const record={summary:String(answer.summary||'').slice(0,1000),candidates:candidates.map(name).filter(Boolean)};
     if(submittedKey!==undefined&&!validApiKey(submittedKey)||typeof rememberKey!=='boolean')throw fail('请填写所选平台的 API Key');
     if(['baseURL','endpoint','url'].some(field=>Object.hasOwn(input,field)))throw fail('请选择站点已配置的服务商');
     const route=routeForQuestion(askProviders,provider,model);
     if(!route)throw fail('请选择受支持的服务商和模型');
-    if(typeof question!=='string'||!question.trim()||question.length>2000||typeof plant!=='string'||plant.length>120)throw fail('问题最多 2000 字，植物名称最多 120 字');
+    if(typeof question!=='string'||!question.trim()||question.length>2000)throw fail('问题最多 2000 字');
     if(!Array.isArray(history)||history.length>4||history.some(item=>!item||
      typeof item.question!=='string'||item.question.length>2000||typeof item.answer!=='string'||item.answer.length>3000))throw fail('问答上下文过长或格式无效');
     const sealed=submittedKey===undefined?askCredentials.find(user.id,route):null;
@@ -154,13 +170,14 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
     }
     let result;
     try{
-     result=await askDsh({apiKey,route,question:question.trim(),plant:plant.trim(),
+     result=await askDsh({apiKey,route,question:question.trim(),plant,record,
       history:history.map(({question,answer})=>({question,answer})),knowledge,signal:request.signal});
     }catch(error){
      if(error.code==='ask_key_invalid'&&sealed)askCredentials.remove(user.id,route,sealed);
      throw error;
     }
     if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
+    if(!askTurn.get(threadId,user.id,saved.id,saved.id))throw fail('这条识别记录已不存在，请从现有记录中提问',404,'ask_record_missing');
     if(rememberKey&&submittedKey!==undefined&&!request.signal.aborted)askCredentials.save(user.id,route,apiKey);
     const sources=knowledge.flatMap(entry=>[
      {title:entry.name+' · '+entry.sourceName,url:entry.source},
@@ -211,8 +228,8 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
     if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
     if(answer.fallback)return json({fallback:answer.fallback,...(nameReview.length?{nameReview}:{})});
     if(nameReview.length)answer.nameReview=nameReview;
-    const id=thread?.id||randomUUID(),created=now();sql.exec('BEGIN IMMEDIATE');try{if(thread){if(!sql.prepare('SELECT id FROM threads WHERE id=? AND owner=?').get(id,user.id))throw fail('记录已删除，未恢复记录',409)}else sql.prepare('INSERT INTO threads VALUES (?,?,?,?,?)').run(id,user.id,text.trim().slice(0,40)||'照片识别',created,created);sql.prepare('INSERT INTO turns VALUES (?,?,?,?,?,?)').run(randomUUID(),id,user.id,text,JSON.stringify(answer),created);sql.prepare('UPDATE threads SET updated=? WHERE id=? AND owner=?').run(created,id,user.id);pruneOwner.run(user.id,historyLimit);removeEmpty.run(user.id);refreshOwnerTitles.run(user.id);sql.exec('COMMIT')}catch(error){sql.exec('ROLLBACK');throw error}
-    return json({threadId:id,answer:enrichIdentification(answer)});
+    const id=thread?.id||randomUUID(),turnId=randomUUID(),created=now();sql.exec('BEGIN IMMEDIATE');try{if(thread){if(!sql.prepare('SELECT id FROM threads WHERE id=? AND owner=?').get(id,user.id))throw fail('记录已删除，未恢复记录',409)}else sql.prepare('INSERT INTO threads VALUES (?,?,?,?,?)').run(id,user.id,text.trim().slice(0,40)||'照片识别',created,created);sql.prepare('INSERT INTO turns VALUES (?,?,?,?,?,?)').run(turnId,id,user.id,text,JSON.stringify(answer),created);sql.prepare('UPDATE threads SET updated=? WHERE id=? AND owner=?').run(created,id,user.id);pruneOwner.run(user.id,historyLimit);removeEmpty.run(user.id);refreshOwnerTitles.run(user.id);sql.exec('COMMIT')}catch(error){sql.exec('ROLLBACK');throw error}
+    return json({threadId:id,turnId,answer:enrichIdentification(answer)});
    }finally{active.delete(user.id)}
   }
   return json({error:'接口不存在'},404);

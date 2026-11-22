@@ -2,12 +2,12 @@
 <aside class="id-rail"><a class="id-brand" href="/plant-id/"><img src="/plant-id/icon.svg" width="36" height="36" alt="">识植助手</a><nav aria-label="识植助手导航">
 <a class="id-nav-item" href="/plant-id/" aria-current="page"><span aria-hidden="true">⌕</span>植物识别</a>
 <a class="id-nav-item" href="/plant-id/#history-list"><span aria-hidden="true">▤</span>识别记录</a>
-<button class="id-nav-item" type="button" data-open-question><span aria-hidden="true">◌</span>植物问答</button>
-<a class="id-nav-item" href="/plant-id/ocr" ><span aria-hidden="true">▧</span>文字识别</a></nav>
-<a class="id-choose web-switch" href="/">⇄　切换应用</a></aside>
-<header class="topbar"><a class="brand" href="/plant-id/"><img src="/plant-id/icon.svg" alt="" width="38" height="38"><span>识植助手</span></a><nav aria-label="应用与账号"><a href="/plant-id/ocr">文字识别</a><a class="web-switch" href="/">切换应用</a><button id="account" class="subtle">登录 / 注册</button></nav></header>
+
+</nav>
+</aside>
+<header class="topbar"><a class="brand" href="/plant-id/"><img src="/plant-id/icon.svg" alt="" width="38" height="38"><span>识植助手</span></a><nav aria-label="应用与账号"><a class="web-switch" href="/">切换应用</a><button id="account" class="subtle">登录 / 注册</button></nav></header>
 <div class="layout"><aside class="history" id="history"><div class="history-head"><h2>我的识别记录</h2><button id="new" class="subtle">新建识别</button></div><p class="muted">保留最近 10 条识别结果（每轮算一条），超出的旧结果自动删除。</p><div id="history-list"><p class="muted">登录后查看自己的记录。</p></div></aside>
-<main><section class="intro"><div class="intro-heading"><h1>植物识别</h1><button id="open-plant-question" type="button" class="tool-link">植物问答</button></div><p>上传照片或描述特征，查看候选植物和辨别依据。</p><p id="model-status" class="service-status" role="status">正在连接识别服务…</p></section>
+<main><section class="intro"><div class="intro-heading"><h1>植物识别</h1><a href="/plant-id/ocr" class="tool-link">文字识别</a></div><p>上传照片或描述特征，查看候选植物和辨别依据。</p><p id="model-status" class="service-status" role="status">正在连接识别服务…</p></section>
 <section class="workspace" aria-label="提交植物照片"><form id="identify-form"><div id="dropzone" class="dropzone"><img src="/plant-id/icon.svg" width="44" height="44" alt=""><div><h2>上传植物照片</h2><p>可搭配整株照和叶、花或果实近照。</p></div><label class="button pick" for="photos">选择照片</label><input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple class="visually-hidden"><p class="muted">支持拖入 · 最多 3 张 · 单张原图最多 20 MiB</p></div><div id="previews" class="previews"></div><p id="photo-note" class="muted" hidden>识别副本会在本机缩放至最长边 2048 像素，手机或电脑原图不变。照片不会写入本站历史记录。</p><label class="field" for="plantName">已知名称或学名（可选）<input id="plantName" maxlength="120" placeholder="例如：月季或 Rosa chinensis"></label><label class="field" for="description"><span>还有哪些特征？<small>可选，也可以仅用文字识别</small></span><textarea id="description" maxlength="6000" rows="3" placeholder="例如：在成都拍摄，叶片对生，白色小花；也可以补充上一轮没拍清的特征。"></textarea></label><label class="consent"><input id="consent" type="checkbox"><span id="consent-label">同意将本轮照片、描述及当前记录的上一轮结果发送至已配置的中国内地视觉服务，用于此次识别。</span></label><div class="submit-row"><p id="quota" class="muted">识别结果是参考线索，不能替代实物核对。</p><button id="submit" class="button" type="submit">开始识别</button><button id="cancel" type="button" class="subtle" hidden>停止等待</button></div><p id="notice" role="status" class="notice"></p></form></section>
 <section id="results" aria-live="polite" aria-label="识别结果"></section><p class="footnote">候选百分比是基于现有证据的主观估计，未经统计校准。照片识别不能确认食用、药用或宠物接触的安全性。</p></main></div>
 
@@ -16,7 +16,7 @@
 <dialog id="ask-dialog" aria-labelledby="ask-title">
 <form>
 <div class="dialog-heading"><h2 id="ask-title">植物问答</h2><button type="button" class="subtle" id="ask-close">关闭</button></div>
-<p id="ask-target" class="muted"></p>
+<p id="ask-target" class="muted"></p><p class="muted">提问时会将这条识别记录的摘要和候选名称发送给所选服务商。</p>
 <label class="field" for="ask-provider">问答服务商</label>
 <select id="ask-provider" required></select>
 <div id="ask-saved-key" hidden><p>已保存此服务商的 API Key。<button type="button" class="subtle" id="ask-change-key">更换密钥</button></p></div>
@@ -37,6 +37,6 @@
 <nav class="id-mobile-nav" aria-label="识植助手移动导航">
 <a class="id-nav-item" href="/plant-id/" aria-current="page"><span aria-hidden="true">⌕</span>植物识别</a>
 <a class="id-nav-item" href="/plant-id/#history-list"><span aria-hidden="true">▤</span>识别记录</a>
-<button class="id-nav-item" type="button" data-open-question><span aria-hidden="true">◌</span>植物问答</button>
-<a class="id-nav-item" href="/plant-id/ocr" ><span aria-hidden="true">▧</span>文字识别</a></nav>
+
+</nav>
 </body></html>

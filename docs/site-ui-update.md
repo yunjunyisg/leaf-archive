@@ -1,6 +1,6 @@
 # 植藏与识植助手界面更新
 
-浏览器打开主域名后，先在选择页进入植藏或识植助手。植藏的直接地址是 `/collection`，识植助手的直接地址是 `/plant-id/`。原账号按应用独立登录。安卓与 Windows 已安装客户端可继续使用，植藏旧客户端通过现有应用桥跳过选择页。普通浏览器内嵌网页仍显示选择页。
+浏览器打开主域名后，先在选择页进入植藏或识植助手。植藏的直接地址是 `/collection`，识植助手的直接地址是 `/plant-id/`。原账号按应用独立登录。安卓与 Windows 已安装客户端可继续使用，旧版安卓客户端直接跳到植藏收藏或识植助手。普通手机浏览器打开根域名仍显示选择页。部分使用安卓内嵌 WebView 的第三方应用也会进入植藏收藏。
 
 植藏保留原有标识和开屏植物。识植助手沿用固定叶片图标。桌面使用侧边导航，手机使用底部导航。两个应用升级后重新打开即可加载新的页面。
 
@@ -10,8 +10,8 @@
 
 下载两个文件，上传到 `/root/leaf-migration/`。
 
-- [植藏更新包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.16/leaf-archive-ui-update-1.8.17.tar.gz)
-- [识植助手更新包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.16/plant-id-web-v1.0.16.tar.gz)
+- [植藏更新包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.17/leaf-archive-ui-update-1.8.18.tar.gz)
+- [识植助手更新包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.17/plant-id-web-v1.0.17.tar.gz)
 
 在 Workbench 管理员终端执行：
 
@@ -20,13 +20,13 @@
 set -e
 cd /root/leaf-migration
 sha256sum -c <<'SUMS'
-7c9c89ec2078b74c43c2f3f5bcf8e686373ccc9f909f3c7ef9e5e0dc3148040c  leaf-archive-ui-update-1.8.17.tar.gz
-b84707c2e4fdb442bd39ec2f7b2e1ce614ed599fa265b70583b303810526ef68  plant-id-web-v1.0.16.tar.gz
+f189fda9f50fa2b7abbc576fbcd7b757af5c8d3720a85cb09f49a19b70b7ecb8  leaf-archive-ui-update-1.8.18.tar.gz
+98044f18a3e22c0da9b36dc338cc798913b2502daf49df591f7fee7b9478ee17  plant-id-web-v1.0.17.tar.gz
 SUMS
 LEAF_DIR=$(mktemp -d /root/leaf-migration/leaf-ui.XXXXXX)
 PLANT_DIR=$(mktemp -d /root/leaf-migration/plant-ui.XXXXXX)
-tar -xzf leaf-archive-ui-update-1.8.17.tar.gz -C "$LEAF_DIR"
-tar -xzf plant-id-web-v1.0.16.tar.gz -C "$PLANT_DIR"
+tar -xzf leaf-archive-ui-update-1.8.18.tar.gz -C "$LEAF_DIR"
+tar -xzf plant-id-web-v1.0.17.tar.gz -C "$PLANT_DIR"
 (cd "$LEAF_DIR" && sha256sum --quiet -c SHA256SUMS)
 (cd "$PLANT_DIR" && sha256sum --quiet -c SHA256SUMS)
 bash "$LEAF_DIR/deploy/apply-standalone-update.sh"
