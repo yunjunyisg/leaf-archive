@@ -187,3 +187,22 @@ test('Zhipu uses its thinking controls and only the default model can select a f
  assert.equal(routeForQuestion(providers,'bigmodel','glm-4.6v-flashx').fallbackModel,undefined);
  assert.equal(routeForQuestion(providers,'dashscope','').fallbackModel,undefined);
 });
+
+test('the filing footer is added once for web pages and omitted by installed clients',async()=>{
+ const f=await appFixture();
+ try{
+  for(const route of ['', 'ocr','apps']){
+   const get=agent=>f.app.fetch(new Request(origin+'/plant-id/'+route,{headers:{'User-Agent':agent}}));
+   const response=await get('Mozilla/5.0 Chrome/130');
+   assert.equal(response.headers.get('Vary'),'User-Agent');
+   const html=await response.text();
+   assert.equal(html.split('蜀ICP备2026066760号').length,2);
+   assert.match(html,/<footer class="site-filing">/);
+   assert.doesNotMatch(html,/<\/body>/i);
+   for(const agent of ['PlantIdClient/1','Electron/45.1.0','Mozilla/5.0 (Linux; Android 15; wv)']){
+    const app=await(await get(agent)).text();
+    assert.doesNotMatch(app,/蜀ICP备|<\/body>/i);
+   }
+  }
+ }finally{await f.close()}
+});

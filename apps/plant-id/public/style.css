@@ -140,3 +140,8 @@ footer{
  .id-auth-art img{width:54px;height:54px}
  .id-auth-frame form{padding:16px}
 }
+
+.site-filing{
+ display:block;text-align:center;border-top:0;padding:16px 14px;font-size:13px;color:var(--muted)
+}
+@media(min-width:761px){.id-app .site-filing{margin-left:-194px}}

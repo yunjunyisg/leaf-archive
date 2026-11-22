@@ -28,6 +28,7 @@ export function createApp({dataDirectory,origin,env={}}){
   const headers=new Headers(request.headers);headers.delete('oai-authenticated-user-id');headers.delete('oai-authenticated-user-email');
   const url=new URL(request.url);if(url.origin!==site.origin)return new Response('Invalid site origin',{status:400});
   request=new Request(request,{headers});
+  const htmlPage=response=>withFilingFooter(response,headers.get('User-Agent')||'');
   if(url.pathname==='/healthz')return Response.json({status:'ok'},{headers:{'Cache-Control':'no-store'}});
   if(!['GET','HEAD','OPTIONS'].includes(request.method)&&request.headers.get('Origin')!==site.origin)return new Response('请求来源无效',{status:403});
   if(url.pathname==='/account-ui.js')return new Response(accountUiClient,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'}});
@@ -37,12 +38,12 @@ export function createApp({dataDirectory,origin,env={}}){
    if(url.pathname==='/'){
     const rootHeaders={'Cache-Control':'no-store',Vary:'User-Agent','X-Content-Type-Options':'nosniff'};
     if(/\bLeafArchiveClient\//.test(headers.get('User-Agent')||''))return new Response(null,{status:302,headers:{...rootHeaders,Location:'/collection'}});
-    return withFilingFooter(new Response(request.method==='HEAD'?null:launcher,{headers:{...rootHeaders,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'"}}));
+    return htmlPage(new Response(request.method==='HEAD'?null:launcher,{headers:{...rootHeaders,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'"}}));
    }
   }
   const session=sessionAccount(database.sql,request);
   if(request.method==='GET'&&session&&isAdmin(database.sql,session.owner)&&['/auth/local','/auth/register'].includes(url.pathname))return new Response(null,{status:303,headers:{Location:accountSecurity(database.sql,session.owner).must_change?'/auth/change-password':'/admin','Cache-Control':'private, no-store'}});
-  const authenticated=await login(request,ip);if(authenticated)return withFilingFooter(authenticated);
+  const authenticated=await login(request,ip);if(authenticated)return htmlPage(authenticated);
   if(session)recordActivity(database.sql,session.owner);
   if(session&&accountSecurity(database.sql,session.owner).must_change&&url.pathname!=='/api/auth/logout'){
    const headers={'Cache-Control':'private, no-store'};
@@ -50,18 +51,18 @@ export function createApp({dataDirectory,origin,env={}}){
    return new Response(null,{status:303,headers:{...headers,Location:'/auth/change-password'}});
   }
   const taxonomy=await taxonomyRoutes(request,{sql:database.sql,session});if(taxonomy)return taxonomy;
-  const personal=await profileRoutes(request,{sql:database.sql,bucket:BUCKET,session});if(personal)return withFilingFooter(personal);
-  const deletion=await accountDeletionRoutes(request,{sql:database.sql,bucket:BUCKET,session,ip});if(deletion)return withFilingFooter(deletion);
+  const personal=await profileRoutes(request,{sql:database.sql,bucket:BUCKET,session});if(personal)return htmlPage(personal);
+  const deletion=await accountDeletionRoutes(request,{sql:database.sql,bucket:BUCKET,session,ip});if(deletion)return htmlPage(deletion);
   if(session&&isAdmin(database.sql,session.owner)){
    if(['/collection','/collection/', '/origins','/origins/','/classification','/classification/','/offline.html'].includes(url.pathname))return new Response(null,{status:303,headers:{Location:'/admin','Cache-Control':'private, no-store'}});
    if(/^\/api\/(plants|taxa|images)(\/|$)/.test(url.pathname))return Response.json({error:'管理员账号仅提供数据、管理和用户总植物地图功能'},{status:403,headers:{'Cache-Control':'private, no-store'}});
   }
-  const administrative=await adminRoutes(request,{sql:database.sql,bucket:BUCKET,dataDirectory,session});if(administrative)return withFilingFooter(administrative);
+  const administrative=await adminRoutes(request,{sql:database.sql,bucket:BUCKET,dataDirectory,session});if(administrative)return htmlPage(administrative);
   const boundaries=await globalBoundaryRoutes(request);if(boundaries)return boundaries;
   const write=session&&['POST','PUT'].includes(request.method)&&/^\/api\/(plants|taxa)(\/|$)/.test(url.pathname);
   const response=await worker.fetch(request,write?{...bindings,DB:classificationWriteDatabase(database,session.owner)}:bindings);
   if(url.pathname==='/api/auth'&&response.ok){const state=await response.json();if(state.user&&session){const local=database.sql.prepare('SELECT nickname FROM local_accounts WHERE owner=?').get(session.owner);if(local)state.user.nickname=local.nickname}return Response.json({...state,passwordLogin:true,legacyLogin:false,isAdmin:Boolean(session&&isAdmin(database.sql,session.owner))},{headers:{'Cache-Control':'no-store'}})}
-  return withFilingFooter(await withAccountUi(response));
+  return htmlPage(await withAccountUi(response));
  },close:()=>database.close()};
  const pending=new Map(),handle=app.fetch.bind(app);
  app.fetch=async(request,ip)=>{

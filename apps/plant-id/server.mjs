@@ -18,6 +18,7 @@ const fail=(message,status=400,code)=>Object.assign(Error(message),{status,code}
 const positive=(value,fallback)=>{const n=Number(value??fallback);if(!Number.isInteger(n)||n<1||n>100000)throw Error('识别限额配置无效');return n};
 async function body(request,limit){const reader=request.body?.getReader();if(!reader)return new Uint8Array();let size=0,parts=[];try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>limit){await reader.cancel();throw fail('提交内容过大，请减少照片或文字',413)}parts.push(value)}}finally{reader.releaseLock()}return Buffer.concat(parts)}
 function imageMime(bytes){if(bytes.length>3&&bytes[0]===255&&bytes[1]===216&&bytes[2]===255)return 'image/jpeg';if(bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))return 'image/png';if(bytes.length>12&&bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP')return 'image/webp';return null}
+const filingFooter='<footer class="site-filing"><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">蜀ICP备2026066760号</a></footer>';
 export function createPlantId({dataDirectory,origin='https://gloriouscarnivorousplants.top',env=process.env,fetchImpl=fetch,referenceFetch=fetch,now=Date.now,dshAnswer}={}){
  const site=new URL(origin);if(site.origin!==origin||!['https:','http:'].includes(site.protocol)||site.protocol==='http:'&&!['localhost','127.0.0.1'].includes(site.hostname))throw Error('应用来源必须是 HTTPS 域名');
  const config=modelConfiguration(env),concurrency=positive(env.PLANT_ID_CONCURRENCY,2),secure=site.protocol==='https:',cookieName=secure?'__Secure-plant_id_session':'plant_id_session',cookie=value=>`${cookieName}=${value}; Path=${base}; HttpOnly; SameSite=Strict; ${secure?'Secure; ':''}Max-Age=${value?604800:0}`;
@@ -69,10 +70,19 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
   if(url.pathname==='/plant-id')return new Response(null,{status:308,headers:{Location:base}});
   if(!url.pathname.startsWith(base))return json({error:'页面不存在'},404);
   const path=url.pathname.slice(base.length);
-  if(request.method==='GET'&&files.has(path)){const [file,type]=files.get(path);const html=type.startsWith('text/html');
-   const content=readFileSync(new URL('./public/'+file,import.meta.url),html?'utf8':null);
-   const native=html&&/\bPlantIdClient\//.test(request.headers.get('User-Agent')||'');
-   return new Response(native?content.replace('<body class="id-app">','<body class="id-app id-native">'):content,{headers:{'Content-Type':type,'Cache-Control':'no-cache','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',...(html?{Vary:'User-Agent'}:{})}})}
+  if(request.method==='GET'&&files.has(path)){
+   const [file,type]=files.get(path),html=type.startsWith('text/html');
+   let content=readFileSync(new URL('./public/'+file,import.meta.url),html?'utf8':null);
+   if(html){
+    const agent=request.headers.get('User-Agent')||'';
+    const native=/\bPlantIdClient\//.test(agent);
+    const app=native||/\bElectron\/|; wv\)/.test(agent);
+    if(native)content=content.replace('<body class="id-app">','<body class="id-app id-native">');
+    // Avoid a duplicate from proxies configured to insert text before </body>.
+    content=content.replace(/<\/body>(?=\s*(?:<\/html>)?\s*$)/i, app?'':filingFooter);
+   }
+   return new Response(content,{headers:{'Content-Type':type,'Cache-Control':'no-cache','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',...(html?{Vary:'User-Agent'}:{})}});
+  }
   if(request.method==='GET'&&path==='healthz')return json({status:'ok'});
   if(path==='mcp'){
    const caller=request.headers.get('Origin');

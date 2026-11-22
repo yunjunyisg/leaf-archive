@@ -30,6 +30,18 @@ test('the web chooser and installed collection clients use separate entry points
   assert.match(collection,/class="primary-nav"/);
   assert.equal((await get('/ui.css')).status,200);
   assert.equal((await get('/welcome/plant-0.webp')).status,200);
+  const filing='蜀ICP备2026066760号';
+  for(const path of ['/','/collection','/classification','/origins','/auth/local','/offline.html']){
+   const web=await (await get(path)).text();
+   assert.equal(web.split(filing).length,2,path);
+   assert.match(web,/<footer class="site-filing"[^>]*text-align:center/);
+   assert.doesNotMatch(web,/<\/body>/i);
+   for(const agent of ['LeafArchiveClient/1','Electron/45.1.0','Mozilla/5.0 (Linux; Android 15; wv)']){
+    const native=await (await get(path,agent)).text();
+    assert.doesNotMatch(native,/蜀ICP备/);
+    assert.doesNotMatch(native,/<\/body>/i);
+   }
+  }
   const manifest=await (await get('/manifest.webmanifest')).json();
   assert.equal(manifest.id,'/');
   assert.equal(manifest.start_url,'/collection');

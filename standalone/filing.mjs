@@ -1,19 +1,32 @@
-// 公共备案信息，不包含用户数据。
-export const filingFooter=`<!-- 备案号组件开始 -->
-<div style="text-align: center; padding: 20px 0; font-size: 14px; color: #666;">
-    <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" style="color: #666; text-decoration: none;">
-        蜀ICP备2026066760号
-    </a>
-</div>
-<!-- 备案号组件结束 -->`;
+const filingFooter=`<footer class="site-filing" style="display:block;box-sizing:border-box;margin:0;padding:16px 14px;text-align:center;font-size:13px;color:#596e60">
+  <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none">蜀ICP备2026066760号</a>
+</footer>`;
+const filingStyles=`<style>
+.leaf-native .site-filing{display:none!important}
+@media(max-width:760px){body:has(>.sidebar)>.site-filing{padding-bottom:calc(68px + env(safe-area-inset-bottom))!important}}
+</style>`;
+const originalFooter=/<!--\s*备案号组件开始\s*-->[\s\S]*?<!--\s*备案号组件结束\s*-->/g;
+const trailingBody=/<\/body>(?=\s*(?:<\/html>)?\s*$)/i;
 
-// 同时适用于服务器已有的页面构建和登录、注册、管理员页面。
-export async function withFilingFooter(response){
+export async function withFilingFooter(response,userAgent=''){
  if(!response.body||!response.headers.get('Content-Type')?.includes('text/html'))return response;
- const html=await response.text();
- const body=html.includes('<!-- 备案号组件开始 -->')?html:html.replace(/<\/body>/i,filingFooter+'</body>');
- // 部分登录页面省略 body 标签，仍在文档末尾展示备案信息。
- const output=body===html&&!html.includes('<!-- 备案号组件开始 -->')?(html.includes('</html>')?html.replace('</html>',filingFooter+'</html>'):html+filingFooter):body;
- const headers=new Headers(response.headers);headers.delete('Content-Length');headers.delete('ETag');
- return new Response(output,{status:response.status,statusText:response.statusText,headers});
+ const app=/\b(?:LeafArchiveClient|Electron)\/|; wv\)/.test(userAgent);
+ const html=(await response.text()).replace(originalFooter,'');
+ let document=html;
+ if(!app){
+  document=/<\/head>/i.test(html)?html.replace(/<\/head>/i,filingStyles+'</head>'):html;
+  if(trailingBody.test(document))document=document.replace(trailingBody,filingFooter);
+  else if(/<\/html>/i.test(document))document=document.replace(/<\/html>/i,filingFooter+'</html>');
+  else document+=filingFooter;
+ }else{
+  document=document.replace(trailingBody,'');
+ }
+ // A terminal body end tag is optional in HTML. Omit it so an older reverse
+ // proxy that appends its own filing number at that tag leaves this page alone.
+ const headers=new Headers(response.headers);
+ headers.delete('Content-Length');
+ headers.delete('ETag');
+ const vary=headers.get('Vary');
+ if(vary!=='*'&&!vary?.split(',').some(name=>name.trim().toLowerCase()==='user-agent'))headers.append('Vary','User-Agent');
+ return new Response(document,{status:response.status,statusText:response.statusText,headers});
 }
