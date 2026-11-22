@@ -15,6 +15,7 @@ function openExternal(url){if(isExternal(url))shell.openExternal(url).catch(()=>
 function createWindow(){
  window=new BrowserWindow({width:1320,height:900,minWidth:800,minHeight:600,title:product.name,icon:path.join(__dirname,'../assets',product.icon),backgroundColor:'#f8f9f5',show:false,webPreferences:{...(!product.pathPrefix?{preload:path.join(__dirname,'preload.cjs')}:{}),partition:product.partition,nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,allowRunningInsecureContent:false,webviewTag:false,devTools:false}});
  const contents=window.webContents;
+ contents.setUserAgent(contents.getUserAgent()+' '+(product.pathPrefix?'PlantIdClient/1':'LeafArchiveClient/1'));
  contents.on('will-navigate',(event,url)=>{if(!isTrusted(url)){event.preventDefault();openExternal(url)}});
  contents.on('will-redirect',(event,url)=>{if(!isTrusted(url)){event.preventDefault();openExternal(url)}});
  contents.setWindowOpenHandler(({url})=>{if(isTrusted(url))contents.loadURL(url).catch(()=>{});else openExternal(url);return {action:'deny'}});

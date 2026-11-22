@@ -19,7 +19,7 @@ export async function adminRoutes(request,{sql,bucket,dataDirectory,session}){
  const url=new URL(request.url),route=url.pathname,isApi=route.startsWith('/api/admin/');
  if(route!=='/admin'&&!route.startsWith('/admin/')&&!isApi)return null;
  if(!session){return isApi?json({error:'请先登录管理员账号'},401):new Response(null,{status:303,headers:{...headers,Location:'/auth/local'}})}
- if(!isAdmin(sql,session.owner))return isApi?json({error:'仅管理员可以访问'},403):new Response('<!doctype html><meta charset="utf-8"><p>仅管理员可以访问此页面。</p><a href="/">返回我的收藏</a>',{status:403,headers:{...headers,'Content-Type':'text/html; charset=utf-8'}});
+ if(!isAdmin(sql,session.owner))return isApi?json({error:'仅管理员可以访问'},403):new Response('<!doctype html><meta charset="utf-8"><p>仅管理员可以访问此页面。</p><a href="/collection">返回我的收藏</a>',{status:403,headers:{...headers,'Content-Type':'text/html; charset=utf-8'}});
  const action=/^\/api\/admin\/users\/(reset-password|deactivate)$/.exec(route);
  if(action){
   if(request.method!=='POST')return json({error:'此操作需要提交确认'},405);

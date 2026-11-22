@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 import {classificationWriteDatabase} from './taxonomy-labels.mjs';
 import {globalBoundaryRoutes} from './global-boundaries.mjs';
 import {taxonomyRoutes} from './taxonomy.mjs';
@@ -16,6 +17,8 @@ import path from 'node:path';
 import worker from '../dist/server/index.js';
 import {openDatabase,diskBucket} from './storage.mjs';
 import {createLocalAuth} from './local-auth.mjs';
+const launcher=readFileSync(new URL('./launcher-page.html',import.meta.url),'utf8');
+const presentation=readFileSync(new URL('./ui.css',import.meta.url),'utf8');
 export function createApp({dataDirectory,origin,env={}}){
  const site=new URL(origin);if(site.protocol!=='https:'||site.pathname!=='/'||site.search||site.hash)throw Error('SITE_ORIGIN 必须是 HTTPS 网站根地址');
  const database=openDatabase(dataDirectory),BUCKET=diskBucket(path.join(dataDirectory,'objects'),{sql:database.sql}),login=createLocalAuth(database.sql);
@@ -28,6 +31,15 @@ export function createApp({dataDirectory,origin,env={}}){
   if(url.pathname==='/healthz')return Response.json({status:'ok'},{headers:{'Cache-Control':'no-store'}});
   if(!['GET','HEAD','OPTIONS'].includes(request.method)&&request.headers.get('Origin')!==site.origin)return new Response('请求来源无效',{status:403});
   if(url.pathname==='/account-ui.js')return new Response(accountUiClient,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'}});
+  if(['GET','HEAD'].includes(request.method)){
+   const publicHeaders={'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'};
+   if(url.pathname==='/ui.css')return new Response(request.method==='HEAD'?null:presentation,{headers:{...publicHeaders,'Content-Type':'text/css; charset=utf-8'}});
+   if(url.pathname==='/'){
+    const rootHeaders={'Cache-Control':'no-store',Vary:'User-Agent','X-Content-Type-Options':'nosniff'};
+    if(/\bLeafArchiveClient\//.test(headers.get('User-Agent')||''))return new Response(null,{status:302,headers:{...rootHeaders,Location:'/collection'}});
+    return withFilingFooter(new Response(request.method==='HEAD'?null:launcher,{headers:{...rootHeaders,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'"}}));
+   }
+  }
   const session=sessionAccount(database.sql,request);
   if(request.method==='GET'&&session&&isAdmin(database.sql,session.owner)&&['/auth/local','/auth/register'].includes(url.pathname))return new Response(null,{status:303,headers:{Location:accountSecurity(database.sql,session.owner).must_change?'/auth/change-password':'/admin','Cache-Control':'private, no-store'}});
   const authenticated=await login(request,ip);if(authenticated)return withFilingFooter(authenticated);
@@ -41,7 +53,7 @@ export function createApp({dataDirectory,origin,env={}}){
   const personal=await profileRoutes(request,{sql:database.sql,bucket:BUCKET,session});if(personal)return withFilingFooter(personal);
   const deletion=await accountDeletionRoutes(request,{sql:database.sql,bucket:BUCKET,session,ip});if(deletion)return withFilingFooter(deletion);
   if(session&&isAdmin(database.sql,session.owner)){
-   if(['/', '/origins','/origins/','/classification','/classification/','/offline.html'].includes(url.pathname))return new Response(null,{status:303,headers:{Location:'/admin','Cache-Control':'private, no-store'}});
+   if(['/collection','/collection/', '/origins','/origins/','/classification','/classification/','/offline.html'].includes(url.pathname))return new Response(null,{status:303,headers:{Location:'/admin','Cache-Control':'private, no-store'}});
    if(/^\/api\/(plants|taxa|images)(\/|$)/.test(url.pathname))return Response.json({error:'管理员账号仅提供数据、管理和用户总植物地图功能'},{status:403,headers:{'Cache-Control':'private, no-store'}});
   }
   const administrative=await adminRoutes(request,{sql:database.sql,bucket:BUCKET,dataDirectory,session});if(administrative)return withFilingFooter(administrative);

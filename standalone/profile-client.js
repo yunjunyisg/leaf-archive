@@ -6,7 +6,7 @@ async function api(url,options={}){const r=await fetch(url,{cache:'no-store',...
 function show(data){
  state=data;$('displayName').textContent=data.displayName;$('nameInput').value=data.displayName;$('loginAccount').textContent='登录账号：'+data.username;$('avatarInitial').textContent=Array.from(data.displayName)[0]||'植';$('avatarImage').hidden=!data.hasAvatar;
  if(data.hasAvatar)$('avatarImage').src='/api/profile/avatar?v='+Date.now();else $('avatarImage').removeAttribute('src');
- $('returnLink').textContent=data.isAdmin?'管理后台':'植物收藏';$('returnLink').href=data.isAdmin?'/admin':'/';$('deleteAccount').hidden=data.isAdmin;
+ $('returnLink').textContent=data.isAdmin?'管理后台':'植物收藏';$('returnLink').href=data.isAdmin?'/admin':'/collection';$('deleteAccount').hidden=data.isAdmin;
  $('collectionSummary').hidden=data.isAdmin;$('classificationSection').hidden=data.isAdmin;
  if(data.summary){const s=data.summary;$('purchaseTotal').textContent='¥ '+s.purchaseTotal;$('plantCount').textContent=s.plantCount+' 株';$('familyCount').textContent=s.familyCount+' 科 / '+s.genusCount+' 属';$('priceNote').textContent='个人全部档案已填写购入价格的合计，不含示例。'+(s.unpriced?s.unpriced+' 份档案未填写价格。':'')+(s.invalidPrices?'部分价格超出统计范围，请检查档案。':'');$('classificationList').replaceChildren();for(const group of s.classification){const li=document.createElement('li'),title=document.createElement('strong'),small=document.createElement('small');title.textContent=group.family+' · '+group.count+' 株';small.textContent=group.genera.map(g=>g.name+' '+g.count+' 株').join(' / ')||'尚未填写属';li.append(title,small);$('classificationList').append(li)}if(!s.classification.length)$('classificationList').textContent='还没有植物档案，添加后会在这里显示。'}
 }

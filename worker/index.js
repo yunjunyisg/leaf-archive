@@ -192,7 +192,7 @@ if(u.pathname==='/map-licenses.txt')return new Response(mapLicenses,{headers:{'C
 if(u.pathname==='/leaflet.css')return publicAsset(request,leafletCss,'text/css; charset=utf-8');
 if(u.pathname==='/geography.js')return publicAsset(request,geographyJs,'text/javascript; charset=utf-8');
 if(u.pathname==='/classification'||u.pathname==='/classification/')return new Response(classificationHtml,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
-if(u.pathname==='/')return new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
+if(['/', '/collection','/collection/'].includes(u.pathname))return new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
 if(welcomeIcons[u.pathname])return publicAsset(request,welcomeIcons[u.pathname],'image/webp',true);
 if(u.pathname==='/style.css')return publicAsset(request,css,'text/css; charset=utf-8');
 if(u.pathname==='/photo-date.js')return publicAsset(request,photoDateJs,'text/javascript; charset=utf-8');

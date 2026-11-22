@@ -83,3 +83,62 @@ a.nav{text-decoration:none}
 
 .taxonomy-canvas .taxon-node>summary{padding-right:67px}.taxonomy-canvas .taxonomy-node-drag{position:absolute;right:10px;top:10px;padding:5px 7px;font-size:11px;min-height:30px;border:1px solid #cad9c0;border-radius:7px;background:#f3f7ed;cursor:grab;touch-action:none;user-select:none}.taxonomy-canvas[data-node-dragging=true] .taxonomy-node-drag{cursor:grabbing}.taxonomy-canvas .taxon-node[data-drop-state=allowed]{outline:3px solid #618b45;outline-offset:3px;background:#f4faee}.taxonomy-canvas .taxon-node[data-drop-state=blocked]{outline:3px solid #b66750;outline-offset:3px}.taxonomy-drag-ghost{position:fixed;z-index:10001;width:220px;padding:14px 16px;border:2px solid #739961;border-radius:16px;background:#fff;box-shadow:0 14px 36px #14201944;pointer-events:none;overflow-wrap:anywhere;font-size:14px;color:var(--green)}.taxonomy-root-drop{position:fixed;z-index:10000;bottom:20px;left:50%;transform:translateX(-50%);padding:16px 24px;border:2px dashed #729260;border-radius:14px;background:#f4faed;color:var(--green);font-size:14px;box-shadow:0 8px 28px #14201930}.taxonomy-root-drop[data-drop-state=allowed]{background:#dcebcf;border-style:solid}.taxonomy-root-drop[data-drop-state=blocked]{border-color:#b66750;color:#91462f}.taxonomy-drag-status{font-size:13px;min-height:20px;margin:8px 0;color:var(--muted)}
 .taxonomy-delete-dialog{width:min(650px,calc(100vw - 28px));max-width:calc(100vw - 28px);max-height:calc(100dvh - 32px)}.taxonomy-assign-dialog{width:min(760px,calc(100vw - 28px));max-width:calc(100vw - 28px);max-height:calc(100dvh - 32px)}.taxonomy-delete-dialog>form,.taxonomy-assign-dialog>form{display:flex;flex-direction:column;max-height:calc(100dvh - 32px);margin:0}.taxonomy-delete-dialog .dialog-header,.taxonomy-delete-dialog .dialog-footer,.taxonomy-assign-dialog .dialog-header,.taxonomy-assign-dialog .dialog-footer{flex-shrink:0}.taxonomy-delete-dialog .form-body,.taxonomy-assign-dialog .form-body{min-height:0;max-height:none;overflow:auto;overflow-wrap:anywhere}@media(pointer:coarse){.taxonomy-canvas .taxonomy-node-drag{min-height:44px;min-width:44px}}
+
+/* Shared interface for the collection, taxonomy and origin map. */
+:root{--ui-sidebar:#193e31;--ui-active:#e3edcc;--ink:#20382d;--muted:#596e60;--line:#dfe5d7;--paper:#f5f5ed}
+.sidebar{background:var(--ui-sidebar);border:0;color:#f2f5e8}
+.sidebar .nav{color:#d1dfd3;border-radius:10px;min-height:42px;align-items:center}
+.sidebar .nav:hover,.sidebar .nav:focus-visible{background:#2a5242;color:#fff}
+.sidebar .nav.active{background:var(--ui-active);color:var(--ink)}
+.sidebar .brand{color:#f2f5e8;margin-bottom:24px}
+.sidebar .count{color:inherit}
+.sidebar nav,.secondary-nav,.side-tools{min-width:0}
+.secondary-nav{margin-top:12px;padding-top:12px;border-top:1px solid #3b5d4e}
+.side-tools{margin-top:auto;padding-top:16px}
+.sidebar .side-bottom{padding:10px 5px;color:inherit}
+.sidebar .side-bottom small{color:#c4d5c6}
+.sidebar .install-app{margin:12px 0 0;color:inherit}
+.sidebar .install-app:hover{background:#2a5242}
+.leaf-native .web-switch{display:none!important}
+.main>header{height:64px;min-height:0;background:#fbfcf5}
+.main>main{max-width:1120px;padding-block:28px}
+.page-heading h1{font-size:clamp(27px,4vw,39px);letter-spacing:-.04em}
+.page-heading .title-dot{display:none}
+.collection-banner{
+ isolation:isolate;min-height:145px;position:relative;overflow:hidden;padding:19px 22px;border:1px solid var(--line);
+ border-radius:20px;background:#e4eadb;margin-bottom:17px;
+}
+.collection-banner::before{
+ content:"";position:absolute;z-index:-1;inset:0;
+ background:linear-gradient(90deg,#e4eadb 37%,#e4eadb27 79%),url("/assets/Anthurium_crystallinum.jpg") right 42%/66% auto no-repeat;
+}
+.collection-banner p{color:#304d3d;text-shadow:0 1px #e4eadb}
+.stats{gap:10px;background:transparent;border:0;border-radius:0;margin-bottom:16px}
+.stats>div{border:1px solid var(--line);border-radius:14px;background:#fffef9}
+.cards{gap:14px}
+.plant-card{border-color:var(--line);border-radius:16px;background:#fffef9;contain-intrinsic-size:auto 330px}
+.card-photo{height:clamp(145px,17vw,195px)}
+.classification-panel,.editor,.origin-picker{border-radius:17px}
+@media(max-width:760px){
+ .sidebar{padding:0;border:0;background:transparent;overflow:visible}
+ .sidebar .brand,.sidebar .side-tools,.sidebar .install-app{display:none!important}
+ .primary-nav{
+  z-index:12;position:fixed;inset:auto 0 0;display:flex;justify-content:space-around;gap:4px;
+  padding:5px 5px calc(5px + env(safe-area-inset-bottom));background:var(--ui-sidebar);
+ }
+ .sidebar .primary-nav .nav{justify-content:center;flex-direction:column;gap:3px;padding:3px 6px;margin:0;min-width:0;font-size:11px}
+ .sidebar .primary-nav .nav>span:first-child{font-size:16px}
+ .sidebar .primary-nav .count{display:none}
+ .secondary-nav{display:flex;margin:0 13px;padding:7px 0 0;border:0;gap:4px}
+ .sidebar .secondary-nav .nav{color:var(--ink);background:#e7eddf;padding:5px 10px;min-height:34px;margin:0}
+ .sidebar .secondary-nav .nav.active{background:var(--ui-sidebar);color:#fff}
+ .main>main{padding:13px 14px 78px}
+ .collection-banner{min-height:120px;padding:13px;border-radius:15px;gap:8px}
+ .collection-banner::before{background-size:auto,67% auto}
+ .collection-banner .primary{min-width:0;white-space:nowrap;padding-inline:8px}
+ .cards{gap:8px}
+ .card-photo{height:120px}
+ .plant-card{border-radius:13px;contain-intrinsic-size:auto 270px}
+}
+.footer-switch{display:none}
+@media(max-width:760px){.footer-switch{display:inline;color:var(--green)}}

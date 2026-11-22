@@ -13,7 +13,7 @@ android {
             title: plantId ? '识植助手' : '植藏',
             icon: plantId ? '@drawable/plant_id_icon' : '@mipmap/ic_launcher',
         ]
-        buildConfigField 'String', 'ENTRY_PATH', plantId ? '"/plant-id/"' : '"/"'
+        buildConfigField 'String', 'ENTRY_PATH', plantId ? '"/plant-id/"' : '"/collection"'
         buildConfigField 'boolean', 'PLANT_ID', plantId ? 'true' : 'false'
     }
     signingConfigs {

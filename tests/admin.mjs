@@ -97,7 +97,7 @@ test('admin reset revokes every session and forces a password change across page
   for(const s of [old,other])assert.equal((await call(app,'/api/admin/stats',s)).status,401);
   assert.equal(cookie(await login(app,'visitor',password)),undefined);
   const signIn=await login(app,'visitor','000000'),forced=cookie(signIn);assert.equal(signIn.headers.get('Location'),'/auth/change-password');
-  for(const url of ['/','/admin','/admin/app.js'])assert.equal((await call(app,url,forced)).headers.get('Location'),'/auth/change-password');
+  for(const url of ['/collection','/admin','/admin/app.js'])assert.equal((await call(app,url,forced)).headers.get('Location'),'/auth/change-password');
   for(const url of ['/api/plants','/api/auth','/api/taxa','/images/00000000-0000-0000-0000-000000000000']){const response=await call(app,url,forced);assert.equal(response.status,403);assert.equal((await response.json()).code,'PASSWORD_CHANGE_REQUIRED')}
   const change=(currentPassword,newPassword,confirmPassword=newPassword,headers={})=>call(app,'/auth/change-password',forced,{method:'POST',body:new URLSearchParams({currentPassword,password:newPassword,confirmPassword}),headers});
   assert.equal((await call(app,'/auth/change-password',forced)).status,200);
@@ -106,11 +106,11 @@ test('admin reset revokes every session and forces a password change across page
   assert.equal((await change('000000','000000')).status,400);
   assert.equal((await change('000000','short')).status,400);
   assert.equal((await change('000000','new-password','different')).status,400);
-  const changed=await change('000000','new-password'),fresh=cookie(changed);assert.equal(changed.status,303);assert.equal(changed.headers.get('Location'),'/');assert.notEqual(fresh,forced);
+  const changed=await change('000000','new-password'),fresh=cookie(changed);assert.equal(changed.status,303);assert.equal(changed.headers.get('Location'),'/collection');assert.notEqual(fresh,forced);
   assert.equal((await call(app,'/auth/change-password',forced)).headers.get('Location'),'/auth/local');
   assert.equal((await call(app,'/api/plants',fresh)).status,200);
   assert.equal(cookie(await login(app,'visitor','000000')),undefined);
-  assert.equal((await login(app,'visitor','new-password')).headers.get('Location'),'/');
+  assert.equal((await login(app,'visitor','new-password')).headers.get('Location'),'/collection');
   const audit=app.database.sql.prepare('SELECT * FROM admin_audit').all();assert.equal(audit.length,1);assert.equal(audit[0].action,'reset-password');assert.ok(!JSON.stringify(audit).includes('000000'));
  }finally{await f.close()}
 });
@@ -163,7 +163,7 @@ test('administrator has only data, management and aggregate map entry points whi
  try{
   await provisionAdmin(app.database.sql,{username:'operator',password});await setAccount(app.database.sql,{username:'visitor',password,owner:'visitor'});
   const admin=cookie(await login(app,'operator')),user=cookie(await login(app,'visitor'));
-  for(const url of ['/','/origins','/origins/','/classification','/classification/','/auth/local','/auth/register']){
+  for(const url of ['/collection','/origins','/origins/','/classification','/classification/','/auth/local','/auth/register']){
    assert.equal((await call(app,url,admin)).headers.get('Location'),'/admin');assert.equal((await call(app,url,user)).status,200);
   }
   for(const url of ['/api/plants','/api/taxa','/api/images'])for(const method of ['GET','POST'])assert.equal((await call(app,url,admin,{method,body:method==='POST'?'{}':undefined})).status,403);

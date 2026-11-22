@@ -1,4 +1,4 @@
-const CACHE='leaf-archive-offline-v1';
+const CACHE='leaf-archive-offline-v2';
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/offline.html')).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('leaf-archive-offline-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 // Only provide a generic offline page. Never cache personal records or photos.

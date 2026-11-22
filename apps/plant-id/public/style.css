@@ -86,3 +86,57 @@ footer{
 }
 #ask-saved-key p{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;font-size:13px}
 #ask-send{margin-top:8px}
+
+/* The native clients and website share this interface. */
+.id-app{
+ --paper:#f5f5ed;--ink:#20382d;--line:#dfe5d7;--green:#193e31;--muted:#596e60;
+ background:var(--paper);color:var(--ink);padding-left:194px
+}
+.id-rail{
+ position:fixed;inset:0 auto 0 0;width:194px;background:#193e31;color:#f3f6eb;padding:24px 12px;
+ display:flex;flex-direction:column;gap:22px;z-index:3;
+}
+.id-brand{display:flex;align-items:center;gap:9px;white-space:nowrap;font-size:19px;font-weight:700}
+.id-brand img{border-radius:10px}
+.id-rail nav{display:grid;gap:6px}
+.id-nav-item{
+ display:flex;align-items:center;gap:9px;min-height:43px;font-size:14px;text-align:left;
+ background:none;border:0;border-radius:10px;color:inherit;padding:7px 10px;
+}
+.id-nav-item span{font-size:18px;width:18px;text-align:center;line-height:1}
+.id-nav-item:hover{color:#e3edcc;background:#2b5141}
+.id-nav-item[aria-current=page]{background:#e3edcc;color:#20382d;font-weight:650}
+.id-choose{margin:auto 4px 0;font-size:13px}
+.id-native .web-switch{display:none!important}
+.id-app .topbar{padding-inline:clamp(14px,3vw,34px);min-height:62px;background:#fbfcf5}
+.id-app .layout{--shell:890px;grid-template-columns:minmax(0,1fr) minmax(0,190px);gap:18px;align-items:start}
+.id-app .layout>main{order:-1}
+.id-app .history{background:#fffef9}
+.id-app .workspace,.id-app .result{background:#fffef9}
+.id-app .dropzone{background:#eef4e6}
+.id-mobile-nav{display:none}
+@media(max-width:1000px){.id-app .layout{display:flex;flex-direction:column;width:min(var(--content),calc(100% - 2 * var(--gutter)))}.id-app .layout>main,.id-app .history{width:100%}}
+@media(max-width:760px){
+ .id-app{padding-left:0;padding-bottom:62px}
+ .id-rail{display:none}
+ .id-mobile-nav{
+  position:fixed;inset:auto 0 0;z-index:6;display:flex;justify-content:space-around;gap:3px;
+  padding:5px 4px calc(5px + env(safe-area-inset-bottom));background:#193e31;color:#f3f6eb;
+ }
+ .id-mobile-nav .id-nav-item{flex-direction:column;justify-content:center;gap:3px;padding:4px 6px;font-size:11px;text-align:center}
+ .id-app .topbar nav>a[href="/plant-id/ocr"]{display:none}
+}
+.id-app .intro{margin-bottom:14px}
+.id-app .workspace .field{margin-top:15px}
+.id-app .consent{margin-block:13px}
+.id-app #auth{width:min(680px,calc(100vw - 24px));padding:0}
+.id-auth-frame{display:grid;grid-template-columns:160px minmax(0,1fr)}
+.id-auth-art{display:grid;place-items:center;background:#e3ebd6;padding:14px}
+.id-auth-art img{max-width:100%;object-fit:contain}
+.id-auth-frame form{padding:24px}
+@media(max-width:540px){
+ .id-auth-frame{grid-template-columns:1fr}
+ .id-auth-art{height:86px}
+ .id-auth-art img{width:54px;height:54px}
+ .id-auth-frame form{padding:16px}
+}

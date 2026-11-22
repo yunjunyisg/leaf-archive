@@ -66,6 +66,7 @@ async function detail(id){
 }
 async function images(){
  const attempt=++imagesEpoch,data=await api('/api/admin/images?page='+imagePage+(owner?'&owner='+encodeURIComponent(owner):''));if(attempt!==imagesEpoch)return;
+ $('allImages').hidden=!owner;
  $('imagesTitle').textContent=owner?'用户 '+ownerName+' 的上传图片':'用户上传图片';$('imageCount').textContent='共 '+data.total+' 张图片';$('uploadedImages').replaceChildren();
  for(const item of data.images){const figure=document.createElement('figure'),img=document.createElement('img'),caption=document.createElement('figcaption'),link=document.createElement('a');img.src='/api/admin/images/'+item.id;img.alt='用户上传图片';img.loading='lazy';img.decoding='async';caption.textContent=item.username+' · '+item.id;previewable(img,caption.textContent);link.href=img.src+'?download=1';link.download='';link.textContent='下载原图';figure.append(img,caption,link);$('uploadedImages').append(figure)}pager('images',data);
 }
@@ -92,6 +93,7 @@ async function loadMap(){
   $('adminMapStatus').textContent='已加载 '+records.length+' 份档案，可缩放地图、筛选分类并点击标点查看用户档案。';
  }catch(error){if(attempt===mapEpoch){$('adminMapStatus').textContent='地图加载失败：'+error.message+'。可点击重新加载。';throw error}}
 }
+$('allImages').onclick=()=>$('clearOwner').click();
 for(const b of document.querySelectorAll('[data-nav]'))b.onclick=()=>setView(b.dataset.nav);
 $('reloadMap').onclick=()=>loadMap().catch(showError);
 $('mapAllUsers').onclick=()=>{mapOwner='';mapOwnerName='';loadMap().catch(showError)};

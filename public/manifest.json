@@ -4,7 +4,7 @@
   "short_name": "植藏",
   "description": "收藏植物，记录来源与生长。",
   "lang": "zh-CN",
-  "start_url": "/",
+  "start_url": "/collection",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f8f9f5",

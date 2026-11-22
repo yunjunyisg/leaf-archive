@@ -69,7 +69,10 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
   if(url.pathname==='/plant-id')return new Response(null,{status:308,headers:{Location:base}});
   if(!url.pathname.startsWith(base))return json({error:'页面不存在'},404);
   const path=url.pathname.slice(base.length);
-  if(request.method==='GET'&&files.has(path)){const [file,type]=files.get(path);return new Response(readFileSync(new URL('./public/'+file,import.meta.url)),{headers:{'Content-Type':type,'Cache-Control':'no-cache','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'}})}
+  if(request.method==='GET'&&files.has(path)){const [file,type]=files.get(path);const html=type.startsWith('text/html');
+   const content=readFileSync(new URL('./public/'+file,import.meta.url),html?'utf8':null);
+   const native=html&&/\bPlantIdClient\//.test(request.headers.get('User-Agent')||'');
+   return new Response(native?content.replace('<body class="id-app">','<body class="id-app id-native">'):content,{headers:{'Content-Type':type,'Cache-Control':'no-cache','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',...(html?{Vary:'User-Agent'}:{})}})}
   if(request.method==='GET'&&path==='healthz')return json({status:'ok'});
   if(path==='mcp'){
    const caller=request.headers.get('Origin');

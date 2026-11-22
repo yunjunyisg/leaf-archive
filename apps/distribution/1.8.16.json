@@ -1,0 +1,15 @@
+{
+  "tag": "plant-id-web-v1.0.15",
+  "files": [
+    {
+      "name": "leaf-archive-ui-update-1.8.16.tar.gz",
+      "url": "https://tmpfiles.org/w2AibKhvcua1/leaf-archive-ui-update-1.8.16.tar.gz",
+      "sha256": "ba654b1664154487b376d10bbaa00d55a4d58684444b2eb7da63bd1064feeac6"
+    },
+    {
+      "name": "plant-id-web-v1.0.15.tar.gz",
+      "url": "https://tmpfiles.org/wKAybPhRcu1a/plant-id-web-v1.0.15.tar.gz",
+      "sha256": "4bcd317bf02e8a2d9a15558e5894e76fc2957f0228655cae0dcee183080488cd"
+    }
+  ]
+}

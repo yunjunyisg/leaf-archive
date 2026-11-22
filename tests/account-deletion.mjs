@@ -16,7 +16,7 @@ async function seed(app,owner){
 test('self-deletion verifies password and explicit confirmation, erases own records and photos without affecting another user',async()=>{
  const f=await fixture(),{app}=f;try{
   const mine=await seed(app,'visitor'),theirs=await seed(app,'another');const user=cookie(await login(app,'visitor')),other=cookie(await login(app,'another'));
-  assert.match(await (await call(app,'/',user)).text(),/href="\/account\/delete"/);
+  assert.match(await (await call(app,'/collection',user)).text(),/href="\/account\/delete"/);
   assert.equal((await call(app,'/account/delete')).status,303);assert.equal((await call(app,'/account/delete',user)).status,200);
   const submit=(input={},headers={})=>call(app,'/account/delete',user,{method:'POST',headers,body:new URLSearchParams({username:'visitor',password,confirmation:'确认注销',owner:'another',...input})});
   assert.equal((await submit({}, {Origin:'null'})).status,403);assert.equal((await submit({password:'wrong'})).status,400);assert.equal((await submit({username:'another'})).status,400);assert.equal((await submit({confirmation:''})).status,400);

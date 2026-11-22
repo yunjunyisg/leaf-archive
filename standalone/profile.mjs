@@ -20,7 +20,7 @@ export async function profileRoutes(request,{sql,bucket,session}){
  if(route!=='/account'&&route!=='/account/'&&route!=='/api/profile'&&route!=='/api/profile/avatar'&&route!=='/profile-client.js')return null;
  if(!session)return route.startsWith('/api/')?json({error:'请先登录'},401):new Response(null,{status:303,headers:{...headers,Location:'/auth/local'}});
  if(!sql.prepare('SELECT owner FROM local_accounts WHERE owner=?').get(session.owner))return json({error:'账号不存在'},401);
- if(route==='/account'||route==='/account/')return request.method==='GET'||request.method==='HEAD'?new Response(request.method==='HEAD'?null:page,{headers:{...headers,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' blob: data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}}):json({error:'不支持此操作'},405);
+ if(route==='/account'||route==='/account/')return request.method==='GET'||request.method==='HEAD'?new Response(request.method==='HEAD'?null:page,{headers:{...headers,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' blob: data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}}):json({error:'不支持此操作'},405);
  if(route==='/profile-client.js')return new Response(client,{headers:{...headers,'Content-Type':'text/javascript; charset=utf-8'}});
  if(route==='/api/profile'&&request.method==='GET')return json(profile(sql,session.owner,url.searchParams.get('summary')!=='0'));
  if(route==='/api/profile/avatar'&&(request.method==='GET'||request.method==='HEAD')){

@@ -8,7 +8,7 @@ fi
 update_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 source_dir="$update_root/standalone"
 target_dir=/opt/leaf-archive/standalone
-for name in server.mjs file-response.mjs native-assets.mjs global-boundaries.mjs taxonomy.mjs profile.mjs profile-page.html profile-client.js account-ui.mjs account-ui.js account-deletion.mjs filing.mjs storage.mjs local-auth.mjs access.mjs admin.mjs admin-account.mjs admin-page.html admin-client.js; do
+for name in server.mjs file-response.mjs native-assets.mjs global-boundaries.mjs taxonomy.mjs profile.mjs profile-page.html profile-client.js account-ui.mjs account-ui.js account-deletion.mjs filing.mjs storage.mjs local-auth.mjs access.mjs admin.mjs admin-account.mjs admin-page.html admin-client.js launcher-page.html ui.css; do
     test -f "$source_dir/$name" || { echo '更新文件不完整，尚未修改服务器。'; exit 1; }
 done
 core_source="$update_root/dist/server/index.js"
