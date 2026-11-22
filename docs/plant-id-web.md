@@ -27,16 +27,16 @@
 
 如果安装 1.0.0 时本机 3110 连接失败并回滚，直接安装当前版本。旧版启动入口比较了两种不同的路径，服务可能直接退出。新版支持通过安装程序使用的 current 符号链接启动。
 
-下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.17/plant-id-web-v1.0.17.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
+下载[识植助手安装包](https://github.com/yunjunyisg/leaf-archive/releases/download/plant-id-web-v1.0.18/plant-id-web-v1.0.18.tar.gz)，上传到阿里云服务器的 `/root/leaf-migration/`。在服务器管理员终端执行：
 
 ```bash
 (
 set -e
 cd /root/leaf-migration
-echo "98044f18a3e22c0da9b36dc338cc798913b2502daf49df591f7fee7b9478ee17  plant-id-web-v1.0.17.tar.gz" | sha256sum -c -
-gzip -t plant-id-web-v1.0.17.tar.gz
+echo "50a677ec93054875249c871bb8a6f7a25fa33417ad8016df613df321df02c266  plant-id-web-v1.0.18.tar.gz" | sha256sum -c -
+gzip -t plant-id-web-v1.0.18.tar.gz
 PLANT_ID_INSTALL_DIR=$(mktemp -d /root/leaf-migration/plant-id-verified.XXXXXX)
-tar -xzf plant-id-web-v1.0.17.tar.gz -C "$PLANT_ID_INSTALL_DIR"
+tar -xzf plant-id-web-v1.0.18.tar.gz -C "$PLANT_ID_INSTALL_DIR"
 (cd "$PLANT_ID_INSTALL_DIR" && sha256sum -c SHA256SUMS)
 bash "$PLANT_ID_INSTALL_DIR/deploy/install.sh"
 )
@@ -111,9 +111,11 @@ systemctl show plant-id -p MemoryCurrent -p MemoryPeak
 识植助手和 OCR 取消站内每日识别次数限制。智谱或百炼仍可能按账户限制用量、并发或计费。本站默认同时处理最多两次模型识别。候选参考图通过服务器向 iNaturalist 查询，只发送公开学名和公开分类编号。页面标出实际照片的物种、作者、许可和原始观察。若图库无可靠匹配或服务器暂时无法访问图库，识别结果仍可查看。
 
 
-## 图片文字识别
+## 植物识别与识别记录
 
-在识植助手顶部点击「文字识别」，或打开 `/plant-id/ocr`。登录后可上传一张不超过 5 MiB 的 JPG 或 PNG，提取并复制标签、包装或截图中的原文。OCR 与植物识别共用当前视觉服务。本站不保存 OCR 图片和结果。已有密钥和代理配置可继续使用。
+「植物识别」支持提交照片和文字描述，可把植物标签与整株照一同上传。旧文字识别网址会回到植物识别页，已接入的 OCR 接口仍可调用。
+
+「识别记录」使用独立页面。选中一条记录后，可以查看结果和提问，也可以点击「补充识别」回到植物识别页继续同一条记录。
 
 ## 识别结果格式提示
 
@@ -175,4 +177,4 @@ https://gloriouscarnivorousplants.top/plant-id/mcp
 
 ## 本次验证范围
 
-26 项自动测试通过，覆盖问答密钥的账号与服务商隔离、加密保存、重启复用、更换和失效。另用真实 DSH 运行时和模拟模型服务检查了智谱回答正文、模型繁忙时的备用调用、欠费和鉴权失败，通过移动尺寸浏览器验证了问答表单。安装包内文件校验通过。亦用真实 DSH 客户端和模拟模型验证了识植助手 MCP 工具调用。模型测试使用模拟接口，目标服务器仍需部署后实测。
+28 项自动测试通过，覆盖问答密钥的账号与服务商隔离、加密保存、重启复用、更换和失效。另用真实 DSH 运行时和模拟模型服务检查了智谱回答正文、模型繁忙时的备用调用、欠费和鉴权失败，通过移动尺寸浏览器验证了问答表单。安装包内文件校验通过。亦用真实 DSH 客户端和模拟模型验证了识植助手 MCP 工具调用。模型测试使用模拟接口，目标服务器仍需部署后实测。

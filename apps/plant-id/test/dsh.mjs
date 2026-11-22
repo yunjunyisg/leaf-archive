@@ -215,7 +215,7 @@ test('Zhipu uses its thinking controls and only the default model can select a f
 test('the filing footer is added once for web pages and omitted by installed clients',async()=>{
  const f=await appFixture();
  try{
-  for(const route of ['', 'ocr','apps']){
+  for(const route of ['', 'history','apps']){
    const get=agent=>f.app.fetch(new Request(origin+'/plant-id/'+route,{headers:{'User-Agent':agent}}));
    const response=await get('Mozilla/5.0 Chrome/130');
    assert.equal(response.headers.get('Vary'),'User-Agent');

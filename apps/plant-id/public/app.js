@@ -5,13 +5,17 @@ const notice=text=>{$('#notice').textContent=text};
 function el(tag,text,className){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node}
 function clearPhotos(){state.photoEpoch++;for(const photo of state.photos)URL.revokeObjectURL(photo.url);state.photos=[];$('#photos').value='';$('#previews').replaceChildren();$('#photo-note').hidden=true;$('#large-photo').removeAttribute('src');$('#photo-dialog').close()}
 const plantQuestion=createPlantQuestion({api,isLoggedIn:()=>Boolean(state.user),showAuth});
-function clearPrivate(){plantQuestion.close();plantQuestion.configure([],[]);state.epoch++;state.controller?.abort();state.controller=null;state.user=null;state.threadId='';state.busy=false;clearPhotos();$('#results').replaceChildren();$('#description').value='';$('#plantName').value='';$('#consent').checked=false;$('#history-list').replaceChildren(el('p','登录后查看自己的记录。','muted'));$('#account-dialog').close();$('#account').textContent='登录 / 注册';$('#quota').textContent='识别结果是参考线索，不能替代实物核对。';setBusy(false)}
+const viewingHistory=document.body.dataset.view==='history';
+const resumeLink=$('#resume-identification');
+const pageUrl=new URL(location.href);
+if(!viewingHistory&&pageUrl.hash==='#history-list')location.replace('/plant-id/history');
+function clearPrivate(){plantQuestion.close();plantQuestion.configure([],[]);state.epoch++;state.controller?.abort();state.controller=null;state.user=null;state.threadId='';resumeLink.hidden=true;state.busy=false;clearPhotos();$('#results').replaceChildren();$('#description').value='';$('#plantName').value='';$('#consent').checked=false;$('#history-list').replaceChildren(el('p','登录后查看自己的记录。','muted'));$('#account-dialog').close();$('#account').textContent='登录 / 注册';$('#quota').textContent='识别结果是参考线索，不能替代实物核对。';setBusy(false)}
 async function session(){const token=state.epoch,data=await api('session');if(token!==state.epoch)return data;if(!data.user&&state.user)clearPrivate();state.user=data.user;plantQuestion.configure(data.askProviders||[],data.savedAskProviders||[]);savedResultLimit=data.historyLimit??10;state.configured=data.configured;state.registration=data.registration;$('#consent-label').textContent='同意将本轮照片、名称、描述及当前记录的上一轮结果发送至'+data.provider+'中国内地视觉服务。填写的中文名称可能用于查询 iNaturalist 俗名。';$('#account').textContent=data.user?data.user.username:'登录 / 注册';$('#model-status').textContent=data.configured?'视觉服务：'+data.provider+' · '+data.model+' · 中国内地接口':'视觉服务尚未开通，暂不能识别；管理员配置后即可使用。';$('#quota').textContent=data.user?'站内不限每日识别次数，仍受模型服务额度和并发限制。':'登录后可保存自己的识别文字记录。';return data}
-function setBusy(busy){state.busy=busy;$('#submit').disabled=busy||state.preparing>0;$('#submit').textContent=busy?'正在观察与比较…':state.threadId?'更新识别':'开始识别';$('#cancel').hidden=!busy;for(const button of document.querySelectorAll('#history-list button,#new'))button.disabled=busy;$('#results').setAttribute('aria-busy',String(busy))}
+function setBusy(busy){state.busy=busy;$('#submit').disabled=busy||state.preparing>0;$('#submit').textContent=busy?'正在观察与比较…':state.threadId?'更新识别':'开始识别';$('#cancel').hidden=!busy;for(const button of document.querySelectorAll('#history-list button'))button.disabled=busy;$('#results').setAttribute('aria-busy',String(busy))}
 function showAuth(){state.mode='login';renderAuth();if(!$('#auth').open)$('#auth').showModal()}
 function renderAuth(){$('#auth-title').textContent=state.mode==='login'?'登录识植助手':'注册识植助手';$('#auth-submit').textContent=state.mode==='login'?'登录':'注册并登录';$('#auth-toggle').hidden=!state.registration;$('#auth-toggle').textContent=state.mode==='login'?'没有识植助手账号？注册':'已有账号？登录';$('#password').autocomplete=state.mode==='login'?'current-password':'new-password';$('#auth-error').textContent=''}
 $('#account').onclick=()=>{if(!state.user)return showAuth();$('#account-name').textContent='当前账号：'+state.user.username;$('#logout-error').textContent='';$('#account-dialog').showModal()};$('#account-close').onclick=()=>$('#account-dialog').close();$('#auth-close').onclick=()=>$('#auth').close();$('#auth').addEventListener('close',()=>{$('#password').value=''});$('#auth-toggle').onclick=()=>{state.mode=state.mode==='login'?'register':'login';renderAuth()};
-$('#auth-form').onsubmit=async event=>{event.preventDefault();const token=state.epoch;$('#auth-submit').disabled=true;$('#auth-toggle').disabled=true;try{const data=await api(state.mode,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('#username').value,password:$('#password').value})});if(token!==state.epoch)return;state.epoch++;state.user=data.user;$('#auth').close();await session();await history()}catch(error){$('#auth-error').textContent=error.message}finally{$('#auth-submit').disabled=false;$('#auth-toggle').disabled=false}};
+$('#auth-form').onsubmit=async event=>{event.preventDefault();const token=state.epoch;$('#auth-submit').disabled=true;$('#auth-toggle').disabled=true;try{const data=await api(state.mode,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('#username').value,password:$('#password').value})});if(token!==state.epoch)return;state.epoch++;state.user=data.user;$('#auth').close();await loadPage()}catch(error){$('#auth-error').textContent=error.message}finally{$('#auth-submit').disabled=false;$('#auth-toggle').disabled=false}};
 $('#logout').onclick=async()=>{$('#logout').disabled=true;try{await api('logout',{method:'POST'});clearPrivate();notice('已退出识植助手。')}catch(error){$('#logout-error').textContent=error.message}finally{$('#logout').disabled=false}};
 function renderPhotos(){const box=$('#previews');box.replaceChildren();for(const [index,photo]of state.photos.entries()){const wrap=el('div',undefined,'preview'),button=el('button'),img=el('img');button.type='button';button.setAttribute('aria-label','预览第 '+(index+1)+' 张照片');img.src=photo.url;img.alt='待识别植物照片 '+(index+1);button.append(img);button.onclick=()=>{$('#large-photo').src=photo.url;$('#photo-dialog').showModal()};const remove=el('button','移除照片 '+(index+1),'remove');remove.type='button';remove.onclick=()=>{URL.revokeObjectURL(photo.url);state.photos.splice(index,1);renderPhotos()};wrap.append(button,remove);box.append(wrap)}$('#photo-note').hidden=!state.photos.length}
 async function preparePhotos(files){const token=state.photoEpoch;if(state.preparing)return notice('照片正在处理，请稍等。');const incoming=[...files];if(state.photos.length+incoming.length>3)return notice('每轮最多选择三张照片，请先移除不需要的照片。');if(incoming.some(f=>!/^image\/(jpeg|png|webp)$/.test(f.type)||f.size>20*1024*1024))return notice('请选择 JPG、PNG 或 WebP，原图单张不超过 20 MiB。');state.preparing++;setBusy(state.busy);notice('正在本机准备识别副本…');try{const prepared=[];try{for(const file of incoming){const bitmap=await createImageBitmap(file);try{const scale=Math.min(1,2048/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.9));if(!blob||blob.size>5*1024*1024)throw Error('识别副本仍然过大，请换一张照片。');prepared.push({blob,url:URL.createObjectURL(blob)})}finally{bitmap.close()}}}catch(error){for(const photo of prepared)URL.revokeObjectURL(photo.url);throw error}if(token!==state.photoEpoch){for(const photo of prepared)URL.revokeObjectURL(photo.url);return}state.photos.push(...prepared);renderPhotos();notice('照片已就绪，可以补充描述后开始识别。')}catch(error){if(token===state.photoEpoch)notice(error.message||'无法读取照片，请换成 JPG 或 PNG。')}finally{state.preparing--;$('#photos').value='';setBusy(state.busy)}}
@@ -136,8 +140,63 @@ function renderAnswer(answer,description,{threadId,turnId}={}){const section=el(
  }
  for(const [candidateIndex,candidate] of answer.candidates.entries()){const card=el('div',undefined,'candidate'),head=el('div',undefined,'candidate-head'),name=el('div');name.append(el('h3',candidate.name),el('span',[candidate.knowledge?.name||candidate.scientificName,candidate.rank].filter(Boolean).join(' · '),'scientific'));head.append(name,el('span',candidate.probability+'%','probability'));const progress=el('progress');progress.max=100;progress.value=candidate.probability;progress.setAttribute('aria-label',candidate.name+'估计概率');const evidence=el('div',undefined,'evidence');for(const [title,items]of [['为什么可能',candidate.evidence],['怎么区分',candidate.distinguish]]){const column=el('div');column.append(el('h4',title));appendList(column,items);evidence.append(column)}card.append(head,progress);
  if(threadId&&turnId)card.append(recordQuestionButton('询问这株植物',{threadId,turnId,candidateIndex,label:candidate.knowledge?.name||candidate.scientificName||candidate.name}));if(candidate.description){const profile=el('div',undefined,'candidate-description');profile.append(el('h4','植物描述'),el('p',candidate.description),el('small','模型整理的典型特征'));card.append(profile)}card.append(candidateReference(candidate),evidence);if(candidate.knowledge)card.append(candidateKnowledge(candidate.knowledge));section.append(card)}const other=el('div',undefined,'other');other.append(el('span','其他可能 / 证据不足'),el('strong',answer.otherProbability+'%'));section.append(other);const details=el('details',undefined,'observations');details.append(el('summary','查看本轮观察与待确认特征'));for(const [title,items]of [['照片中可见',answer.observations.visible],['用户描述',answer.observations.described],['待确认',answer.observations.uncertain]]){details.append(el('strong',title));appendList(details,items)}section.append(details);if(answer.followUp.length){const follow=el('div',undefined,'follow-up');follow.append(el('h3','下一步，拍清这些特征'));appendList(follow,answer.followUp);section.append(follow)}section.append(el('p','百分比是当前证据下的粗略估计，会随补充信息变化。','muted'));$('#results').append(section);const saved=$('#results').querySelectorAll('.saved-result');for(const old of Array.from(saved).slice(0,-savedResultLimit))old.remove();return section}
-async function history(){if(!state.user)return;const token=state.epoch,data=await api('threads');if(token!==state.epoch)return;const list=$('#history-list');list.replaceChildren();if(!data.threads.length)list.append(el('p','还没有记录，试着认识第一株植物。','muted'));for(const thread of data.threads){const row=el('div',undefined,'history-item'),open=el('button',undefined,'history-open');open.append(el('span',thread.title),el('small',new Date(thread.updated).toLocaleDateString('zh-CN')));open.onclick=async()=>{if(state.busy)return;const token=++state.epoch;try{const data=await api('threads/'+thread.id);if(token!==state.epoch)return;clearPhotos();$('#description').value='';$('#plantName').value='';$('#results').replaceChildren();state.threadId=thread.id;for(const turn of data.turns)renderAnswer(turn.answer,turn.description,{threadId:thread.id,turnId:turn.id});setBusy(false);notice('已打开历史文字记录。旧照片不保存，需要重新看图时请再次选取。');$('#results').scrollIntoView({behavior:'instant'})}catch(error){notice(error.message)}};const remove=el('button','删除','subtle');remove.setAttribute('aria-label','删除记录 '+thread.title);remove.onclick=async()=>{if(!confirm('删除这条识别文字记录？此操作不会影响植藏。'))return;try{await api('threads/'+thread.id,{method:'DELETE'});if(state.threadId===thread.id)newRecord();await history()}catch(error){notice(error.message)}};row.append(open,recordQuestionButton('提问',{threadId:thread.id,label:thread.title},'subtle record-ask'),remove);list.append(row)}setBusy(state.busy)}
-function newRecord(){state.epoch++;state.controller?.abort();state.threadId='';clearPhotos();$('#description').value='';$('#plantName').value='';$('#results').replaceChildren();setBusy(false);notice('已新建识别。你可以上传照片，也可以描述植物特征。')};$('#new').onclick=newRecord;
+async function openRecord(id){
+ if(state.busy||!state.user)return;
+ const token=++state.epoch;
+ try{
+  const data=await api('threads/'+id);
+  if(token!==state.epoch)return;
+  clearPhotos();
+  $('#description').value='';
+  $('#plantName').value='';
+  $('#results').replaceChildren();
+  state.threadId=id;
+  for(const turn of data.turns)renderAnswer(turn.answer,turn.description,{threadId:id,turnId:turn.id});
+  resumeLink.hidden=!viewingHistory;
+  if(viewingHistory)resumeLink.href='/plant-id/?record='+encodeURIComponent(id);
+  setBusy(false);
+  notice(viewingHistory?'已打开历史文字记录。':'已打开记录，可添加照片或特征继续识别。');
+  if(viewingHistory)$('#notice').scrollIntoView({behavior:'instant',block:'start'});
+ }catch(error){if(token===state.epoch)notice(error.message)}
+}
+async function history(){
+ if(!viewingHistory||!state.user)return;
+ const token=state.epoch,data=await api('threads');
+ if(token!==state.epoch)return;
+ const list=$('#history-list');
+ list.replaceChildren();
+ if(!data.threads.length)list.append(el('p','保存第一条识别结果后，可在此查看。','muted'));
+ for(const thread of data.threads){
+  const row=el('div',undefined,'history-item');
+  const open=el('button',undefined,'history-open');
+  open.append(el('span',thread.title),el('small',new Date(thread.updated).toLocaleDateString('zh-CN')));
+  open.onclick=()=>openRecord(thread.id);
+  const remove=el('button','删除','subtle');
+  remove.setAttribute('aria-label','删除记录 '+thread.title);
+  remove.onclick=async()=>{
+   if(!confirm('删除这条识别文字记录？'))return;
+   try{
+    await api('threads/'+thread.id,{method:'DELETE'});
+    if(state.threadId===thread.id){
+     state.epoch++;
+     state.threadId='';
+     resumeLink.hidden=true;
+     $('#results').replaceChildren();
+     notice('识别记录已删除。');
+    }
+    await history();
+   }catch(error){notice(error.message)}
+  };
+  row.append(open,recordQuestionButton('提问',{threadId:thread.id,label:thread.title},'subtle record-ask'),remove);
+  list.append(row);
+ }
+}
+async function loadPage(){
+ await session();
+ if(viewingHistory)return history();
+ const id=pageUrl.searchParams.get('record')||'';
+ if(/^[a-f0-9-]{36}$/.test(id)&&state.user&&!state.threadId)await openRecord(id);
+}
 $('#cancel').onclick=()=>{state.epoch++;state.controller?.abort();state.controller=null;setBusy(false);notice('已停止等待。已提交的请求仍可能产生模型用量。');session().catch(()=>{})};
 function renderModelReply(fallback,nameReview){
  const section=el('article',undefined,'result');
@@ -151,4 +210,4 @@ function renderModelReply(fallback,nameReview){
  return section;
 }
 $('#identify-form').onsubmit=async event=>{event.preventDefault();if(state.busy||state.preparing)return;if(!state.user)return showAuth();if(!state.configured)return notice('识别服务尚未开通，请联系管理员配置视觉模型。');if(!state.photos.length&&!$('#description').value.trim()&&!$('#plantName').value.trim())return notice('请先选择照片，或填写植物的名称或特征。');if(!$('#consent').checked)return notice('请先勾选同意发送本轮照片和描述。');const token=++state.epoch,description=$('#description').value,plantName=$('#plantName').value,form=new FormData();form.set('text',description);form.set('plantName',plantName);form.set('consent','yes');if(state.threadId)form.set('threadId',state.threadId);for(const [i,photo]of state.photos.entries())form.append('images',photo.blob,'plant-'+i+'.jpg');state.controller=new AbortController();setBusy(true);notice('正在查看照片并比较候选，通常需要十几秒，请稍等。');try{const data=await api('identify',{method:'POST',body:form,signal:state.controller.signal});if(token!==state.epoch)return;if(data.fallback){const reply=renderModelReply(data.fallback,data.nameReview);notice(data.fallback.truncated?'回复被截断，可保留最清楚的一张照片再试。':'已显示模型回复，可核对文字或调整照片后再试。');await session();if(token===state.epoch)reply.scrollIntoView({block:'start'});return}state.threadId=data.threadId;const result=renderAnswer(data.answer,description,{threadId:data.threadId,turnId:data.turnId});if($('#description').value===description)$('#description').value='';if($('#plantName').value===plantName)$('#plantName').value='';notice('识别已更新。可补拍照片或填写新的特征继续核对。');await session();await history();result.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'})}catch(error){if(token===state.epoch)notice(error.name==='AbortError'?'已停止等待。':error.message)}finally{if(token===state.epoch){state.controller=null;setBusy(false)}}};
-window.addEventListener('pagehide',()=>{state.epoch++;state.controller?.abort()});session().then(history).catch(error=>notice(error.message));
+window.addEventListener('pagehide',()=>{state.epoch++;state.controller?.abort()});loadPage().catch(error=>notice(error.message));

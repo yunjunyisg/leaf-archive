@@ -68,12 +68,15 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
  }catch(error){sql.exec('ROLLBACK');sql.close();throw error}
  function account(request){const raw=request.headers.get('Cookie')?.split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1);if(!raw||!/^[a-f0-9]{64}$/.test(raw))return null;return sql.prepare('SELECT users.id,users.username FROM sessions JOIN users ON users.id=sessions.owner WHERE sessions.token=? AND sessions.expires>?').get(hash(raw),now())||null}
  const json=(value,status=200,extra={})=>Response.json(value,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',...extra}});
- const files=new Map([['', ['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']],['icon.svg',['icon.svg','image/svg+xml']],['apps',['apps.html','text/html; charset=utf-8']],['ocr',['ocr.html','text/html; charset=utf-8']],['ocr.js',['ocr.js','text/javascript; charset=utf-8']],['ask.js',['ask.js','text/javascript; charset=utf-8']]]);
+ const files=new Map([['', ['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']],['icon.svg',['icon.svg','image/svg+xml']],['apps',['apps.html','text/html; charset=utf-8']],['history',['index.html','text/html; charset=utf-8']],['ask.js',['ask.js','text/javascript; charset=utf-8']]]);
  async function route(request,{ip='local'}={}){
   const url=new URL(request.url);if(url.origin!==origin)return json({error:'请求来源无效'},403);
   if(url.pathname==='/plant-id')return new Response(null,{status:308,headers:{Location:base}});
   if(!url.pathname.startsWith(base))return json({error:'页面不存在'},404);
   const path=url.pathname.slice(base.length);
+  if(request.method==='GET'&&['ocr','ocr/','history/'].includes(path)){
+   return new Response(null,{status:302,headers:{Location:path==='history/'?base+'history':base,'Cache-Control':'no-store'}});
+  }
   if(request.method==='GET'&&files.has(path)){
    const [file,type]=files.get(path),html=type.startsWith('text/html');
    let content=readFileSync(new URL('./public/'+file,import.meta.url),html?'utf8':null);
@@ -81,7 +84,15 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
     const agent=request.headers.get('User-Agent')||'';
     const native=/\bPlantIdClient\//.test(agent);
     const app=native||/\bElectron\/|; wv\)/.test(agent);
-    if(app)content=content.replace('<body class="id-app">','<body class="id-app id-native">');
+    if(app)content=content.replace('class="id-app"','class="id-app id-native"');
+    if(path==='history'){
+     content=content.replace('data-view="identify"','data-view="history"')
+      .replace('<title>植物识别','<title>识别记录')
+      .replaceAll('href="/plant-id/" aria-current="page"','href="/plant-id/"')
+      .replaceAll('class="id-nav-item" href="/plant-id/history"','class="id-nav-item" href="/plant-id/history" aria-current="page"')
+      .replace('id="history" class="history" hidden','id="history" class="history"')
+      .replace('id="identify-view"','id="identify-view" hidden');
+    }
     // Avoid a duplicate from proxies configured to insert text before </body>.
     content=content.replace(/<\/body>(?=\s*(?:<\/html>)?\s*$)/i, app?'':filingFooter);
    }

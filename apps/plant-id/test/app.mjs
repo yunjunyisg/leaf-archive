@@ -61,8 +61,8 @@ test('OCR returns plain transcription, ignores old daily quotas and creates no p
  try{
   const {cookie} = await f.register();
   const body = () => f.form({text:''});
-  assert.equal((await f.request('ocr')).status,200);
-  assert.equal((await f.request('ocr.js')).status,200);
+  assert.equal((await f.request('ocr')).status,302);
+  assert.equal((await f.request('ocr')).headers.get('Location'),'/plant-id/');
   assert.equal((await f.request('api/ocr',{method:'POST',body:body()})).status,401);
   assert.equal((await f.request('api/ocr',{method:'POST',cookie,body:f.form({text:'',consent:'no'})})).status,400);
   assert.equal((await f.request('api/ocr',{method:'POST',cookie,body:f.form({text:'',images:[image,image]})})).status,400);
@@ -293,5 +293,19 @@ test('only explicit common names go to the lookup service and a name alone canno
   assert.equal(result.nameReview[0].name,'Ginkgo biloba');
   assert.equal(result.resolution.rank,'undetermined');
   assert.deepEqual(calls,['公孙树']);
+ }finally{await f.close()}
+});
+
+test('identification and history have independent navigation and content',async()=>{
+ const f=await fixture();
+ try{
+  const home=await(await f.request('')).text();
+  assert.match(home,/id="history" class="history" hidden/);
+  assert.doesNotMatch(home,/href="\/plant-id\/ocr"/);
+  const history=await(await f.request('history')).text();
+  assert.match(history,/data-view="history"/);
+  assert.match(history,/href="\/plant-id\/history" aria-current="page"/);
+  assert.match(history,/id="identify-view" hidden/);
+  assert.doesNotMatch(history,/id="history" class="history" hidden/);
  }finally{await f.close()}
 });
