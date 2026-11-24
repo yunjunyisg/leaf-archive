@@ -13,13 +13,14 @@
 .ui-launcher-main h1,.ui-auth h1{font-size:clamp(28px,4vw,38px);margin:0 0 7px;line-height:1.22}
 .ui-note{margin:0;color:var(--ui-muted);line-height:1.65;font-size:14px}
 .ui-entries{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:18px}
-.ui-entries article{overflow:hidden;border:1px solid var(--ui-line);border-radius:20px;background:var(--ui-white)}
-.ui-entry-art{display:block;height:220px;overflow:hidden;background:#dce7cf}
-.ui-entry-art img{width:100%;height:100%;object-fit:cover;object-position:center 43%}
-.ui-entry-art.ui-botanical img{object-fit:contain;padding:11px}
-.ui-entries article>div{padding:17px 20px 20px}
-.ui-entries h2{display:flex;align-items:center;gap:10px;margin:0;font-size:24px}
-.ui-entries h2 img{width:35px;height:35px;border-radius:9px}
+.ui-entries article{display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--ui-line);border-radius:20px;background:var(--ui-white)}
+.ui-entry-art{display:grid;place-items:center;height:168px;overflow:hidden;background:#edf1e6;padding:14px}
+.ui-entry-art img{display:block;max-width:100%;max-height:100%;object-fit:contain}
+.ui-entry-archive img{width:100%;height:100%;min-height:0}
+.ui-entry-recognition img{width:90px;aspect-ratio:1}
+.ui-entry-details{display:flex;flex:1;flex-direction:column;align-items:flex-start;padding:17px 20px 20px}
+.ui-entry-details .ui-action{margin-top:auto}
+.ui-entries h2{margin:0;font-size:24px}
 .ui-entries p{margin:9px 0 14px;color:var(--ui-muted);line-height:1.55}
 .ui-action,.ui-auth button{
  border:1px solid var(--ui-pine);background:var(--ui-pine);color:#fff;
@@ -31,12 +32,10 @@
 .ui-auth-top>a{text-decoration:none}
 .ui-auth-mark{display:inline-grid;place-items:center;margin-right:8px;border-radius:9px;background:#244b39;color:#dce8b9;width:34px;height:34px;font-size:22px}
 .ui-auth-frame{
- width:min(910px,calc(100% - 56px));margin:30px auto;display:grid;grid-template-columns:1fr 1fr;
+ width:min(490px,calc(100% - 56px));margin:30px auto;
  background:var(--ui-white);border:1px solid var(--ui-line);border-radius:21px;overflow:hidden;
 }
-.ui-auth-art{display:grid;place-items:center;background:#e3ebd6;min-height:420px;padding:18px}
-.ui-auth-art img{display:block;width:min(90%,350px);max-height:440px;object-fit:contain}
-.ui-auth-form{align-self:center;padding:30px 32px;min-width:0}
+.ui-auth-form{padding:30px 32px;min-width:0}
 .ui-auth-form h1{font-size:30px}
 .ui-auth-form label{display:block;margin:13px 0 0;font-size:14px;font-weight:650}
 .ui-auth-form input{
@@ -48,7 +47,6 @@
 .ui-auth-form .error{color:#964637;font-size:14px}
 .ui-auth-form .error:empty{display:none}
 .ui-auth-form .links{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;font-size:14px}
-.ui-auth-frame.ui-auth-single{display:block;max-width:490px}
 .ui-account main{max-width:920px}
 .ui-account main nav{padding-bottom:14px;border-bottom:1px solid var(--ui-line)}
 .ui-account main section{background:var(--ui-white);border-color:var(--ui-line);border-radius:18px}
@@ -71,14 +69,13 @@
 .ui-admin .ui-admin-nav button[hidden]{display:none}
 .ui-offline main{width:min(460px,calc(100% - 28px));background:var(--ui-white);border:1px solid var(--ui-line);border-radius:17px}
 @media(max-width:760px){
- .ui-launcher-header,.ui-launcher-main,.ui-auth-top,.ui-auth-frame{width:calc(100% - 28px)}
+ .ui-launcher-header,.ui-launcher-main,.ui-auth-top{width:calc(100% - 28px)}
  .ui-launcher-main{margin-block:17px 26px}
  .ui-entries{grid-template-columns:1fr;gap:12px}
- .ui-entry-art{height:140px}
- .ui-entries article>div{padding:12px 14px 14px}
- .ui-auth-frame{grid-template-columns:1fr;margin:16px auto}
- .ui-auth-art{min-height:0;height:170px;padding:8px}
- .ui-auth-art img{height:100%;width:auto}
+ .ui-entry-art{height:120px;padding:10px}
+ .ui-entry-recognition img{width:68px}
+ .ui-entry-details{padding:12px 14px 14px}
+ .ui-auth-frame{width:min(490px,calc(100% - 28px));margin:16px auto}
  .ui-auth-form{padding:16px}
  .ui-admin main{padding:14px 14px 76px}
  .ui-admin header{min-height:0;gap:10px}

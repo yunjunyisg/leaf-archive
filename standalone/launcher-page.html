@@ -1,12 +1,36 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#193e31"><title>选择应用</title><link rel="stylesheet" href="/ui.css"><script src="/account-ui.js" defer></script></head>
+<html lang="zh-CN">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <meta name="theme-color" content="#193e31">
+ <title>选择应用</title>
+ <link rel="stylesheet" href="/ui.css">
+ <script src="/account-ui.js" defer></script>
+</head>
 <body class="ui-launcher">
 <header class="ui-launcher-header">植物应用</header>
 <main class="ui-launcher-main">
- <h1>选择应用</h1><p class="ui-note">两个应用各有独立账号。</p>
+ <h1>选择应用</h1>
+ <p class="ui-note">两个应用各有独立账号。</p>
  <div class="ui-entries">
-  <article><a class="ui-entry-art" href="/collection" aria-label="打开植藏"><img src="/assets/Anthurium_crystallinum.jpg" alt=""></a><div><h2><img src="/icons/icon-192.png" alt="">植藏</h2><p>建立植物档案，记录收藏、分类、产地与养护。</p><a class="ui-action" href="/collection">打开植藏</a></div></article>
-  <article><a class="ui-entry-art ui-botanical" href="/plant-id/" aria-label="打开识植助手"><img src="/welcome/plant-0.webp" alt=""></a><div><h2><img src="/plant-id/icon.svg" alt="">识植助手</h2><p>上传照片辨认植物，提取图片文字，继续追问。</p><a class="ui-action" href="/plant-id/">打开识植助手</a></div></article>
+  <article>
+   <div class="ui-entry-art ui-entry-archive"><img src="/welcome/plant-0.webp" alt=""></div>
+   <div class="ui-entry-details">
+    <h2>植藏</h2>
+    <p>建立植物档案，记录收藏、分类、产地与养护。</p>
+    <a class="ui-action" href="/collection">打开植藏</a>
+   </div>
+  </article>
+  <article>
+   <div class="ui-entry-art ui-entry-recognition"><img src="/plant-id/icon.svg" alt=""></div>
+   <div class="ui-entry-details">
+    <h2>识植助手</h2>
+    <p>上传照片辨认植物，提取图片文字，继续追问。</p>
+    <a class="ui-action" href="/plant-id/">打开识植助手</a>
+   </div>
+  </article>
  </div>
 </main>
-</body></html>
+</body>
+</html>
