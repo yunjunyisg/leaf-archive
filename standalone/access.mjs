@@ -25,9 +25,9 @@ export function sessionAccount(sql,request){
 export function isAdmin(sql,owner){return Boolean(owner&&sql.prepare('SELECT owner FROM local_admins WHERE owner=?').get(owner));}
 export function recordActivity(sql,owner,{registered=false,login=false,now=Date.now()}={}){
  if(sql.prepare('SELECT 1 FROM deleted_owners WHERE owner=?').get(owner))return;
- sql.prepare('INSERT INTO activity_meta VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=min(value,excluded.value)').run('started_at',now);
  const old=sql.prepare('SELECT last_seen FROM account_activity WHERE owner=?').get(owner);
  if(!registered&&!login&&old?.last_seen>now-60000&&dayInChina(old.last_seen)===dayInChina(now))return;
+ sql.prepare('INSERT INTO activity_meta VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=min(value,excluded.value)').run('started_at',now);
  sql.prepare(`INSERT INTO account_activity(owner,registered_at,last_login,last_seen) VALUES (?,?,?,?)
  ON CONFLICT(owner) DO UPDATE SET registered_at=COALESCE(account_activity.registered_at,excluded.registered_at),last_login=COALESCE(excluded.last_login,account_activity.last_login),last_seen=excluded.last_seen`).run(owner,registered?now:null,login?now:null,now);
  sql.prepare('INSERT OR IGNORE INTO activity_days(owner,day) VALUES (?,?)').run(owner,dayInChina(now));

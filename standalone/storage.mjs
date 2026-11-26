@@ -17,8 +17,23 @@ export function openDatabase(directory,{migrations=new URL('../drizzle/',import.
  }
  sql.exec('CREATE TABLE IF NOT EXISTS local_accounts (username TEXT PRIMARY KEY, owner TEXT NOT NULL UNIQUE, nickname TEXT NOT NULL, salt TEXT NOT NULL, password_hash TEXT NOT NULL); CREATE TABLE IF NOT EXISTS local_login_limits (key TEXT PRIMARY KEY, attempts INTEGER NOT NULL, expires INTEGER NOT NULL)');
  ensureAccessSchema(sql);
+ sql.exec('CREATE TABLE IF NOT EXISTS archive_sync (owner TEXT PRIMARY KEY, revision TEXT NOT NULL)');
+ const touch=owner=>`INSERT INTO archive_sync(owner,revision) VALUES (${owner},lower(hex(randomblob(16))))
+  ON CONFLICT(owner) DO UPDATE SET revision=excluded.revision;`;
+ for(const table of ['plants','taxa']){
+  sql.exec(`CREATE TRIGGER IF NOT EXISTS archive_sync_${table}_insert AFTER INSERT ON ${table}
+   BEGIN ${touch('NEW.owner')} END;
+   CREATE TRIGGER IF NOT EXISTS archive_sync_${table}_update AFTER UPDATE ON ${table}
+   BEGIN ${touch('NEW.owner')} END;
+   CREATE TRIGGER IF NOT EXISTS archive_sync_${table}_move AFTER UPDATE OF owner ON ${table}
+   WHEN OLD.owner<>NEW.owner BEGIN ${touch('OLD.owner')} END;
+   CREATE TRIGGER IF NOT EXISTS archive_sync_${table}_delete AFTER DELETE ON ${table}
+   BEGIN ${touch('OLD.owner')} END;`);
+ }
+ const revision=sql.prepare('SELECT revision FROM archive_sync WHERE owner=?');
+ const syncGeneration=randomUUID();
  const DB={prepare(query){const statement=sql.prepare(query);const bind=(...args)=>({async all(){return {results:statement.all(...args)}},async first(){return statement.get(...args)||null},async run(){const r=statement.run(...args);return {meta:{changes:Number(r.changes),last_row_id:Number(r.lastInsertRowid)}}}});return {bind,...bind()}}};
- return {sql,DB,close:()=>sql.close()};
+ return {sql,DB,archiveVersion:owner=>syncGeneration+':'+(revision.get(owner)?.revision||''),close:()=>sql.close()};
 }
 export function diskBucket(directory,{sql}={}){
  const root=path.resolve(directory),file=key=>path.join(root,createHash('sha256').update(key).digest('hex')),writes=new Map();

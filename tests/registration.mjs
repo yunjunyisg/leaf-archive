@@ -67,3 +67,34 @@ test('registration works through real HTTP and survives process restart',async()
   assert.equal((await (await get(app,'/api/auth',session)).json()).user.nickname,'new-person');assert.equal((await app.fetch(form('/auth/local',{username:'NEW-PERSON',password}))).status,303);
  }finally{if(server)await new Promise(r=>server.close(r));app.close();await fs.rm(directory,{recursive:true,force:true})}
 });
+
+test('archive version tracks committed plant and classification changes only for their owner',async()=>{
+ const {app,close}=await fixture();
+ try{
+  const a=cookie(await signup(app,'sync_a')),b=cookie(await signup(app,'sync_b'));
+  const state=async session=>(await get(app,'/api/auth',session)).json();
+  const owner=(await state(a)).user.id;
+  const version=async session=>(await state(session)).archiveVersion;
+  const first=await version(a),other=await version(b);
+  assert.ok(first);
+  assert.equal((await state()).archiveVersion,undefined);
+  assert.equal(await version(a),first);
+  const sql=app.database.sql;
+  sql.exec('BEGIN IMMEDIATE');
+  sql.prepare('INSERT INTO plants (id,owner,number,data,created) VALUES (?,?,?,?,?)').run('pending',owner,'one','{}','2026-01-01');
+  sql.exec('ROLLBACK');
+  assert.equal(await version(a),first);
+  const plant=await app.fetch(new Request(origin+'/api/plants',{method:'POST',headers:{Cookie:a,Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({name:'捕蝇草',number:'one',photos:[],logs:[]})}));
+  assert.equal(plant.status,201);
+  const second=await version(a);
+  assert.notEqual(second,first);
+  assert.equal(await version(b),other);
+  const taxon=await app.fetch(new Request(origin+'/api/taxa',{method:'POST',headers:{Cookie:a,Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({path:[{rank:'genus',nameZh:'捕蝇草属'}],references:[],system:'apg4'})}));
+  assert.equal(taxon.status,201);
+  const third=await version(a);
+  assert.notEqual(third,second);
+  sql.prepare('DELETE FROM plants WHERE owner=?').run(owner);
+  assert.notEqual(await version(a),third);
+  assert.equal(await version(b),other);
+ }finally{await close()}
+});

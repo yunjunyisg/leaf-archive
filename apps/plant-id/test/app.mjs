@@ -309,3 +309,29 @@ test('identification and history have independent navigation and content',async(
   assert.doesNotMatch(history,/id="history" class="history" hidden/);
  }finally{await f.close()}
 });
+
+test('public asset validators preserve browser and installed-client variants without caching private API data',async()=>{
+ const f=await fixture();
+ try{
+  for(const path of ['app.js','style.css','icon.svg','ask.js']){
+   const first=await f.request(path),etag=first.headers.get('ETag');
+   assert.equal(first.status,200);
+   assert.ok(etag);
+   assert.equal((await f.request(path,{headers:{'If-None-Match':'"older", W/'+etag}})).status,304);
+   const head=await f.request(path,{method:'HEAD'});
+   assert.equal(head.status,200);
+   assert.equal(head.headers.get('ETag'),etag);
+   assert.equal(await head.text(),'');
+  }
+  const page=await f.request('history'),browserVersion=page.headers.get('ETag');
+  assert.match(await page.text(),/蜀ICP备2026066760号/);
+  const native=await f.request('history',{headers:{'User-Agent':'PlantIdClient/1','If-None-Match':browserVersion}});
+  assert.equal(native.status,200);
+  assert.notEqual(native.headers.get('ETag'),browserVersion);
+  assert.doesNotMatch(await native.text(),/蜀ICP备/);
+  assert.equal((await f.request('history',{headers:{'If-None-Match':browserVersion}})).status,304);
+  const session=await f.request('api/session',{headers:{'If-None-Match':'*'}});
+  assert.equal(session.status,200);
+  assert.match(session.headers.get('Cache-Control'),/no-store/);
+ }finally{await f.close()}
+});

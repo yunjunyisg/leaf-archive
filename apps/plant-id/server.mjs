@@ -69,6 +69,33 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
  function account(request){const raw=request.headers.get('Cookie')?.split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1);if(!raw||!/^[a-f0-9]{64}$/.test(raw))return null;return sql.prepare('SELECT users.id,users.username FROM sessions JOIN users ON users.id=sessions.owner WHERE sessions.token=? AND sessions.expires>?').get(hash(raw),now())||null}
  const json=(value,status=200,extra={})=>Response.json(value,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',...extra}});
  const files=new Map([['', ['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']],['icon.svg',['icon.svg','image/svg+xml']],['apps',['apps.html','text/html; charset=utf-8']],['history',['index.html','text/html; charset=utf-8']],['ask.js',['ask.js','text/javascript; charset=utf-8']]]);
+ const publicResources=new Map();
+ function publicResponse(request,path){
+  const [file,type]=files.get(path),html=type.startsWith('text/html');
+  const app=html&&(/\bPlantIdClient\/|\bElectron\/|; wv\)/.test(request.headers.get('User-Agent')||''));
+  const key=path+(app?':client':'');
+  let resource=publicResources.get(key);
+  if(!resource){
+   let content=readFileSync(new URL('./public/'+file,import.meta.url),'utf8');
+   if(app)content=content.replace('class="id-app"','class="id-app id-native"');
+   if(path==='history'){
+    content=content.replace('data-view="identify"','data-view="history"')
+     .replace('<title>植物识别','<title>识别记录')
+     .replaceAll('href="/plant-id/" aria-current="page"','href="/plant-id/"')
+     .replaceAll('class="id-nav-item" href="/plant-id/history"','class="id-nav-item" href="/plant-id/history" aria-current="page"')
+     .replace('id="history" class="history" hidden','id="history" class="history"')
+     .replace('id="identify-view"','id="identify-view" hidden');
+   }
+   // Avoid a duplicate from proxies configured to insert text before </body>.
+   if(html)content=content.replace(/<\/body>(?=\s*(?:<\/html>)?\s*$)/i,app?'':filingFooter);
+   resource={content,etag:'"'+hash(content)+'"'};
+   publicResources.set(key,resource);
+  }
+  const headers={'Content-Type':type,'Cache-Control':'no-cache','ETag':resource.etag,'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',...(html?{Vary:'User-Agent'}:{})};
+  const validators=(request.headers.get('If-None-Match')||'').split(',').map(value=>value.trim().replace(/^W\//,''));
+  if(validators.includes('*')||validators.includes(resource.etag))return new Response(null,{status:304,headers});
+  return new Response(request.method==='HEAD'?null:resource.content,{headers});
+ }
  async function route(request,{ip='local'}={}){
   const url=new URL(request.url);if(url.origin!==origin)return json({error:'请求来源无效'},403);
   if(url.pathname==='/plant-id')return new Response(null,{status:308,headers:{Location:base}});
@@ -77,27 +104,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
   if(request.method==='GET'&&['ocr','ocr/','history/'].includes(path)){
    return new Response(null,{status:302,headers:{Location:path==='history/'?base+'history':base,'Cache-Control':'no-store'}});
   }
-  if(request.method==='GET'&&files.has(path)){
-   const [file,type]=files.get(path),html=type.startsWith('text/html');
-   let content=readFileSync(new URL('./public/'+file,import.meta.url),html?'utf8':null);
-   if(html){
-    const agent=request.headers.get('User-Agent')||'';
-    const native=/\bPlantIdClient\//.test(agent);
-    const app=native||/\bElectron\/|; wv\)/.test(agent);
-    if(app)content=content.replace('class="id-app"','class="id-app id-native"');
-    if(path==='history'){
-     content=content.replace('data-view="identify"','data-view="history"')
-      .replace('<title>植物识别','<title>识别记录')
-      .replaceAll('href="/plant-id/" aria-current="page"','href="/plant-id/"')
-      .replaceAll('class="id-nav-item" href="/plant-id/history"','class="id-nav-item" href="/plant-id/history" aria-current="page"')
-      .replace('id="history" class="history" hidden','id="history" class="history"')
-      .replace('id="identify-view"','id="identify-view" hidden');
-    }
-    // Avoid a duplicate from proxies configured to insert text before </body>.
-    content=content.replace(/<\/body>(?=\s*(?:<\/html>)?\s*$)/i, app?'':filingFooter);
-   }
-   return new Response(content,{headers:{'Content-Type':type,'Cache-Control':'no-cache','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',...(html?{Vary:'User-Agent'}:{})}});
-  }
+  if((request.method==='GET'||request.method==='HEAD')&&files.has(path))return publicResponse(request,path);
   if(request.method==='GET'&&path==='healthz')return json({status:'ok'});
   if(path==='mcp'){
    const caller=request.headers.get('Origin');
@@ -221,9 +228,22 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
     const raw=await body(request,(ocr?6:11)*1024*1024);let form;try{form=await new Response(raw,{headers:{'Content-Type':request.headers.get('Content-Type')||''}}).formData()}catch{throw fail('照片提交格式无效')}
     const text=form.get('text')||'',name=form.get('plantName')||'',threadId=form.get('threadId')||'';if(typeof name!=='string'||name.length>120||typeof text!=='string'||text.length>6000||typeof threadId!=='string'||threadId&&!/^[a-f0-9-]{36}$/.test(threadId))throw fail('文字或记录格式无效');
     if(form.get('consent')!=='yes')throw fail('请先同意将本轮照片和描述发送给视觉模型');
-    const images=[];let total=0;for(const file of form.getAll('images')){if(typeof file==='string'||file.size>5*1024*1024||!file.size)throw fail('识别副本单张不能超过 5 MiB');const bytes=Buffer.from(await file.arrayBuffer()),mime=imageMime(bytes);if(!mime||mime!==file.type||(ocr||config.provider==='bigmodel')&&mime==='image/webp')throw fail(ocr?'请选择有效的 JPG 或 PNG 图片':'请选择有效的 JPG、PNG 或 WebP 图片');total+=bytes.length;images.push({bytes,mime})}
-    if(ocr&&(images.length!==1||text||name||threadId))throw fail('文字识别每次需要一张照片');
-    if(images.length>3||total>10*1024*1024)throw fail('每轮最多三张识别副本，合计不超过 10 MiB');if(!images.length&&!text.trim()&&!name.trim())throw fail('请上传照片，或填写植物名称与特征');
+    const photos=form.getAll('images');
+    if(photos.length>3)throw fail('每轮最多三张识别副本，合计不超过 10 MiB');
+    let total=0;
+    for(const photo of photos){
+     if(typeof photo==='string'||photo.size>5*1024*1024||!photo.size)throw fail('识别副本单张不能超过 5 MiB');
+     total+=photo.size;
+    }
+    if(total>10*1024*1024)throw fail('每轮最多三张识别副本，合计不超过 10 MiB');
+    if(ocr&&(photos.length!==1||text||name||threadId))throw fail('文字识别每次需要一张照片');
+    if(!photos.length&&!text.trim()&&!name.trim())throw fail('请上传照片，或填写植物名称与特征');
+    const images=[];
+    for(const photo of photos){
+     const bytes=Buffer.from(await photo.arrayBuffer()),mime=imageMime(bytes);
+     if(!mime||mime!==photo.type||(ocr||config.provider==='bigmodel')&&mime==='image/webp')throw fail(ocr?'请选择有效的 JPG 或 PNG 图片':'请选择有效的 JPG、PNG 或 WebP 图片');
+     images.push({bytes,mime});
+    }
     const thread=threadId?sql.prepare('SELECT * FROM threads WHERE id=? AND owner=?').get(threadId,user.id):null;if(threadId&&!thread)throw fail('记录不存在',404);
     const previous=thread?JSON.parse(sql.prepare('SELECT answer FROM turns WHERE thread=? AND owner=? ORDER BY created DESC,rowid DESC LIMIT 1').get(threadId,user.id)?.answer||'null'):null;
     if(ocr){

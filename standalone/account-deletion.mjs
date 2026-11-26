@@ -15,7 +15,7 @@ export function eraseAccount(sql,{owner,actor,action}){
  sql.prepare('INSERT OR IGNORE INTO deleted_owners(owner,deleted_at) VALUES (?,?)').run(owner,Date.now());
  for(const {id} of sql.prepare('SELECT id FROM images WHERE owner=?').all(owner))sql.prepare('INSERT OR IGNORE INTO object_deletions(key) VALUES (?)').run(owner+'/'+id);
  sql.prepare('INSERT OR IGNORE INTO object_deletions(key) SELECT key FROM account_objects WHERE owner=?').run(owner);
- for(const table of ['plants','taxa','images','auth_sessions','wechat_identities','account_activity','activity_days'])sql.prepare(`DELETE FROM ${table} WHERE owner=?`).run(owner);
+ for(const table of ['plants','taxa','images','auth_sessions','wechat_identities','account_activity','activity_days','archive_sync'])sql.prepare(`DELETE FROM ${table} WHERE owner=?`).run(owner);
  const username=sql.prepare('SELECT username FROM local_accounts WHERE owner=?').get(owner)?.username;
  for(const key of ['change-owner:'+owner,'delete-owner:'+owner,...(username?['account:'+username.toLowerCase()]:[])])sql.prepare('DELETE FROM local_login_limits WHERE key=?').run(key);
  sql.prepare('DELETE FROM local_accounts WHERE owner=?').run(owner);
