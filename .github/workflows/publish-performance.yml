@@ -1,0 +1,36 @@
+name: 发布双应用性能更新
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm test --prefix apps/plant-id
+      - name: 打包并发布
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          output=$(mktemp -d)
+          node scripts/package-runtime-update.mjs "$output/leaf-archive-performance-v1.tar.gz" --with-core --reuse-boundaries
+          node scripts/package-plant-id.mjs "$output/plant-id-performance-v1.tar.gz"
+          (cd "$output" && sha256sum -- *.tar.gz > SHA256SUMS)
+          for archive in "$output"/*.tar.gz; do
+            folder=$(mktemp -d)
+            tar -xzf "$archive" -C "$folder"
+            (cd "$folder" && sha256sum --quiet --check SHA256SUMS)
+          done
+          gh release create performance-v1 "$output"/* --target "$GITHUB_SHA" \
+            --prerelease --title "植藏与识植助手性能更新" \
+            --notes "植藏减少空闲同步的整份档案读取。识植助手复用页面静态资源，并在复制识别照片前检查数量和体积。植藏更新包复用已安装的全球地图边界。"
