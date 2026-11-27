@@ -32,6 +32,13 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
  CREATE INDEX IF NOT EXISTS thread_owner ON threads(owner,updated);
  CREATE TABLE IF NOT EXISTS turns(id TEXT PRIMARY KEY,thread TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,owner TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,description TEXT NOT NULL,answer TEXT NOT NULL,created INTEGER NOT NULL);
  CREATE INDEX IF NOT EXISTS turn_thread ON turns(owner,thread,created);
+ CREATE TABLE IF NOT EXISTS care_notes(
+  id TEXT PRIMARY KEY, thread TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  owner TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, subject TEXT NOT NULL,
+  note TEXT NOT NULL, created INTEGER NOT NULL
+ );
+ CREATE INDEX IF NOT EXISTS care_note_scope ON care_notes(thread,owner,subject,created);
+ CREATE UNIQUE INDEX IF NOT EXISTS care_note_unique ON care_notes(thread,owner,subject,note);
 `);chmodSync(join(dataDirectory,'plant-id.sqlite'),0o600);
  const active=new Set(),rates=new Map();let authJobs=0;
  function limit(key,max,span){let entry=rates.get(key);if(!entry||entry.until<=now())entry={count:0,until:now()+span};entry.count++;rates.delete(key);rates.set(key,entry);if(rates.size>2000)rates.delete(rates.keys().next().value);if(entry.count>max)throw fail('操作过于频繁，请稍后重试',429)}
@@ -47,6 +54,26 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
   WHERE thread=? AND owner=? AND (? IS NULL OR id=?)
   ORDER BY created DESC,rowid DESC LIMIT 1`);
  const recordId=value=>typeof value==='string'&&/^[a-f0-9-]{36}$/.test(value);
+ const getCareNotes=sql.prepare('SELECT id,note,created FROM care_notes WHERE thread=? AND owner=? AND subject=? ORDER BY created,rowid');
+ const addCareNote=sql.prepare(`INSERT INTO care_notes(id,thread,owner,subject,note,created)
+  SELECT ?,?,?,?,?,? WHERE (SELECT count(*) FROM care_notes WHERE thread=? AND owner=?)<12
+  ON CONFLICT(thread,owner,subject,note) DO NOTHING`);
+ const deleteCareNote=sql.prepare('DELETE FROM care_notes WHERE id=? AND thread=? AND owner=? AND subject=?');
+ function questionRecord(owner,{threadId,turnId=null,candidateIndex}){
+  if(!recordId(threadId))throw fail('请先保存一条识别记录，再从记录中提问',400,'ask_record_required');
+  if(turnId!==null&&!recordId(turnId))throw fail('识别结果无效',400,'ask_record_required');
+  const saved=askTurn.get(threadId,owner,turnId,turnId);
+  if(!saved)throw fail('这条识别记录已不存在，请从现有记录中提问',404,'ask_record_missing');
+  const answer=JSON.parse(saved.answer);
+  const candidates=Array.isArray(answer.candidates)?answer.candidates.slice(0,4):[];
+  if(candidateIndex!==undefined&&(!Number.isInteger(candidateIndex)||!candidates[candidateIndex]))throw fail('这条记录中没有该候选植物');
+  const name=candidate=>String(candidate?.scientificName||candidate?.name||'').trim().slice(0,120);
+  const candidate=candidates[candidateIndex??0],plant=name(candidate);
+  const label=String(candidate?.name||plant).slice(0,120);
+  const subject=plant.normalize('NFKC').toLowerCase().replace(/\s+/g,' ');
+  const record={summary:String(answer.summary||'').slice(0,1000),candidates:candidates.map(name).filter(Boolean)};
+  return {saved,plant,label,record,scope:[threadId,owner,subject]};
+ }
  const pruneOwner=sql.prepare('DELETE FROM turns WHERE rowid IN (SELECT rowid FROM turns WHERE owner=? ORDER BY created DESC,rowid DESC LIMIT -1 OFFSET ?)');
  const removeEmpty=sql.prepare('DELETE FROM threads WHERE owner=? AND NOT EXISTS (SELECT 1 FROM turns WHERE thread=threads.id)');
  const refreshTitle=`UPDATE threads SET title=(
@@ -140,6 +167,30 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
   if(path==='api/threads'&&request.method==='GET'){return json({threads:sql.prepare('SELECT id,title,created,updated FROM threads WHERE owner=? ORDER BY updated DESC,id').all(user.id)})}
   const match=/^api\/threads\/([a-f0-9-]{36})$/.exec(path);
   if(match){const thread=sql.prepare('SELECT * FROM threads WHERE id=? AND owner=?').get(match[1],user.id);if(!thread)throw fail('记录不存在',404);if(request.method==='DELETE'){sql.prepare('DELETE FROM threads WHERE id=? AND owner=?').run(thread.id,user.id);return json({ok:true})}if(request.method==='GET')return json({thread,turns:sql.prepare('SELECT id,description,answer,created FROM turns WHERE thread=? AND owner=? ORDER BY created,rowid').all(thread.id,user.id).map(t=>({...t,answer:enrichIdentification(JSON.parse(t.answer))}))})}
+  if(path==='api/ask/memory'){
+   const params=url.searchParams;
+   const selection={threadId:params.get('threadId'),turnId:params.get('turnId'),
+    candidateIndex:params.has('candidateIndex')?Number(params.get('candidateIndex')):undefined};
+   let edit;
+   if(request.method==='POST'){
+    limit('care-note:'+user.id,30,60000);
+    try{edit=JSON.parse((await body(request,4096)).toString())}
+    catch(error){if(error.status)throw error;throw fail('养护记忆格式无效')}
+    if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
+   }
+   const {saved,label,scope}=questionRecord(user.id,selection);
+   if(request.method==='POST'){
+    const note=typeof edit?.note==='string'?edit.note.trim():'';
+    if(!note||note.length>300)throw fail('每条养护记忆需填写 1 至 300 个字符');
+    if(!addCareNote.run(randomUUID(),...scope,note,now(),...scope.slice(0,2)).changes&&!getCareNotes.all(...scope).some(item=>item.note===note))throw fail('这条记录已保存 12 条记忆，请先删除一条',409);
+   }
+   if(request.method==='DELETE'){
+    const id=params.get('id');
+    if(!recordId(id))throw fail('养护记忆无效');
+    if(!deleteCareNote.run(id,...scope).changes)throw fail('养护记忆不存在',404);
+   }
+   return json({label,turnId:saved.id,notes:getCareNotes.all(...scope)});
+  }
   if(path==='api/ask'&&request.method==='POST'){
    if(!dshAvailable)throw fail('植物问答的 DSH 运行时尚未安装，请联系管理员',503);
    if(asking)throw fail('植物问答正在处理另一请求，请稍后再试',429);
@@ -151,18 +202,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
     catch(error){if(error.status)throw error;throw fail('问答提交格式无效')}
     if(!input||typeof input!=='object')throw fail('问答提交格式无效');
     const {apiKey:submittedKey,rememberKey=false,provider='deepseek',model='',question,threadId,turnId=null,candidateIndex,history=[]}=input;
-    if(!recordId(threadId))throw fail('请先保存一条识别记录，再从记录中提问',400,'ask_record_required');
-    if(turnId!==null&&!recordId(turnId))throw fail('识别结果无效',400,'ask_record_required');
-    const saved=askTurn.get(threadId,user.id,turnId,turnId);
-    if(!saved)throw fail('这条识别记录已不存在，请从现有记录中提问',404,'ask_record_missing');
-    const answer=JSON.parse(saved.answer);
-    const candidates=Array.isArray(answer.candidates)?answer.candidates.slice(0,4):[];
-    if(candidateIndex!==undefined&&(!Number.isInteger(candidateIndex)||!candidates[candidateIndex])){
-     throw fail('这条记录中没有该候选植物',400);
-    }
-    const name=candidate=>String(candidate?.scientificName||candidate?.name||'').trim().slice(0,120);
-    const plant=name(candidates[candidateIndex??0]);
-    const record={summary:String(answer.summary||'').slice(0,1000),candidates:candidates.map(name).filter(Boolean)};
+    const {saved,plant,record,scope}=questionRecord(user.id,{threadId,turnId,candidateIndex});
     if(submittedKey!==undefined&&!validApiKey(submittedKey)||typeof rememberKey!=='boolean')throw fail('请填写所选平台的 API Key');
     if(['baseURL','endpoint','url'].some(field=>Object.hasOwn(input,field)))throw fail('请选择站点已配置的服务商');
     const route=routeForQuestion(askProviders,provider,model);
@@ -189,7 +229,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
     let result;
     try{
      result=await askDsh({apiKey,route,question:question.trim(),plant,record,
-      history:history.map(({question,answer})=>({question,answer})),knowledge,signal:request.signal});
+      history:history.map(({question,answer})=>({question,answer})),knowledge,careNotes:getCareNotes.all(...scope).map(item=>item.note),signal:request.signal});
     }catch(error){
      if(error.code==='ask_key_invalid'&&sealed)askCredentials.remove(user.id,route,sealed);
      throw error;

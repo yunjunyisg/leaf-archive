@@ -230,3 +230,58 @@ test('the filing footer is added once for web pages and omitted by installed cli
   }
  }finally{await f.close()}
 });
+
+test('care memory is confirmed by its owner, persists across restart and stays scoped to the plant and record',async()=>{
+ const calls=[];
+ const f=await appFixture(async data=>{calls.push(data);return {text:'回答',model:'test',truncated:false}});
+ try{
+  const cookie=await f.login('care_owner'),other=await f.login('care_other');
+  const record=f.seed('care_owner'),unrelated=f.seed('care_owner');
+  f.app.sql.prepare('UPDATE turns SET answer=? WHERE id=?').run(JSON.stringify({
+   candidates:[{name:'月季',scientificName:'Rosa chinensis'},{name:'野蔷薇',scientificName:'Rosa multiflora'}],
+  }),record.turnId);
+  const request=(scope,{method='GET',note,id,session=cookie,source=origin}={})=>{
+   const query=new URLSearchParams(scope);
+   if(id)query.set('id',id);
+   return f.app.fetch(new Request(origin+'/plant-id/api/ask/memory?'+query,{
+    method,headers:{Cookie:session,Origin:source,'Content-Type':'application/json'},
+    ...(method==='POST'?{body:JSON.stringify({note})}:{}),
+   }));
+  };
+  const observation='东窗养护，换盆后用水苔栽培。';
+  assert.equal((await request(record,{method:'POST',note:observation,session:other})).status,404);
+  assert.equal((await request(record,{method:'POST',note:observation,source:'https://example.com'})).status,403);
+  assert.equal((await request(record,{method:'POST',note:'x'.repeat(301)})).status,400);
+  assert.equal((await request(record,{session:other})).status,404);
+  const save=await request(record,{method:'POST',note:observation});
+  assert.equal(save.status,200);
+  const {notes:[saved],label}=await save.json();
+  assert.equal(label,'月季');
+  assert.equal(saved.note,observation);
+  assert.equal((await (await request(record,{method:'POST',note:observation})).json()).notes.length,1);
+  const secondDevice=await f.post('api/login',{username:'care_owner',password:'test-password'});
+  assert.equal(secondDevice.status,200);
+  const secondSession=secondDevice.headers.get('Set-Cookie').split(';')[0];
+  assert.notEqual(secondSession,cookie);
+  assert.equal((await (await request(record,{session:secondSession})).json()).notes[0].note,observation);
+  assert.deepEqual((await (await request({...record,candidateIndex:1})).json()).notes,[]);
+  assert.deepEqual((await (await request(unrelated)).json()).notes,[]);
+  f.restart();
+  assert.equal((await (await request(record)).json()).notes[0].id,saved.id);
+  const ask=scope=>f.post('api/ask',{...scope,apiKey:'test-personal-care-key',question:'如何调整浇水？'},{cookie});
+  assert.equal((await ask(record)).status,200);
+  assert.deepEqual(calls.at(-1).careNotes,[observation]);
+  assert.equal((await ask({...record,candidateIndex:1})).status,200);
+  assert.deepEqual(calls.at(-1).careNotes,[]);
+  assert.equal((await request(record,{method:'DELETE',id:saved.id,session:other})).status,404);
+  assert.equal((await request(record,{method:'DELETE',id:saved.id})).status,200);
+  assert.equal((await ask(record)).status,200);
+  assert.deepEqual(calls.at(-1).careNotes,[]);
+  assert.equal((await request(record,{method:'POST',note:observation})).status,200);
+  const deleteThread=await f.app.fetch(new Request(origin+'/plant-id/api/threads/'+record.threadId,{
+   method:'DELETE',headers:{Cookie:cookie,Origin:origin},
+  }));
+  assert.equal(deleteThread.status,200);
+  assert.equal(f.app.sql.prepare('SELECT count(*) AS total FROM care_notes').get().total,0);
+ }finally{await f.close()}
+});

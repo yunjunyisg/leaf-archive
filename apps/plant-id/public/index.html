@@ -23,23 +23,50 @@
 <dialog id="auth"><div class="id-auth-frame"><div class="id-auth-art"><img src="/plant-id/icon.svg" width="96" height="96" alt=""></div><form id="auth-form"><div class="dialog-heading"><h2 id="auth-title">登录识植助手</h2><button id="auth-close" type="button" class="subtle" aria-label="关闭">关闭</button></div><p class="muted">这是独立应用，请使用识植助手账号。植藏的账号和植物档案不会转入这里。</p><label class="field">账号<input id="username" name="username" autocomplete="username" required pattern="[A-Za-z0-9_]{3,32}" minlength="3" maxlength="32" placeholder="3 至 32 位字母、数字或下划线"></label><label class="field">密码<input id="password" name="password" type="password" autocomplete="current-password" minlength="6" maxlength="256" required placeholder="至少 6 个字符"></label><p id="auth-error" class="notice" role="alert"></p><button id="auth-submit" class="button" type="submit">登录</button><button id="auth-toggle" class="subtle" type="button">没有识植助手账号？注册</button></form></div></dialog>
 <dialog id="account-dialog"><div class="dialog-heading"><h2>识植助手账号</h2><button id="account-close" class="subtle">关闭</button></div><p id="account-name"></p><p class="muted">退出这里只影响识植助手，不会退出植藏。</p><button id="logout" class="button">退出登录</button><p id="logout-error" class="notice" role="alert"></p></dialog>
 <dialog id="ask-dialog" aria-labelledby="ask-title">
-<form>
-<div class="dialog-heading"><h2 id="ask-title">植物问答</h2><button type="button" class="subtle" id="ask-close">关闭</button></div>
-<p id="ask-target" class="muted"></p><p class="muted">提问时会将这条识别记录的摘要和候选名称发送给所选服务商。</p>
-<label class="field" for="ask-provider">问答服务商</label>
-<select id="ask-provider" required></select>
-<div id="ask-saved-key" hidden><p>已保存此服务商的 API Key。<button type="button" class="subtle" id="ask-change-key">更换密钥</button></p></div>
-<div id="ask-key-entry" hidden>
-<label class="field" for="ask-key">你的 API Key</label>
-<input id="ask-key" type="password" autocomplete="off" spellcheck="false" minlength="8" maxlength="512">
-<p class="muted">首次成功回答后，密钥会加密保存到当前识植助手账号。问答使用你在所选服务商的额度。</p>
-<button type="button" class="subtle" id="ask-cancel-key" hidden>继续使用已保存的密钥</button>
-</div>
-<div id="ask-messages" role="log" aria-label="问答内容"></div>
-<label class="field" for="ask-question">你想了解哪个方面？</label>
-<textarea id="ask-question" rows="3" maxlength="2000" placeholder="例如：怎样和另一种植物区分？" required></textarea>
-<p id="ask-status" role="status" class="notice"></p>
-<button type="submit" id="ask-send" class="button">发送问题</button>
+<form novalidate>
+ <header class="ask-header">
+  <button type="button" class="subtle" id="ask-close" autofocus>返回</button>
+  <div class="ask-heading"><h2 id="ask-title">植物养护助手</h2><p id="ask-target"></p></div>
+  <button type="button" class="subtle" id="ask-settings" aria-controls="ask-provider-panel" aria-expanded="false">设置</button>
+ </header>
+ <div class="ask-toolbar"><button type="button" id="ask-memory" aria-controls="ask-memory-panel" aria-expanded="false">养护记忆</button></div>
+ <div class="ask-scroll">
+  <section id="ask-provider-panel" class="ask-panel" aria-label="问答设置" hidden>
+   <label class="field" for="ask-provider">问答服务商</label>
+   <select id="ask-provider"></select>
+   <div id="ask-saved-key" hidden><p>已保存该平台密钥。<button type="button" class="subtle" id="ask-change-key">更换密钥</button></p></div>
+   <div id="ask-key-entry" hidden>
+    <label class="field" for="ask-key">你的 API Key</label>
+    <input id="ask-key" type="password" autocomplete="off" spellcheck="false" maxlength="512">
+    <p class="muted">首次回答成功后加密保存。问答使用你在所选服务商的额度。</p>
+    <button type="button" class="subtle" id="ask-cancel-key" hidden>继续使用已保存的密钥</button>
+   </div>
+  </section>
+  <section id="ask-memory-panel" class="ask-panel" aria-labelledby="ask-memory-title" hidden>
+   <h3 id="ask-memory-title">这株植物的养护记忆</h3>
+   <p class="muted">保存并确认环境、养护记录或纠正。以后向这株植物提问时，这些记忆会随问题发给你选的服务商。</p>
+   <ul id="ask-notes"></ul>
+   <label class="field" for="ask-note">添加一条记忆</label>
+   <textarea id="ask-note" rows="2" maxlength="300" placeholder="例如：放在东窗，换盆后用水苔栽培。"></textarea>
+   <button type="button" id="ask-save-note">保存记忆</button>
+   <p id="ask-memory-status" class="muted" role="status"></p>
+  </section>
+  <div id="ask-messages" role="log" aria-label="问答内容"></div>
+  <div id="ask-quick" class="ask-quick" aria-label="快捷提问">
+   <button type="button">叶子发黄时，该检查什么？</button>
+   <button type="button">怎么判断这株植物该浇水了？</button>
+   <button type="button">按季节怎么养护？</button>
+  </div>
+ </div>
+ <div class="ask-compose">
+  <p id="ask-status" role="status" class="notice"></p>
+  <div class="ask-input">
+   <label class="visually-hidden" for="ask-question">输入问题</label>
+   <textarea id="ask-question" rows="1" maxlength="2000" placeholder="输入你想了解的问题"></textarea>
+   <button type="submit" id="ask-send" class="button">发送</button>
+  </div>
+  <p class="ask-disclosure muted">发送问题时会附带识别摘要与已保存的养护记忆。</p>
+ </div>
 </form>
 </dialog>
 <dialog id="photo-dialog"><button id="photo-close" class="subtle">关闭预览</button><img id="large-photo" alt="待识别的植物照片"></dialog>

@@ -1,0 +1,33 @@
+name: 发布识植助手网页更新包
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm test --prefix apps/plant-id
+      - name: 打包并发布
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./apps/plant-id/package.json').version")
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          tag="plant-id-web-v$version"
+          output=$(mktemp -d)
+          archive="$output/$tag.tar.gz"
+          node scripts/package-plant-id.mjs "$archive"
+          folder=$(mktemp -d)
+          tar -xzf "$archive" -C "$folder"
+          (cd "$folder" && sha256sum --quiet --check SHA256SUMS)
+          (cd "$output" && sha256sum "$tag.tar.gz" > SHA256SUMS)
+          gh release create "$tag" "$archive" "$output/SHA256SUMS" --target "$GITHUB_SHA" \
+            --prerelease --title "识植助手 $version" --generate-notes

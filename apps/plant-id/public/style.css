@@ -61,19 +61,54 @@ footer{
 .candidate-description h4,.candidate-description p{margin:.25rem 0}
 .candidate-description small{color:var(--muted)}
 
-#ask-dialog{width:min(540px,calc(100% - 24px))}
-#ask-messages{max-height:36dvh;overflow:auto}
-.ask-message{margin:.65rem 0;padding:.75rem 1rem;border:1px solid var(--line);border-radius:12px}
-.ask-message p{white-space:pre-wrap;overflow-wrap:anywhere;margin:.45rem 0}
-#ask-dialog .field{display:block;margin-top:.65rem}
-#ask-status{min-height:1.5em}
-
-#ask-provider{
- width:100%;min-height:44px;padding:8px 10px;background:#fcfdfc;color:var(--ink);
- border:1px solid var(--line);border-radius:8px;
+#ask-dialog{
+ width:min(640px,calc(100% - 28px));height:min(760px,calc(100dvh - 48px));max-height:none;
+ padding:0;overflow:hidden;border-radius:22px;background:#f3f6ef
 }
-#ask-saved-key p{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;font-size:13px}
-#ask-send{margin-top:8px}
+#ask-dialog form{height:100%;min-height:0;display:flex;flex-direction:column}
+.ask-header{
+ display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;
+ padding:10px 14px;background:#fff;border-bottom:1px solid var(--line)
+}
+.ask-heading{min-width:0;text-align:center}
+.ask-heading h2{font-size:18px;margin:0}
+.ask-heading p{font-size:13px;color:var(--muted);margin:3px 0 0;overflow-wrap:anywhere}
+.ask-header button,.ask-toolbar button{padding:6px 10px;min-height:44px;font-size:14px}
+.ask-header button[aria-expanded=true],.ask-toolbar button[aria-expanded=true]{background:#e4ecdb}
+.ask-toolbar{padding:6px 16px 0;display:flex;justify-content:flex-end}
+.ask-toolbar button{border-radius:999px;background:transparent}
+.ask-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:8px 16px 16px}
+.ask-panel{padding:12px 14px;margin:0 0 14px;background:#fff;border:1px solid var(--line);border-radius:12px}
+.ask-panel h3,.ask-panel p{margin:4px 0 8px}
+.ask-panel .field{margin:6px 0}
+.ask-panel select{width:100%;min-height:44px;padding:8px 10px;background:#fff;color:inherit;border:1px solid var(--line);border-radius:8px}
+#ask-notes{list-style:none;margin:0;padding:0}
+#ask-notes li{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+#ask-notes li span{flex:1;min-width:0;overflow-wrap:anywhere;white-space:pre-wrap}
+#ask-notes button,#ask-saved-key button,#ask-cancel-key{padding:6px 8px;font-size:13px}
+#ask-save-note{margin-top:8px}
+#ask-messages{display:flex;flex-direction:column;gap:12px}
+.ask-message{align-self:flex-start;max-width:94%;padding:11px 14px;background:#fff;border:1px solid var(--line);border-radius:4px 16px 16px 16px}
+.ask-message.user{align-self:flex-end;background:#214b38;color:white;border-color:transparent;border-radius:16px 4px 16px 16px}
+.ask-message strong{font-size:12px;font-weight:650}
+.ask-message p{white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0 0;line-height:1.65}
+.ask-message details{margin-top:8px;font-size:13px}
+.ask-message a{text-decoration:underline;overflow-wrap:anywhere}
+.ask-quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.ask-quick button{border-radius:16px;padding:8px 12px;min-height:44px;font-size:14px;background:#fff}
+.ask-compose{padding:10px 16px max(10px,env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line)}
+.ask-input{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
+#ask-dialog #ask-question{margin:0;min-height:44px;max-height:22dvh;padding:9px 12px;border-radius:12px}
+#ask-send{min-height:44px;padding:0 15px;border-radius:12px}
+#ask-status{margin:0}
+#ask-status:not(:empty){margin-bottom:6px}
+#ask-status[data-waiting]{color:var(--green)}
+.ask-disclosure{margin:5px 0 0;font-size:12px}
+@media(max-width:600px){
+ #ask-dialog{box-sizing:border-box;width:100%;height:var(--ask-viewport,100dvh);max-width:none;margin:0;border:0;border-radius:0;inset:var(--ask-offset,0px) 0 auto}
+ .ask-header{padding-top:max(10px,env(safe-area-inset-top))}
+ .ask-message{max-width:97%}
+}
 
 /* The native clients and website share this interface. */
 .id-app{
