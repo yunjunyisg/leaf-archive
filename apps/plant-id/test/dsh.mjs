@@ -8,9 +8,9 @@ import {createPlantId} from '../server.mjs';
 import {askProviderRegistry,compatibleProviderPatch,routeForQuestion} from '../dsh/providers.mjs';
 
 const origin='https://gloriouscarnivorousplants.top';
-async function appFixture(dshAnswer,env={}){
+async function appFixture(dshAnswer,env={},referenceFetch=async()=>Response.json({results:[]})){
  const dir=await mkdtemp(join(tmpdir(),'plant-ask-test-'));
- const options={dataDirectory:dir,origin,env:{PLANT_ID_API_KEY:'server-vision-key',...env},dshAnswer};
+ const options={dataDirectory:dir,origin,env:{PLANT_ID_API_KEY:'server-vision-key',...env},dshAnswer,referenceFetch};
  let app=createPlantId(options);
  const post=(path,value,{cookie='',source=origin}={})=>app.fetch(new Request(origin+'/plant-id/'+path,{
   method:'POST',headers:{Cookie:cookie,Origin:source,'Content-Type':'application/json'},body:JSON.stringify(value),
@@ -334,5 +334,74 @@ test('legacy care notes migrate as private observations before history is pruned
   assert.equal(remove.status,200);
   f.restart();
   assert.deepEqual((await (await read()).json()).notes.map(item=>item.id),[id]);
+ }finally{await f.close()}
+});
+
+test('the image shortcut returns licensed ordensis photos and sourced facts even without upstream access',async()=>{
+ const f=await appFixture(async()=>{throw Error('verified details do not need the model')},{},async()=>{throw Error('unavailable')});
+ try{
+  const cookie=await f.login('ordensis_user'),other=await f.login('different_user');
+  const record=f.seed('ordensis_user','Drosera ordensis');
+  const get=(path,session)=>f.app.fetch(new Request(origin+'/plant-id/'+path,{headers:session?{Cookie:session}:{}}));
+  const path='api/ask/images?'+new URLSearchParams(record);
+  assert.equal((await get(path)).status,401);
+  assert.equal((await get(path,other)).status,404);
+  const gallery=await (await get(path,cookie)).json();
+  assert.equal(gallery.images.length,2);
+  assert.match(gallery.text,/找到 2 张/);
+  for(const photo of gallery.images){
+   assert.match(photo.license,/CC BY-SA/);
+   assert.ok(photo.attribution);
+   const image=await get(photo.src.slice('/plant-id/'.length));
+   assert.equal(image.headers.get('Content-Type'),'image/jpeg');
+   assert.deepEqual(new Uint8Array(await image.arrayBuffer()).slice(0,2),new Uint8Array([255,216]));
+  }
+  const ask=question=>f.post('api/ask',{...record,apiKey:'personal-test-key',question},{cookie});
+  const originAnswer=await (await ask('这个的得名由来')).json();
+  assert.match(originAnswer.text,/奥德河/);
+  assert.ok(originAnswer.sources.some(s=>s.url==='https://doi.org/10.58828/nuy00212'));
+  const appearance=await(await ask('这个的外表')).json();
+  assert.match(appearance.text,/绒毛/);
+  assert.equal(appearance.images.length,2);
+ }finally{await f.close()}
+});
+
+test('other plants use exact Chinese and international source results, reusable facts and open photos',async()=>{
+ const calls=[],requested=[];
+ let offline=false;
+ const fetcher=async url=>{
+  const u=new URL(url);
+  requested.push(u.href);
+  if(offline)throw Error('offline');
+  const name='Rosa chinensis',fqId='urn:lsid:ipni.org:names:731845-1';
+  if(u.hostname==='powo.science.kew.org'){
+   if(u.pathname.endsWith('/search'))return Response.json({results:[{name,kingdom:'Plantae',accepted:true,fqId}]});
+   return Response.json({name,fqId,taxonomicStatus:'Accepted',authors:'Jacq.',taxonRemarks:'China'});
+  }
+  if(u.hostname==='www.iplant.cn')return new Response('<span class="infocname">月季花</span><div id="sptitlel" class="infolatin">Rosa chinensis</div>');
+  if(u.pathname.endsWith('/autocomplete'))return Response.json({results:[{name,id:3,rank:'species',iconic_taxon_name:'Plantae',wikipedia_url:'https://en.wikipedia.org/wiki/Rosa_chinensis'}]});
+  if(u.pathname.endsWith('/taxa/3'))return Response.json({results:[{name,id:3,wikipedia_url:'https://en.wikipedia.org/wiki/Rosa_chinensis',wikipedia_summary:'A flowering shrub.'}]});
+  const photo=(id,license_code)=>({id,license_code,attribution:'Author '+id,url:'https://inaturalist-open-data.s3.amazonaws.com/photos/'+id+'/square.jpg'});
+  return Response.json({results:[
+   {id:4,taxon:{id:3,name},photos:[photo(11,'cc-by'),photo(11,'cc-by'),photo(12,'cc0'),photo(13,'cc-by-nc')]},
+   {id:5,taxon:{id:8,name:'Rosa rubiginosa'},photos:[photo(14,'cc0')]},
+  ]});
+ };
+ const f=await appFixture(async input=>{calls.push(input);return {text:'没有查到资料。不过，这个物种已经有多项记录。',model:'test',truncated:false}},{},fetcher);
+ try{
+  const cookie=await f.login('source_user'),record=f.seed('source_user');
+  const ask=()=>f.post('api/ask',{...record,apiKey:'personal-test-key',question:'请介绍这种植物？无关私有字串'},{cookie});
+  const answer=await (await ask()).json();
+  assert.match(answer.text,/月季花/);
+  assert.doesNotMatch(answer.text,/没有查到资料/);
+  assert.ok(calls[0].evidence.some(item=>item.url.startsWith('https://powo.science.kew.org/')));
+  assert.ok(calls[0].evidence.some(item=>item.kind==='overview'));
+  assert.ok(requested.every(u=>!decodeURIComponent(u).includes('无关私有字串')));
+  const response=await f.app.fetch(new Request(origin+'/plant-id/api/ask/images?'+new URLSearchParams(record),{headers:{Cookie:cookie}}));
+  assert.deepEqual((await response.json()).images.map(image=>image.id),['11','12']);
+  offline=true;
+  f.restart();
+  const cached=await (await ask()).json();
+  assert.match(cached.text,/月季花/);
  }finally{await f.close()}
 });

@@ -99,6 +99,10 @@ footer{
 .ask-message p{white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0 0;line-height:1.65}
 .ask-message details{margin-top:8px;font-size:13px}
 .ask-message a{text-decoration:underline;overflow-wrap:anywhere}
+.ask-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.ask-gallery figure{margin:0;min-width:0}
+.ask-gallery img{display:block;width:100%;aspect-ratio:4/3;object-fit:contain;background:var(--paper);border-radius:8px}
+.ask-gallery figcaption{padding:5px 0;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 .ask-quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .ask-quick button{border-radius:16px;padding:8px 12px;min-height:44px;font-size:14px;background:#fff}
 .ask-compose{padding:10px 16px max(10px,env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line)}

@@ -1,0 +1,42 @@
+{
+  "drosera ordensis": {
+    "facts": [
+      {
+        "kind": "appearance",
+        "title": "原始分类描述 · 外观",
+        "text": "多年生草本，叶片在基部排成莲座。叶柄呈倒披针形，近叶片处宽约 2–4 毫米，两面密生白色、分枝的长绒毛。捕虫叶片近圆形，宽约 3.5–5 毫米。花瓣由粉色至近白色。",
+        "url": "https://doi.org/10.58828/nuy00212"
+      },
+      {
+        "kind": "etymology",
+        "title": "原始分类描述 · 命名",
+        "text": "Allen Lowrie 于 1994 年描述该种。种加词 ordensis 指奥德河（Ord River）的冲积河谷，这个种生长在那里。",
+        "url": "https://doi.org/10.58828/nuy00212"
+      },
+      {
+        "kind": "distribution",
+        "title": "英国皇家植物园邱园 · 原产地",
+        "text": "原生于澳大利亚北部，分布从西澳大利亚北部延伸至北领地。",
+        "url": "https://powo.science.kew.org/taxon/978107-1"
+      }
+    ],
+    "images": [
+      {
+        "file": "drosera-ordensis-rosette.jpg",
+        "attribution": "Denis Barthel",
+        "license": "CC BY-SA 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+        "source": "https://commons.wikimedia.org/wiki/File:DroseraOrdensis.jpg",
+        "changes": "缩小、重新编码"
+      },
+      {
+        "file": "drosera-ordensis-mirama.jpg",
+        "attribution": "Cooleyray",
+        "license": "CC BY-SA 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://commons.wikimedia.org/wiki/File:Drosera_ordensis_%27Mirama%2C_Kimberley%27_%28near_type_area_Kununurra%29.jpg",
+        "changes": "缩小、重新编码"
+      }
+    ]
+  }
+}

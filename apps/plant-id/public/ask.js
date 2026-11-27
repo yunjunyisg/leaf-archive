@@ -8,6 +8,7 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
  let record=null,history=[],pending=null,memoryPending=null,editing=false,panel=null,greeting=null;
  let choices=new Map(),savedProviders=new Set();
  const viewport=window.visualViewport;
+ const wantsImages=text=>/^(我想要更多图片|(?:请)?(?:给我|看看|我想看)(?:更多|几张|参考)?(?:这株植物的)?(?:图片|照片)|更多(?:参考)?(?:图片|照片))[？?。！!]?$/u.test(text.trim());
 
  function setPanel(next){
   panel=next;
@@ -35,7 +36,7 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
   $('change-key').disabled=$('cancel-key').disabled=provider.disabled=Boolean(pending);
   $('cancel-key').hidden=!saved;
   question.disabled=Boolean(pending);
-  $('send').disabled=!available||Boolean(pending)||Boolean(record&&!record.turnId&&memoryPending);
+  $('send').disabled=(!available&&!wantsImages(question.value))||Boolean(pending)||Boolean(record&&!record.turnId&&memoryPending);
   for(const button of quick.querySelectorAll('button'))button.disabled=Boolean(pending);
  }
  function configure(options,saved){
@@ -205,14 +206,38 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
  function scrollToReply(){scroller.scrollTop=scroller.scrollHeight}
  for(const button of quick.querySelectorAll('button'))button.onclick=()=>{
   question.value=button.textContent;
+  updateProvider();
   question.focus();
  };
+ question.addEventListener('input',updateProvider);
+ function appendImages(entry,images){
+  const gallery=document.createElement('div');
+  gallery.className='ask-gallery';
+  for(const photo of images){
+   if(!/^\/plant-id\/(?:photos\/[a-z0-9-]+\.jpg|api\/reference-image\/\d+)$/.test(photo.src))continue;
+   const figure=document.createElement('figure'),image=document.createElement('img');
+   const caption=document.createElement('figcaption'),source=document.createElement('a'),license=document.createElement('a');
+   image.src=photo.src;
+   image.alt=photo.scientificName+' 参考图';
+   image.loading='lazy';
+   source.href=photo.source;
+   source.textContent=photo.attribution;
+   license.href=photo.licenseUrl;
+   license.textContent=photo.license;
+   for(const link of [source,license]){link.target='_blank';link.rel='noopener noreferrer'}
+   caption.append(photo.scientificName+' · ',source,' · ',license,photo.changes?' · '+photo.changes:'');
+   image.addEventListener('error',()=>{image.hidden=true;caption.prepend('图片暂时无法加载。')},{once:true});
+   figure.append(image,caption);
+   gallery.append(figure);
+  }
+  if(gallery.children.length)entry.append(gallery);
+ }
  form.addEventListener('submit',async event=>{
   event.preventDefault();
-  const choice=choices.get(provider.value),input=question.value.trim();
-  if(!record?.threadId||!choice||pending||!record.turnId&&memoryPending)return;
+  const choice=choices.get(provider.value),input=question.value.trim(),imagesOnly=wantsImages(input);
+  if(!record?.threadId||(!choice&&!imagesOnly)||pending||!record.turnId&&memoryPending)return;
   if(!input)return question.focus();
-  const submitted=!savedProviders.has(choice.id)||editing;
+  const submitted=!imagesOnly&&(!savedProviders.has(choice.id)||editing);
   if(submitted&&!/^[!-~]{8,512}$/.test(key.value.trim())){
    setPanel('provider');
    notify('请填写所选服务商的 API Key。');
@@ -227,19 +252,23 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
   question.value='';
   setPanel(null);
   updateProvider();
-  notify('正在生成回答…',true);
+  notify(imagesOnly?'正在查找参考图片…':'正在生成回答…',true);
   scrollToReply();
   try{
-   const reply=await api('ask',{
+   const params=new URLSearchParams(Object.entries(record).filter(([,value])=>value!==undefined));
+   const reply=imagesOnly?await api('ask/images?'+params,{signal:current.signal}):await api('ask',{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({provider:choice.id,...credential,question:input,...record,history}),
     signal:current.signal,
    });
    if(pending!==current)return;
-   if(reply.savedKey)savedProviders.add(choice.id);
-   key.value='';
-   editing=false;
+   if(!imagesOnly){
+    if(reply.savedKey)savedProviders.add(choice.id);
+    key.value='';
+    editing=false;
+   }
    const entry=message('植物养护助手',reply.text);
+   if(reply.images?.length)appendImages(entry,reply.images);
    if(reply.sources?.length){
     const details=document.createElement('details'),summary=document.createElement('summary'),list=document.createElement('ul');
     summary.textContent='参考资料';
@@ -259,7 +288,7 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
    userMessage.remove();
    question.value=input;
    quick.hidden=history.length>0;
-   if(['ask_key_invalid','ask_key_required'].includes(error.code)){
+   if(!imagesOnly&&['ask_key_invalid','ask_key_required'].includes(error.code)){
     if(!submitted)savedProviders.delete(choice.id);
     key.value='';
     setPanel('provider');

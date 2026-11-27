@@ -7,9 +7,10 @@ import {randomBytes,randomUUID,createHash,scrypt as scryptCallback,timingSafeEqu
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {identify,recognizeText,modelConfiguration} from './model.mjs';
-import {enrichIdentification,knowledgeContext,reviewPlantNames} from './knowledge.mjs';
+import {enrichIdentification,findKnowledge,knowledgeContext,reviewPlantNames} from './knowledge.mjs';
 import {createReferences} from './references.mjs';
 import {createObservations,observationSubject} from './observations.mjs';
+import {createPlantSources,localFacts,localPhotos,localPhotoFiles} from './plant-sources.mjs';
 import {createDshAnswer} from './dsh/ask.mjs';
 import {createAskCredentials} from './dsh/credentials.mjs';
 import {askProviderRegistry,publicAskProviders,routeForQuestion,validApiKey} from './dsh/providers.mjs';
@@ -44,6 +45,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
  const active=new Set(),rates=new Map();let authJobs=0;
  function limit(key,max,span){let entry=rates.get(key);if(!entry||entry.until<=now())entry={count:0,until:now()+span};entry.count++;rates.delete(key);rates.set(key,entry);if(rates.size>2000)rates.delete(rates.keys().next().value);if(entry.count>max)throw fail('操作过于频繁，请稍后重试',429)}
  const references=createReferences(referenceFetch);
+ const plantSources=createPlantSources(referenceFetch,sql,now);
  const dshDirectory=env.PLANT_ID_DSH_RUNTIME||'/opt/plant-id/dsh-runtime';
  const askDsh=dshAnswer||createDshAnswer(dshDirectory);
  const askProviders=askProviderRegistry(env);
@@ -68,7 +70,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
   const candidate=candidates[candidateIndex??0],plant=name(candidate);
   const subject=observationSubject(plant,typeof candidate?.rank==='string'?candidate.rank:'',String(candidate?.name||'').slice(0,120),threadId);
   const record={summary:String(answer.summary||'').slice(0,1000),candidates:candidates.map(name).filter(Boolean)};
-  return {saved,plant,subject,record};
+  return {saved,plant,rank:typeof candidate?.rank==='string'?candidate.rank:'',subject,record};
  }
  const pruneOwner=sql.prepare('DELETE FROM turns WHERE rowid IN (SELECT rowid FROM turns WHERE owner=? ORDER BY created DESC,rowid DESC LIMIT -1 OFFSET ?)');
  const removeEmpty=sql.prepare('DELETE FROM threads WHERE owner=? AND NOT EXISTS (SELECT 1 FROM turns WHERE thread=threads.id)');
@@ -92,14 +94,30 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
  function account(request){const raw=request.headers.get('Cookie')?.split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1);if(!raw||!/^[a-f0-9]{64}$/.test(raw))return null;return sql.prepare('SELECT users.id,users.username FROM sessions JOIN users ON users.id=sessions.owner WHERE sessions.token=? AND sessions.expires>?').get(hash(raw),now())||null}
  const json=(value,status=200,extra={})=>Response.json(value,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',...extra}});
  const files=new Map([['', ['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']],['icon.svg',['icon.svg','image/svg+xml']],['apps',['apps.html','text/html; charset=utf-8']],['history',['index.html','text/html; charset=utf-8']],['ask.js',['ask.js','text/javascript; charset=utf-8']]]);
+ for(const file of localPhotoFiles)files.set(file,[file,'image/jpeg']);
  const publicResources=new Map();
+ async function plantGallery(name,rank,signal,timeout=3500){
+  const local=localPhotos(name);
+  const deadline=AbortSignal.any([signal,AbortSignal.timeout(timeout)]);
+  try{
+   const result=await references.gallery(name,rank,deadline);
+   return {photos:[...local,...result.photos].slice(0,4),reading:result.reading,unavailable:false};
+  }catch{return {photos:local,unavailable:!local.length}}
+ }
+ function selectionFrom(params){
+  return {threadId:params.get('threadId'),turnId:params.get('turnId'),
+   candidateIndex:params.has('candidateIndex')?Number(params.get('candidateIndex')):undefined};
+ }
+ function uniqueSources(facts){
+  return [...new Map(facts.map(({title,url})=>[url,{title,url}])).values()];
+ }
  function publicResponse(request,path){
   const [file,type]=files.get(path),html=type.startsWith('text/html');
   const app=html&&(/\bPlantIdClient\/|\bElectron\/|; wv\)/.test(request.headers.get('User-Agent')||''));
   const key=path+(app?':client':'');
   let resource=publicResources.get(key);
   if(!resource){
-   let content=readFileSync(new URL('./public/'+file,import.meta.url),'utf8');
+   let content=readFileSync(new URL('./public/'+file,import.meta.url),type==='image/jpeg'?null:'utf8');
    if(app)content=content.replace('class="id-app"','class="id-app id-native"');
    if(path==='history'){
     content=content.replace('data-view="identify"','data-view="history"')
@@ -173,8 +191,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
   }
   if(path==='api/ask/memory'){
    const params=url.searchParams;
-   const selection={threadId:params.get('threadId'),turnId:params.get('turnId'),
-    candidateIndex:params.has('candidateIndex')?Number(params.get('candidateIndex')):undefined};
+   const selection=selectionFrom(params);
    let edit;
    if(request.method==='POST'){
     limit('observation:'+user.id,30,60000);
@@ -196,6 +213,18 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
    }
    return json({label:subject.label,canShare:subject.canShare,turnId:saved.id,notes:observations.list(user.id,subject.key)});
   }
+  if(path==='api/ask/images'&&request.method==='GET'){
+   limit('ask-images:'+user.id,20,60000);
+   const {saved,plant,rank,subject}=questionRecord(user.id,selectionFrom(url.searchParams));
+   const matched=findKnowledge(plant,rank),name=matched?.name||plant;
+   const gallery=await plantGallery(name,matched?.rank||rank,request.signal,5500);
+   if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
+   const threadId=url.searchParams.get('threadId');
+   if(!askTurn.get(threadId,user.id,saved.id,saved.id))throw fail('这条识别记录已不存在',404,'ask_record_missing');
+   const text=gallery.photos.length?'找到 '+gallery.photos.length+' 张「'+subject.label+'」的参考图片。':gallery.unavailable?
+    '图片来源暂时无法访问，请稍后重试。':'本次没有查到学名匹配、可在站内展示的公开图片。';
+   return json({text,images:gallery.photos});
+  }
   if(path==='api/ask'&&request.method==='POST'){
    if(!dshAvailable)throw fail('植物问答的 DSH 运行时尚未安装，请联系管理员',503);
    if(asking)throw fail('植物问答正在处理另一请求，请稍后再试',429);
@@ -207,7 +236,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
     catch(error){if(error.status)throw error;throw fail('问答提交格式无效')}
     if(!input||typeof input!=='object')throw fail('问答提交格式无效');
     const {apiKey:submittedKey,rememberKey=false,provider='deepseek',model='',question,threadId,turnId=null,candidateIndex,history=[]}=input;
-    const {saved,plant,record,subject}=questionRecord(user.id,{threadId,turnId,candidateIndex});
+    const {saved,plant,rank,record,subject}=questionRecord(user.id,{threadId,turnId,candidateIndex});
     if(submittedKey!==undefined&&!validApiKey(submittedKey)||typeof rememberKey!=='boolean')throw fail('请填写所选平台的 API Key');
     if(['baseURL','endpoint','url'].some(field=>Object.hasOwn(input,field)))throw fail('请选择站点已配置的服务商');
     const route=routeForQuestion(askProviders,provider,model);
@@ -225,6 +254,18 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
     }
     if(!apiKey)throw fail('请先填写所选平台的 API Key',400,'ask_key_required');
     const knowledge=await plantKnowledge(plant);
+    const matched=findKnowledge(plant,rank);
+    const taxonomyName=matched?.name||plant;
+    const [fresh,gallery]=await Promise.all([
+     plantSources(taxonomyName,request.signal),
+     plantGallery(taxonomyName,matched?.rank||rank,request.signal),
+    ]);
+    const specific=localFacts(taxonomyName);
+    const evidence=[...specific,...fresh.filter(item=>!specific.some(fact=>fact.kind===item.kind))];
+    if(gallery.reading)evidence.push({kind:'overview',title:'维基百科 · 物种条目',url:gallery.reading.url,text:gallery.reading.text});
+    const focus=/^(这个的外表|这株植物的外表)[？?。]?$/.test(question.trim())?'appearance':
+     /^(这个的得名由来|这株植物的得名由来)[？?。]?$/.test(question.trim())?'etymology':'';
+    const verified=evidence.find(item=>item.kind===focus);
     const mentioned=await reviewPlantNames({name:'',description:question,commonSearch:async()=>[]});
     for(const hint of mentioned){
      if(!hint.name||knowledge.length>=5||knowledge.some(item=>item.name===hint.name))continue;
@@ -233,21 +274,29 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
     }
     let result;
     try{
-     result=await askDsh({apiKey,route,question:question.trim(),plant,record,
+     result=verified?{text:verified.text,model:null,truncated:false}:await askDsh({apiKey,route,question:question.trim(),plant,record,
       history:history.map(({question,answer})=>({question,answer})),knowledge,observationNotes:observations.list(user.id,subject.key).slice(0,12).map(item=>item.note),
-      communityObservations:observations.shared(user.id,subject),signal:request.signal});
+      communityObservations:observations.shared(user.id,subject),evidence,signal:request.signal});
     }catch(error){
      if(error.code==='ask_key_invalid'&&sealed)askCredentials.remove(user.id,route,sealed);
      throw error;
     }
     if(account(request)?.id!==user.id)throw fail('登录已失效，请重新登录',401);
     if(!askTurn.get(threadId,user.id,saved.id,saved.id))throw fail('这条识别记录已不存在，请从现有记录中提问',404,'ask_record_missing');
-    if(rememberKey&&submittedKey!==undefined&&!request.signal.aborted)askCredentials.save(user.id,route,apiKey);
-    const sources=knowledge.flatMap(entry=>[
+    if(!verified&&rememberKey&&submittedKey!==undefined&&!request.signal.aborted)askCredentials.save(user.id,route,apiKey);
+    const sources=uniqueSources([...evidence,...knowledge.flatMap(entry=>[
      {title:entry.name+' · '+entry.sourceName,url:entry.source},
      ...(entry.traits?[{title:entry.traits.sourceName,url:entry.traits.source}]:[]),
-    ]).filter((item,index,all)=>all.findIndex(other=>other.url===item.url)===index);
-    return json({text:result.text,model:result.model,provider:route.label,truncated:result.truncated,savedKey:Boolean(sealed||rememberKey&&submittedKey!==undefined),sources});
+    ])]);
+    const denial=/^(?:抱歉[，。\s]*)?(?:(?:目前|本次|暂时|我)\s*){0,3}(?:没有|未能|未|没能)(?:查到|找到|检索到|获取到)(?:该植物|这种植物|这株植物)?(?:的)?(?:任何)?(?:相关)?资料(?:[，。；：\s]|$)/;
+    const genericDenial=denial.test(result.text);
+    const text=!genericDenial?result.text:evidence.length?
+     '本次核对到的资料：\n'+evidence.map(item=>item.title+'：'+item.text).join('\n'):knowledge.length?
+     '本次核对到的名录记录：'+knowledge.map(item=>item.name+(item.family?'（'+item.family+'）':'')).join('、')+'。专题资料仍待核对。':
+     '本次未找到可核对的物种资料。';
+    return json({text,model:result.model,provider:route.label,truncated:!genericDenial&&result.truncated,
+     savedKey:Boolean(sealed||!verified&&rememberKey&&submittedKey!==undefined),sources,
+     ...(focus==='appearance'?{images:gallery.photos}:{})});
    }finally{asking=false}
   }
   if(path==='api/reference'&&request.method==='GET'){

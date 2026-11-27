@@ -73,7 +73,7 @@ export function createReferences(fetchImpl=fetch){
   const key=nameKey(name)+'|'+expected;
   const cached=cache.get(key);
   if(cached&&cached.expires>Date.now()){
-   if(cached.photo)remember(photos,cached.photo.id,cached.photo.path);
+   for(const photo of cached.photos)remember(photos,photo.id,photo.path);
    return cached;
   }
   const deadline=AbortSignal.any([signal,AbortSignal.timeout(7000)]);
@@ -85,12 +85,13 @@ export function createReferences(fetchImpl=fetch){
   const [observations,reading]=await Promise.all([
    records('/v1/observations',{
     taxon_id:String(taxon.id),quality_grade:'research',photos:'true',
-    photo_license:[...licenses.keys()].join(','),per_page:'5',
+    photo_license:[...licenses.keys()].join(','),per_page:'8',
    },deadline),
    wikipediaLink(taxon.wikipedia_url)
     ?records('/v1/taxa/'+taxon.id,{},deadline).then(rows=>readingFrom(rows[0],taxon)).catch(()=>null)
     :null,
   ]);
+  const collected=new Map();
   for(const observation of observations){
    const observed=observation.taxon;
    if(!Number.isSafeInteger(observation.id)||typeof observed?.name!=='string'||!(observed.id===taxon.id||observed.ancestor_ids?.includes(taxon.id)))continue;
@@ -101,13 +102,12 @@ export function createReferences(fetchImpl=fetch){
     if(!path||path[1]!==String(image.id))continue;
     const id=String(image.id);
     const photo={id,path:'/photos/'+id+'/medium.'+path[2],scientificName:observed.name,attribution:image.attribution,license:license[0],licenseUrl:image.license_url&&/^https?:\/\/creativecommons\.org\/(?:licenses\/(?:by|by-sa)|publicdomain\/zero)\/\d\.\d\/?$/.test(image.license_url)?image.license_url:license[1],source:'https://www.inaturalist.org/observations/'+observation.id};
-    remember(photos,id,photo.path);
-    const entry={photo,reading,expires:Date.now()+30*60*1000};
-    remember(cache,key,entry);
-    return entry;
+    if(!collected.has(id)&&collected.size<4)collected.set(id,photo);
    }
   }
-  const entry={photo:null,reading,expires:Date.now()+5*60*1000};
+  const gallery=[...collected.values()];
+  for(const photo of gallery)remember(photos,photo.id,photo.path);
+  const entry={photos:gallery,reading,expires:Date.now()+(gallery.length?30:5)*60*1000};
   remember(cache,key,entry);
   return entry;
  }
@@ -117,6 +117,7 @@ export function createReferences(fetchImpl=fetch){
   active++;
   try{return await action()}finally{active--}
  }
+ const publicPhoto=({path,...photo})=>photo;
  return {
   commonNames(name,signal){return limited(async ()=>{
    const cached=commonCache.get(name);
@@ -131,9 +132,12 @@ export function createReferences(fetchImpl=fetch){
   lookup(name,rank,signal){return limited(async ()=>{
    const result=await find(name,rank,signal);
    if(!result)return {photo:null};
-   const photo=result.photo;
-   const publicPhoto=photo?Object.fromEntries(Object.entries(photo).filter(([key])=>key!=='path')):null;
-   return {photo:publicPhoto,...(result.reading?{reading:result.reading}:{})};
+   const photo=result.photos[0];
+   return {photo:photo?publicPhoto(photo):null,...(result.reading?{reading:result.reading}:{})};
+  })},
+  gallery(name,rank,signal){return limited(async()=>{
+   const result=await find(name,rank,signal);
+   return result?{photos:result.photos.map(photo=>({...publicPhoto(photo),src:'/plant-id/api/reference-image/'+photo.id})),reading:result.reading}:{photos:[]};
   })},
   image(id,signal){return limited(async ()=>{
    const path=photos.get(id);
