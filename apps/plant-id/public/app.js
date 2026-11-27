@@ -7,6 +7,7 @@ function el(tag,text,className){const node=document.createElement(tag);if(text!=
 function clearPhotos(){state.photoEpoch++;for(const photo of state.photos)URL.revokeObjectURL(photo.url);state.photos=[];$('#photos').value='';$('#previews').replaceChildren();$('#photo-note').hidden=true;$('#large-photo').removeAttribute('src');$('#photo-dialog').close()}
 const plantQuestion=createPlantQuestion({api,isLoggedIn:()=>Boolean(state.user),showAuth});
 const viewingHistory=document.body.dataset.view==='history';
+$('#history-memory').onclick=()=>plantQuestion.openLibrary();
 const resumeLink=$('#resume-identification');
 const pageUrl=new URL(location.href);
 if(!viewingHistory&&pageUrl.hash==='#history-list')location.replace('/plant-id/history');
@@ -194,7 +195,7 @@ async function history(){
    }catch(error){if(state.user?.id===owner.id)notice(error.message)}
    finally{remove.disabled=state.busy}
   };
-  row.append(open,recordQuestionButton('提问',{threadId:thread.id,label:thread.title},'subtle record-ask'),remove);
+  row.append(open,recordQuestionButton('提问',{threadId:thread.id},'subtle record-ask'),remove);
   list.append(row);
  }
 }

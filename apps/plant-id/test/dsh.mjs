@@ -231,21 +231,22 @@ test('the filing footer is added once for web pages and omitted by installed cli
  }finally{await f.close()}
 });
 
-test('care memory is confirmed by its owner, persists across restart and stays scoped to the plant and record',async()=>{
+test('observations outlive recognition records and share only explicitly contributed material with the same species',async()=>{
  const calls=[];
  const f=await appFixture(async data=>{calls.push(data);return {text:'回答',model:'test',truncated:false}});
  try{
   const cookie=await f.login('care_owner'),other=await f.login('care_other');
-  const record=f.seed('care_owner'),unrelated=f.seed('care_owner');
+  const record=f.seed('care_owner'),samePlant=f.seed('care_owner'),unrelated=f.seed('care_owner','Nepenthes alata');
+  const otherPlant=f.seed('care_other'),otherSpecies=f.seed('care_other','Rosa multiflora');
   f.app.sql.prepare('UPDATE turns SET answer=? WHERE id=?').run(JSON.stringify({
    candidates:[{name:'月季',scientificName:'Rosa chinensis'},{name:'野蔷薇',scientificName:'Rosa multiflora'}],
   }),record.turnId);
-  const request=(scope,{method='GET',note,id,session=cookie,source=origin}={})=>{
+  const request=(scope,{method='GET',note,share=false,id,session=cookie,source=origin}={})=>{
    const query=new URLSearchParams(scope);
    if(id)query.set('id',id);
    return f.app.fetch(new Request(origin+'/plant-id/api/ask/memory?'+query,{
     method,headers:{Cookie:session,Origin:source,'Content-Type':'application/json'},
-    ...(method==='POST'?{body:JSON.stringify({note})}:{}),
+    ...(method==='POST'?{body:JSON.stringify({note,share})}:{}),
    }));
   };
   const observation='东窗养护，换盆后用水苔栽培。';
@@ -266,22 +267,72 @@ test('care memory is confirmed by its owner, persists across restart and stays s
   assert.equal((await (await request(record,{session:secondSession})).json()).notes[0].note,observation);
   assert.deepEqual((await (await request({...record,candidateIndex:1})).json()).notes,[]);
   assert.deepEqual((await (await request(unrelated)).json()).notes,[]);
+  assert.equal((await (await request(samePlant)).json()).notes[0].id,saved.id);
   f.restart();
   assert.equal((await (await request(record)).json()).notes[0].id,saved.id);
-  const ask=scope=>f.post('api/ask',{...scope,apiKey:'test-personal-care-key',question:'如何调整浇水？'},{cookie});
+  const ask=(scope,session=cookie)=>f.post('api/ask',{...scope,apiKey:'test-personal-care-key',question:'如何调整浇水？'},{cookie:session});
   assert.equal((await ask(record)).status,200);
-  assert.deepEqual(calls.at(-1).careNotes,[observation]);
+  assert.deepEqual(calls.at(-1).observationNotes,[observation]);
   assert.equal((await ask({...record,candidateIndex:1})).status,200);
-  assert.deepEqual(calls.at(-1).careNotes,[]);
+  assert.deepEqual(calls.at(-1).observationNotes,[]);
   assert.equal((await request(record,{method:'DELETE',id:saved.id,session:other})).status,404);
   assert.equal((await request(record,{method:'DELETE',id:saved.id})).status,200);
   assert.equal((await ask(record)).status,200);
-  assert.deepEqual(calls.at(-1).careNotes,[]);
+  assert.deepEqual(calls.at(-1).observationNotes,[]);
   assert.equal((await request(record,{method:'POST',note:observation})).status,200);
+  assert.equal((await ask(otherPlant,other)).status,200);
+  assert.deepEqual(calls.at(-1).communityObservations,[]);
+  const publish=await request(record,{method:'POST',note:observation,share:true});
+  assert.equal(publish.status,200);
+  const {notes:[contribution]}=await publish.json();
+  assert.equal(contribution.shared,1);
   const deleteThread=await f.app.fetch(new Request(origin+'/plant-id/api/threads/'+record.threadId,{
    method:'DELETE',headers:{Cookie:cookie,Origin:origin},
   }));
   assert.equal(deleteThread.status,200);
-  assert.equal(f.app.sql.prepare('SELECT count(*) AS total FROM care_notes').get().total,0);
+  assert.equal((await request(record)).status,404);
+  assert.equal((await ask(samePlant)).status,200);
+  assert.deepEqual(calls.at(-1).observationNotes,[observation]);
+  assert.equal((await ask(otherPlant,other)).status,200);
+  assert.deepEqual(calls.at(-1).communityObservations,[observation]);
+  assert.equal((await ask(otherSpecies,other)).status,200);
+  assert.deepEqual(calls.at(-1).communityObservations,[]);
+  const library=(session,method='GET')=>f.app.fetch(new Request(origin+'/plant-id/api/observation-library?id='+contribution.id,{
+   method,headers:{Cookie:session,Origin:origin},
+  }));
+  assert.equal((await (await library(cookie)).json()).notes[0].id,contribution.id);
+  assert.deepEqual((await (await library(other)).json()).notes,[]);
+  assert.equal((await library(other,'DELETE')).status,404);
+  assert.equal((await library(cookie,'DELETE')).status,200);
+  assert.equal((await ask(otherPlant,other)).status,200);
+  assert.deepEqual(calls.at(-1).communityObservations,[]);
+ }finally{await f.close()}
+});
+
+test('legacy care notes migrate as private observations before history is pruned',async()=>{
+ const f=await appFixture();
+ try{
+  const cookie=await f.login('legacy_observer'),record=f.seed('legacy_observer');
+  const owner=f.app.sql.prepare('SELECT owner FROM threads WHERE id=?').get(record.threadId).owner;
+  const id=randomUUID(),note='仅本人过去的观察';
+  f.app.sql.prepare('INSERT INTO care_notes VALUES (?,?,?,?,?,?)').run(id,record.threadId,owner,'rosa chinensis',note,0);
+  for(let index=0;index<10;index++)f.seed('legacy_observer');
+  f.app.sql.prepare('UPDATE turns SET created=0 WHERE id=?').run(record.turnId);
+  f.restart();
+  assert.equal(f.app.sql.prepare('SELECT id FROM threads WHERE id=?').get(record.threadId),undefined);
+  const read=()=>f.app.fetch(new Request(origin+'/plant-id/api/observation-library',{headers:{Cookie:cookie}}));
+  const {notes}=await (await read()).json();
+  assert.deepEqual(notes.map(({id,note,shared})=>({id,note,shared})),[{id,note,shared:0}]);
+  const freshRecord=f.seed('legacy_observer');
+  const freshId=randomUUID();
+  f.app.sql.prepare('INSERT INTO care_notes VALUES (?,?,?,?,?,?)').run(freshId,freshRecord.threadId,owner,'rosa chinensis','可撤回的旧记忆',Date.now());
+  f.restart();
+  assert.equal((await (await read()).json()).notes.length,2);
+  const remove=await f.app.fetch(new Request(origin+'/plant-id/api/observation-library?id='+freshId,{
+   method:'DELETE',headers:{Cookie:cookie,Origin:origin},
+  }));
+  assert.equal(remove.status,200);
+  f.restart();
+  assert.deepEqual((await (await read()).json()).notes.map(item=>item.id),[id]);
  }finally{await f.close()}
 });

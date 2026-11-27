@@ -4,8 +4,8 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
  const form=dialog.querySelector('form'),key=$('key'),provider=$('provider');
  const question=$('question'),status=$('status'),messages=$('messages'),quick=$('quick');
  const note=$('note'),saveNote=$('save-note'),memoryStatus=$('memory-status'),notes=$('notes');
- const scroller=dialog.querySelector('.ask-scroll');
- let record=null,history=[],pending=null,memoryPending=null,editing=false,panel=null;
+ const scroller=dialog.querySelector('.ask-scroll'),share=$('share');
+ let record=null,history=[],pending=null,memoryPending=null,editing=false,panel=null,greeting=null;
  let choices=new Map(),savedProviders=new Set();
  const viewport=window.visualViewport;
 
@@ -77,22 +77,29 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
   notes.replaceChildren();
   for(const item of items){
    const row=document.createElement('li'),text=document.createElement('span'),remove=document.createElement('button');
-   text.textContent=item.note;
+   const details=[item.label,item.shared?'已贡献到共享总资料库':''].filter(Boolean);
+   if(details.length){
+    const label=document.createElement('small');
+    label.textContent=details.join(' · ');
+    text.append(label);
+   }
+   text.append(document.createTextNode(item.note));
    remove.type='button';
    remove.textContent='删除';
-   remove.setAttribute('aria-label','删除养护记忆 '+item.note);
+   remove.setAttribute('aria-label','删除观察记忆 '+item.note);
    remove.onclick=()=>manageMemory('DELETE',item.id);
    row.append(text,remove);
    notes.append(row);
   }
  }
  function updateMemory(){
+  share.disabled=Boolean(memoryPending);
   saveNote.disabled=Boolean(memoryPending)||!note.value.trim();
   for(const button of notes.querySelectorAll('button'))button.disabled=Boolean(memoryPending);
  }
  async function manageMemory(method='GET',id){
   if(!record||memoryPending)return;
-  const selection=record,controller=new AbortController(),draft=note.value.trim();
+  const selection=record,controller=new AbortController(),draft=note.value.trim(),publish=share.checked;
   const params=new URLSearchParams(Object.entries(selection).filter(([,value])=>value!==undefined));
   if(id)params.set('id',id);
   memoryPending=controller;
@@ -101,15 +108,20 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
   updateProvider();
   memoryStatus.textContent=method==='GET'?'正在读取记忆…':'正在更新记忆…';
   try{
-   const data=await api('ask/memory?'+params,{method,signal:controller.signal,...(method==='POST'?{
-    headers:{'Content-Type':'application/json'},body:JSON.stringify({note:draft}),
+   const endpoint=selection.threadId?'ask/memory':'observation-library';
+   const data=await api(endpoint+'?'+params,{method,signal:controller.signal,...(method==='POST'?{
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({note:draft,share:publish}),
    }:{})});
    if(record!==selection)return;
-   record.turnId=data.turnId;
-   if(data.label)$('target').textContent=data.label;
+   if(selection.threadId){
+    record.turnId=data.turnId;
+    $('share-option').hidden=!data.canShare;
+    if(!data.canShare)share.checked=false;
+    if(data.label)showPlant(data.label);
+   }
    renderNotes(data.notes);
-   if(method==='POST'&&note.value.trim()===draft)note.value='';
-   memoryStatus.textContent=method==='POST'?'记忆已保存。':method==='DELETE'?'记忆已删除。':data.notes.length?'':'还没有保存养护记忆。';
+   if(method==='POST'&&note.value.trim()===draft){note.value='';share.checked=false}
+   memoryStatus.textContent=method==='POST'?(publish?'观察已保存并贡献到共享总资料库。':'观察已保存到云端。'):method==='DELETE'?'观察记忆已删除。':data.notes.length?'':'还没有保存观察记忆。';
   }catch(error){
    if(record===selection)memoryStatus.textContent=controller.signal.aborted?'云端响应超时，请重新打开记忆面板确认状态。':error.message;
   }finally{
@@ -128,6 +140,8 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
   viewport?.removeEventListener('scroll',resizeChat);
   if(dialog.open)dialog.close();
   key.value=question.value=note.value='';
+  share.checked=false;
+  greeting=null;
   editing=false;
   history=[];
   record=null;
@@ -139,20 +153,43 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
   updateMemory();
   updateProvider();
  }
- function open({threadId,turnId,candidateIndex,label}){
-  if(!isLoggedIn())return showAuth();
-  if(!threadId)return;
-  close();
-  record={threadId,turnId,candidateIndex};
-  $('target').textContent=label||'当前识别记录';
-  message('植物养护助手','可以问我这株植物的浇水、光照、病虫害或换盆问题。你也可以把实际观察保存到养护记忆。');
-  quick.hidden=false;
+ function showPlant(name){
+  $('target').textContent=name;
+  const welcome='关于【'+name+'】，你还有哪些方面想要了解/补充？';
+  if(greeting)greeting.querySelector('p').textContent=welcome;
+  else greeting=message('植物养护助手',welcome);
+ }
+ function present(library){
+  $('title').textContent=library?'观察记忆':'植物养护助手';
+  $('target').textContent=library?'我的云端观察':'';
+  $('settings').hidden=library;
+  dialog.querySelector('.ask-toolbar').hidden=library;
+  dialog.querySelector('.ask-compose').hidden=library;
+  $('note-editor').hidden=library;
+  $('share-option').hidden=true;
+  messages.hidden=quick.hidden=library;
   dialog.showModal();
   resizeChat();
   viewport?.addEventListener('resize',resizeChat);
   viewport?.addEventListener('scroll',resizeChat);
   scroller.scrollTop=0;
+ }
+ function open({threadId,turnId,candidateIndex,label}){
+  if(!isLoggedIn())return showAuth();
+  if(!threadId)return;
+  close();
+  record={threadId,turnId,candidateIndex};
+  present(false);
+  if(label)showPlant(label);
   if(!choices.size)notify('问答服务商尚未加载，请刷新后再试。');
+  void manageMemory();
+ }
+ function openLibrary(){
+  if(!isLoggedIn())return showAuth();
+  close();
+  record={};
+  present(true);
+  setPanel('memory');
   void manageMemory();
  }
  function message(title,text,isUser=false){
@@ -173,7 +210,7 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
  form.addEventListener('submit',async event=>{
   event.preventDefault();
   const choice=choices.get(provider.value),input=question.value.trim();
-  if(!record||!choice||pending||!record.turnId&&memoryPending)return;
+  if(!record?.threadId||!choice||pending||!record.turnId&&memoryPending)return;
   if(!input)return question.focus();
   const submitted=!savedProviders.has(choice.id)||editing;
   if(submitted&&!/^[!-~]{8,512}$/.test(key.value.trim())){
@@ -235,5 +272,5 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
  $('close').onclick=close;
  dialog.addEventListener('cancel',event=>{event.preventDefault();close()});
  window.addEventListener('pagehide',close);
- return {open,close,configure};
+ return {open,openLibrary,close,configure};
 }

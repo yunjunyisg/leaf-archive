@@ -8,7 +8,7 @@
 <header class="topbar"><a class="brand" href="/plant-id/"><img src="/plant-id/icon.svg" alt="" width="38" height="38"><span>识植助手</span></a><nav aria-label="应用与账号"><a class="web-switch" href="/">切换应用</a><button id="account" class="subtle">登录 / 注册</button></nav></header>
 <main class="single-main">
 <section id="history" class="history" hidden aria-labelledby="history-title">
- <div class="history-head"><h1 id="history-title">识别记录</h1><a href="/plant-id/" class="button">新建识别</a></div>
+ <div class="history-head"><h1 id="history-title">识别记录</h1><div class="history-actions"><button type="button" id="history-memory">记忆</button><a href="/plant-id/" class="button">新建识别</a></div></div>
  <p class="muted">保留最近 10 条识别结果，每轮算一条。</p>
  <div id="history-list"><p class="muted">登录后查看自己的记录。</p></div>
 </section>
@@ -29,7 +29,7 @@
   <div class="ask-heading"><h2 id="ask-title">植物养护助手</h2><p id="ask-target"></p></div>
   <button type="button" class="subtle" id="ask-settings" aria-controls="ask-provider-panel" aria-expanded="false">设置</button>
  </header>
- <div class="ask-toolbar"><button type="button" id="ask-memory" aria-controls="ask-memory-panel" aria-expanded="false">养护记忆</button></div>
+ <div class="ask-toolbar"><button type="button" id="ask-memory" aria-controls="ask-memory-panel" aria-expanded="false">记忆</button></div>
  <div class="ask-scroll">
   <section id="ask-provider-panel" class="ask-panel" aria-label="问答设置" hidden>
    <label class="field" for="ask-provider">问答服务商</label>
@@ -43,12 +43,15 @@
    </div>
   </section>
   <section id="ask-memory-panel" class="ask-panel" aria-labelledby="ask-memory-title" hidden>
-   <h3 id="ask-memory-title">这株植物的养护记忆</h3>
-   <p class="muted">保存并确认环境、养护记录或纠正。以后向这株植物提问时，这些记忆会随问题发给你选的服务商。</p>
+   <h3 id="ask-memory-title">观察记忆</h3>
+   <p class="muted">观察独立保存在云端，删除识别记录后仍可用。勾选贡献的观察会作为共享资料供其他用户的问答参考。</p>
    <ul id="ask-notes"></ul>
-   <label class="field" for="ask-note">添加一条记忆</label>
-   <textarea id="ask-note" rows="2" maxlength="300" placeholder="例如：放在东窗，换盆后用水苔栽培。"></textarea>
-   <button type="button" id="ask-save-note">保存记忆</button>
+   <div id="ask-note-editor">
+    <label class="field" for="ask-note">添加一条观察</label>
+    <textarea id="ask-note" rows="2" maxlength="300" placeholder="例如：新叶边缘带红色，换盆两周后抽出花芽。"></textarea>
+    <label class="ask-share" id="ask-share-option" hidden><input id="ask-share" type="checkbox">贡献到共享总资料库</label>
+    <button type="button" id="ask-save-note">保存记忆</button>
+   </div>
    <p id="ask-memory-status" class="muted" role="status"></p>
   </section>
   <div id="ask-messages" role="log" aria-label="问答内容"></div>
@@ -65,7 +68,7 @@
    <textarea id="ask-question" rows="1" maxlength="2000" placeholder="输入你想了解的问题"></textarea>
    <button type="submit" id="ask-send" class="button">发送</button>
   </div>
-  <p class="ask-disclosure muted">发送问题时会附带识别摘要与已保存的养护记忆。</p>
+  <p class="ask-disclosure muted">发给所选服务商的内容包括识别摘要、相关观察记忆与共享资料。</p>
  </div>
 </form>
 </dialog>
