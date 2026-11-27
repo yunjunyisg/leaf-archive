@@ -44,4 +44,4 @@ npm test --prefix apps/plant-id
 
 所有名录中可核对的学名使用同一套按名称检索的流程。问答优先使用本地 WFO 名录，再向邱园 POWO 核对接受名、发表信息与物种备注，向中国科学院植物研究所植物智核对有对应条目的中文名，并在 iNaturalist 的学名条目有对应维基百科摘要时读取该摘要。每次查询仅发送公开学名。已核对的邱园和植物智事实写入站内 SQLite 缓存，按使用更新。植物智原文不批量镜像。专题描述、命名释义与开放图片的可用程度因物种而异。 [邱园 POWO](https://powo.science.kew.org/) · [植物智](https://www.iplant.cn/newsinfo/56)
 
-`species-notes.json` 保存有出处的专题事实和可离线提供的图。首批资料包括 Allen Lowrie 1994 年发表的 `Drosera ordensis` 原始描述。两张 Wikimedia Commons 图片的作者、许可、来源与缩放说明和图片一同发布。图库还会按候选学名查询 iNaturalist 的开放授权照片，并排除物种不匹配和许可不符的记录。 [原始分类描述](https://doi.org/10.58828/nuy00212) · [Wikimedia Commons 图片分类](https://commons.wikimedia.org/wiki/Category:Drosera_ordensis)
+`species-notes.json` 保存有出处的专题事实和可离线提供的图。首批资料包括 Allen Lowrie 1994 年发表的 `Drosera ordensis` 原始描述。两张 Wikimedia Commons 图片的作者、许可、来源与缩放说明和图片一同发布。图库还会按候选学名查询 iNaturalist 的开放授权照片，并排除物种不匹配和许可不符的记录。没有可用观察图时，尝试精确学名百科条目所用的 Wikimedia Commons 开放许可图片。 [原始分类描述](https://doi.org/10.58828/nuy00212) · [Wikimedia Commons 图片分类](https://commons.wikimedia.org/wiki/Category:Drosera_ordensis)

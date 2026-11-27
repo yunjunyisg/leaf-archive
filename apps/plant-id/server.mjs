@@ -101,7 +101,12 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
   const deadline=AbortSignal.any([signal,AbortSignal.timeout(timeout)]);
   try{
    const result=await references.gallery(name,rank,deadline);
-   return {photos:[...local,...result.photos].slice(0,4),reading:result.reading,unavailable:false};
+   const pictures=new Map();
+   for(const photo of [...local,...result.photos]){
+    const key=/^\d+$/.test(photo.id||'')?photo.id:decodeURIComponent(photo.source);
+    if(!pictures.has(key))pictures.set(key,photo);
+   }
+   return {photos:[...pictures.values()].slice(0,4),reading:result.reading,unavailable:false};
   }catch{return {photos:local,unavailable:!local.length}}
  }
  function selectionFrom(params){
@@ -306,7 +311,7 @@ export function createPlantId({dataDirectory,origin='https://gloriouscarnivorous
    try{return json(await references.lookup(name,rank,request.signal))}
    catch{throw fail('参考图暂时无法加载',503)}
   }
-  const referenceImage=/^api\/reference-image\/(\d{1,16})$/.exec(path);
+  const referenceImage=/^api\/reference-image\/((?:wm-)?\d{1,16})$/.exec(path);
   if(referenceImage&&request.method==='GET'){
    limit('reference-image:'+user.id,120,60000);
    try{

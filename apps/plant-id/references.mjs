@@ -7,6 +7,7 @@ const licenses=new Map([
 ]);
 const ranks=new Map([['种','species'],['属','genus'],['科','family']]);
 const nameKey=name=>name.trim().replace(/\s+/g,' ').toLowerCase();
+const validName=name=>/^[A-Za-z][A-Za-z .'-]{1,119}$/.test(name);
 
 function wikipediaLink(value){
  try{
@@ -47,7 +48,7 @@ async function readLimited(response,limit){
 }
 
 export function createReferences(fetchImpl=fetch){
- const photos=new Map(),cache=new Map(),commonCache=new Map();
+ const photos=new Map(),cache=new Map(),commonCache=new Map(),commonsCache=new Map();
  let active=0;
  const remember=(map,key,value)=>{
   map.delete(key);
@@ -62,13 +63,40 @@ export function createReferences(fetchImpl=fetch){
   }
   return response;
  }
- async function records(path,params,signal){
-  const body=await readLimited(await upstream(apiHost+path+'?'+new URLSearchParams(params),signal),512*1024);
-  const results=JSON.parse(body).results;
+ async function json(host,path,params,signal,max=512*1024){
+  const body=await readLimited(await upstream(host+path+'?'+new URLSearchParams(params),signal),max);
+  return JSON.parse(body);
+ }
+ async function records(path,params,signal,max){
+  const results=(await json(apiHost,path,params,signal,max)).results;
   return Array.isArray(results)?results:[];
  }
+ async function commonsPhoto(name,signal){
+  const wiki=await json('https://en.wikipedia.org','/w/api.php',{
+   action:'query',prop:'pageimages',piprop:'name',titles:name,format:'json',formatversion:'2',
+  },signal);
+  const article=wiki.query?.pages?.[0];
+  if(nameKey(article?.title||'')!==nameKey(name)||typeof article.pageimage!=='string'||!/\.(jpe?g|png)$/i.test(article.pageimage))return null;
+  const commons='https://commons.wikimedia.org';
+  const files=await json(commons,'/w/api.php',{
+   action:'query',prop:'imageinfo',iiprop:'url|extmetadata',iiurlwidth:'480',
+   iimetadataversion:'latest',titles:'File:'+article.pageimage,format:'json',formatversion:'2',
+  },signal);
+  const file=files.query?.pages?.[0],item=file?.imageinfo?.[0],metadata=item?.extmetadata;
+  if(!Number.isSafeInteger(file?.pageid)||file.imagerepository!=='local'||!item)return null;
+  const thumb=new URL(item.thumburl),license=metadata?.LicenseShortName?.value;
+  const licenseUrl=String(metadata?.LicenseUrl?.value||'').replace(/^http:/,'https:');
+  const attribution=String(metadata?.Artist?.value||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,240);
+  if(!['thumb.wikimedia.org','upload.wikimedia.org'].includes(thumb.hostname)||thumb.username||thumb.password||thumb.port||
+   thumb.protocol!=='https:'||!thumb.pathname.startsWith('/wikipedia/commons/')||!attribution||
+   !/^(?:CC0|CC BY(?:-SA)? \d\.\d)$/.test(license||'')||
+   !/^https:\/\/creativecommons\.org\/(?:licenses\/(?:by|by-sa)|publicdomain\/zero)\/\d\.\d\/(?:[a-z-]+\/)?$/.test(licenseUrl))return null;
+  thumb.search='';
+  return {id:'wm-'+file.pageid,path:thumb.href,scientificName:name,attribution,license,licenseUrl,
+   source:commons+'/wiki/'+encodeURIComponent(file.title.replaceAll(' ','_'))};
+ }
  async function find(name,rank,signal){
-  if(!/^[A-Za-z][A-Za-z .'-]{1,119}$/.test(name))return null;
+  if(!validName(name))return null;
   const expected=ranks.get(rank)||rank.toLowerCase();
   const key=nameKey(name)+'|'+expected;
   const cached=cache.get(key);
@@ -86,7 +114,7 @@ export function createReferences(fetchImpl=fetch){
    records('/v1/observations',{
     taxon_id:String(taxon.id),quality_grade:'research',photos:'true',
     photo_license:[...licenses.keys()].join(','),per_page:'8',
-   },deadline),
+   },deadline,1536*1024),
    wikipediaLink(taxon.wikipedia_url)
     ?records('/v1/taxa/'+taxon.id,{},deadline).then(rows=>readingFrom(rows[0],taxon)).catch(()=>null)
     :null,
@@ -136,13 +164,25 @@ export function createReferences(fetchImpl=fetch){
    return {photo:photo?publicPhoto(photo):null,...(result.reading?{reading:result.reading}:{})};
   })},
   gallery(name,rank,signal){return limited(async()=>{
-   const result=await find(name,rank,signal);
-   return result?{photos:result.photos.map(photo=>({...publicPhoto(photo),src:'/plant-id/api/reference-image/'+photo.id})),reading:result.reading}:{photos:[]};
+   if(!validName(name))return {photos:[]};
+   let primaryFailed=false,fallbackFailed=false;
+   const result=await find(name,rank,signal).catch(()=>{primaryFailed=true;return null});
+   let gallery=result?.photos||[];
+   if(!gallery.length){
+    const key=nameKey(name),cached=commonsCache.get(key);
+    const fallback=cached?.expires>Date.now()?cached.photo:await commonsPhoto(name,signal).then(photo=>{
+     remember(commonsCache,key,{photo,expires:Date.now()+(photo?30:5)*60000});
+     return photo;
+    }).catch(()=>{fallbackFailed=true;return null});
+    if(fallback){remember(photos,fallback.id,fallback.path);gallery=[fallback]}
+   }
+   if(primaryFailed&&fallbackFailed)throw Error('参考图库未能核对');
+   return {photos:gallery.map(photo=>({...publicPhoto(photo),src:'/plant-id/api/reference-image/'+photo.id})),reading:result?.reading};
   })},
   image(id,signal){return limited(async ()=>{
    const path=photos.get(id);
    if(!path)return null;
-   const response=await upstream(imageHost+path,AbortSignal.any([signal,AbortSignal.timeout(8000)]));
+   const response=await upstream(path.startsWith('/')?imageHost+path:path,AbortSignal.any([signal,AbortSignal.timeout(8000)]));
    const type=response.headers.get('Content-Type')?.split(';')[0];
    if(!['image/jpeg','image/png'].includes(type)){
     await response.body?.cancel();

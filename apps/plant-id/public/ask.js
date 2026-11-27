@@ -214,7 +214,7 @@ export function createPlantQuestion({api,isLoggedIn,showAuth}){
   const gallery=document.createElement('div');
   gallery.className='ask-gallery';
   for(const photo of images){
-   if(!/^\/plant-id\/(?:photos\/[a-z0-9-]+\.jpg|api\/reference-image\/\d+)$/.test(photo.src))continue;
+   if(!/^\/plant-id\/(?:photos\/[a-z0-9-]+\.jpg|api\/reference-image\/(?:wm-)?\d+)$/.test(photo.src))continue;
    const figure=document.createElement('figure'),image=document.createElement('img');
    const caption=document.createElement('figcaption'),source=document.createElement('a'),license=document.createElement('a');
    image.src=photo.src;

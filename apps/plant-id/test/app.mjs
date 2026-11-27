@@ -335,3 +335,29 @@ test('public asset validators preserve browser and installed-client variants wit
   assert.match(session.headers.get('Cache-Control'),/no-store/);
  }finally{await f.close()}
 });
+
+test('a Commons fallback verifies the exact article and license before proxying its image',async()=>{
+ const name='Rosa chinensis';
+ const lookup=async url=>{
+  const source=new URL(url);
+  if(source.hostname==='en.wikipedia.org')return Response.json({query:{pages:[{title:name,pageimage:'Rosa_chinensis.jpg'}]}});
+  if(source.hostname==='commons.wikimedia.org')return Response.json({query:{pages:[{pageid:791,title:'File:Rosa chinensis.jpg',imagerepository:'local',imageinfo:[{
+   thumburl:'https://thumb.wikimedia.org/wikipedia/commons/thumb/x/rosa.jpg/500px-rosa.jpg',
+   extmetadata:{LicenseShortName:{value:'CC BY-SA 4.0'},LicenseUrl:{value:'https://creativecommons.org/licenses/by-sa/4.0/'},Artist:{value:'<b>Botanist</b>'}},
+  }]}]}});
+  if(source.hostname==='thumb.wikimedia.org')return new Response(image,{headers:{'Content-Type':'image/png'}});
+  return Response.json({results:[]});
+ };
+ const f=await fixture({referenceFetch:lookup});
+ try{
+  const {cookie,user}=await f.register();
+  const id=crypto.randomUUID(),turn=crypto.randomUUID(),sql=f.app.sql;
+  sql.prepare('INSERT INTO threads VALUES (?,?,?,?,?)').run(id,user.id,'月季',1,1);
+  sql.prepare('INSERT INTO turns VALUES (?,?,?,?,?,?)').run(turn,id,user.id,'月季',JSON.stringify({candidates:[{scientificName:name}]}),1);
+  const response=await f.request('api/ask/images?threadId='+id,{cookie});
+  const {images:[photo]}=await response.json();
+  assert.equal(photo.attribution,'Botanist');
+  assert.match(photo.src,/wm-791$/);
+  assert.equal((await f.request('api/reference-image/wm-791',{cookie})).status,200);
+ }finally{await f.close()}
+});
